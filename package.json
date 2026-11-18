@@ -20,6 +20,7 @@
   },
   "files": [
     "bin/cli.mjs",
+    "bin/server.mjs",
     "dist/release/**",
     "!*.map"
   ],

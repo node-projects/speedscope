@@ -25,6 +25,7 @@ import {importFromCallgrind} from './callgrind'
 import {importFromPapyrus} from './papyrus'
 import {importFromPMCStatCallGraph} from './pmcstat-callgraph'
 import {importFromJfr, isJfrRecording} from './java-flight-recorder'
+import {importFromJSSelfProfiling, isJSSelfProfiling} from './js-self-profiling'
 
 export async function importProfileGroupFromText(
   fileName: string,
@@ -178,6 +179,9 @@ async function _importProfileGroup(dataSource: ProfileDataSource): Promise<Profi
     } else if (isSafariTimeline(parsed)) {
       console.log('Importing as Safari profile')
       return toGroup(importFromSafari(parsed))
+    } else if (isJSSelfProfiling(parsed)) {
+      console.log('Importing as JS Self-Profiling')
+      return toGroup(importFromJSSelfProfiling(parsed))
     }
   } else {
     // Format is not JSON

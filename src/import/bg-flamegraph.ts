@@ -11,6 +11,7 @@ interface BGSample {
 function parseBGFoldedStacks(contents: TextFileContent): BGSample[] {
   const samples: BGSample[] = []
   for (const line of contents.splitLines()) {
+    if (/^\s*#/.test(line)) continue
     const match = /^(.*) (\d+)$/gm.exec(line)
     if (!match) continue
     const stack = match[1]

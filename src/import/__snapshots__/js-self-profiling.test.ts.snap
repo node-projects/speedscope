@@ -1,0 +1,35 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`imports JS Self-Profiling through format detection 1`] = `
+{
+  "frames": [
+    Frame {
+      "col": 1,
+      "file": "https://example.com/main.js",
+      "key": 0,
+      "line": 1,
+      "name": "main",
+      "selfWeight": 5,
+      "totalWeight": 15,
+    },
+    Frame {
+      "col": 3,
+      "file": "https://example.com/main.js",
+      "key": 1,
+      "line": 5,
+      "name": "work",
+      "selfWeight": 10,
+      "totalWeight": 10,
+    },
+  ],
+  "name": "simple.json",
+  "stacks": [
+    "main 5.00ms",
+    "main;work 10.00ms",
+  ],
+}
+`;
+
+exports[`imports JS Self-Profiling through format detection: indexToView 1`] = `0`;
+
+exports[`imports JS Self-Profiling through format detection: profileGroup.name 1`] = `"simple.json"`;

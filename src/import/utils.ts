@@ -34,6 +34,10 @@ export interface TextFileContent {
 // assuming utf-8 encoding)
 let TEXT_FILE_CHUNK_SIZE = 1 << 27
 
+// When a v8 log is postprocessed with a different version of V8 than
+// the one that generated the log, it prepends a informational line.
+const DIFFERENT_V8_VERSION = 'Testing v8 version different from logging version'
+
 export async function withMockedFileChunkSizeForTests(chunkSize: number, cb: () => any) {
   const original = TEXT_FILE_CHUNK_SIZE
   TEXT_FILE_CHUNK_SIZE = chunkSize
@@ -54,16 +58,78 @@ function permissivelyParseJSONString(content: string) {
   //   and if this is obviously the case, we fix it up before throwing the string
   //   at JSON.parse.
   content = content.trim()
+
+  if (content.startsWith(DIFFERENT_V8_VERSION)) {
+    console.debug(`Skipping leading message about different V8 version`)
+    content = content.slice(DIFFERENT_V8_VERSION.length).trim()
+  }
+
   if (content[0] === '[') {
     content = content.replace(/,\s*$/, '')
     if (content[content.length - 1] !== ']') {
       content += ']'
     }
   }
-  return JSON.parse(content)
+  try {
+    return JSON.parse(content)
+  } catch (e) {
+    // Some producers leave a trailing comma before a closing bracket or brace.
+    // Retry once with those removed. If that still fails, report the original
+    // error, since it points at the real input.
+    const stripped = stripTrailingCommas(content)
+    if (stripped === content) throw e
+    try {
+      return JSON.parse(stripped)
+    } catch {
+      throw e
+    }
+  }
+}
+
+// Remove commas that are directly followed (ignoring whitespace) by a ']' or
+// '}'. Contents of string literals are never modified.
+function stripTrailingCommas(content: string): string {
+  let out = ''
+  let segmentStart = 0
+  let inString = false
+  for (let i = 0; i < content.length; i++) {
+    const c = content[i]
+    if (inString) {
+      if (c === '\\') i++
+      else if (c === '"') inString = false
+    } else if (c === '"') {
+      inString = true
+    } else if (c === ',') {
+      let j = i + 1
+      while (j < content.length && /\s/.test(content[j])) j++
+      if (content[j] === ']' || content[j] === '}') {
+        out += content.slice(segmentStart, i)
+        segmentStart = i + 1
+      }
+    }
+  }
+  return segmentStart === 0 ? content : out + content.slice(segmentStart)
 }
 
 function permissivelyParseJSONUint8Array(byteArray: Uint8Array) {
+  let warningOffset = 0
+  while (
+    warningOffset < byteArray.length &&
+    /\s/.test(String.fromCharCode(byteArray[warningOffset]))
+  ) {
+    warningOffset++
+  }
+  let hasWarning = true
+  for (let i = 0; i < DIFFERENT_V8_VERSION.length; i++) {
+    if (byteArray[warningOffset + i] !== DIFFERENT_V8_VERSION.charCodeAt(i)) {
+      hasWarning = false
+      break
+    }
+  }
+  if (hasWarning) {
+    byteArray = byteArray.subarray(warningOffset + DIFFERENT_V8_VERSION.length)
+  }
+
   let indexOfFirstNonWhitespaceChar = 0
   for (let i = 0; i < byteArray.length; i++) {
     if (!/\s/.exec(String.fromCharCode(byteArray[i]))) {

@@ -296,3 +296,34 @@ test('StringBackedTextFileContent.parseAsJSON', async () => {
   const content = new StringBackedTextFileContent(str)
   expect(content.parseAsJSON()).toEqual([200, 300, 400])
 })
+
+test('StringBackedTextFileContent.parseAsJSON trailing commas', async () => {
+  expect(new StringBackedTextFileContent('{"a":[1,2,],}').parseAsJSON()).toEqual({a: [1, 2]})
+  expect(new StringBackedTextFileContent('{"a": [1,\n 2 , \n],\n}').parseAsJSON()).toEqual({
+    a: [1, 2],
+  })
+
+  // String contents must be left intact
+  expect(new StringBackedTextFileContent('{"a":",]","b":"\\",}",}').parseAsJSON()).toEqual({
+    a: ',]',
+    b: '",}',
+  })
+
+  // Invalid JSON still throws
+  expect(() => new StringBackedTextFileContent('{"a":').parseAsJSON()).toThrow()
+  expect(() => new StringBackedTextFileContent('{"a":,}').parseAsJSON()).toThrow()
+})
+
+test('StringBackedTextFileContent.parseAsJSON.includesV8Warning', () => {
+  // Test if permissivelyParseJSONString properly removes the 'Testing v8 version different from logging version'
+  // line that appears in some V8 logs.
+  const str = `
+Testing v8 version different from logging version
+{
+  "code": [],
+  "functions": [],
+  "ticks": []
+}`
+  const content = new StringBackedTextFileContent(str)
+  expect(content.parseAsJSON()).toEqual({code: [], functions: [], ticks: []})
+})

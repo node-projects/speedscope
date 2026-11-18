@@ -189,11 +189,13 @@ export class Profile {
   // classes. Once a Profile instance has been constructed, it should be treated
   // as immutable.
   protected sortGroupedCallTree() {
-    function visit(node: CallTreeNode) {
+    const pending = [this.groupedCalltreeRoot]
+    while (pending.length > 0) {
+      const node = pending.pop()!
       node.children.sort((a, b) => -(a.getTotalWeight() - b.getTotalWeight()))
-      node.children.forEach(visit)
+      // Push individually: spreading a very wide node can exceed argument limits.
+      for (const child of node.children) pending.push(child)
     }
-    visit(this.groupedCalltreeRoot)
   }
 
   forEachCallGrouped(

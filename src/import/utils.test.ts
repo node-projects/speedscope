@@ -95,3 +95,22 @@ test('retains byte-array parsing when text exceeds the string limit', async () =
     expect(parsed).toEqual([1, 2])
   })
 })
+
+test('removes a V8 version warning before partial arrays in both parser paths', async () => {
+  await withMockedFileChunkSizeForTests(2, () => {
+    const text = ' \nTesting v8 version different from logging version\n[1,2,'
+    const content = new BufferBackedTextFileContent(arrayBuffer(new TextEncoder().encode(text)))
+    expect(content.parseAsJSON()).toEqual([1, 2])
+    const join = jest.spyOn(Array.prototype, 'join')
+    join.mockImplementationOnce(() => {
+      throw new RangeError('Invalid string length')
+    })
+    let parsed: any
+    try {
+      parsed = content.parseAsJSON()
+    } finally {
+      join.mockRestore()
+    }
+    expect(parsed).toEqual([1, 2])
+  })
+})

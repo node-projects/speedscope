@@ -342,11 +342,14 @@ class CallgrindParser {
 
   private filename: string | null = null
   private functionName: string | null = null
+  private functionFile: string | null = null
+  private currentFunctionFile: string | null = null
   private calleeFilename: string | null = null
   private calleeFunctionName: string | null = null
 
   private savedFileNames: {[id: string]: string} = {}
   private savedFunctionNames: {[id: string]: string} = {}
+  private numPositionFields = 1
 
   constructor(
     contents: TextFileContent,
@@ -396,7 +399,7 @@ class CallgrindParser {
   }
 
   private frameInfo(): FrameInfo {
-    const file = this.filename || '(unknown)'
+    const file = this.functionFile || '(unknown)'
     const name = this.functionName || '(unknown)'
     const key = `${file}:${name}`
     return {key, name, file}
@@ -412,6 +415,11 @@ class CallgrindParser {
   private parseHeaderLine(line: string): boolean {
     const headerMatch = /^\s*(\w+):\s*(.*)+$/.exec(line)
     if (!headerMatch) return false
+
+    if (headerMatch[1] === 'positions') {
+      this.numPositionFields = headerMatch[2].trim().split(/\s+/).length
+      return true
+    }
 
     if (headerMatch[1] !== 'events') {
       // We don't care about other headers. Ignore this line.
@@ -445,23 +453,29 @@ class CallgrindParser {
       case 'fe':
       case 'fi': {
         // fe/fi are used to indicate the source-file of a function definition
-        // changed mid-definition. This is for inlined code, but doesn't
-        // indicate that we've actually switched to referring to a different
-        // function, so we mostly ignore it.
-        //
-        // We still need to do the parseNameWithCompression call in case a name
-        // is defined and then referenced later on for name compression.
-        this.parseNameWithCompression(value, this.savedFileNames)
+        // changed mid-definition. This is for inlined code, but when a function
+        // is called from within the inlined code, it is indicated that it
+        // comes from file marked by fe/fi.
+        this.filename = this.parseNameWithCompression(value, this.savedFileNames)
         break
       }
 
       case 'fl': {
         this.filename = this.parseNameWithCompression(value, this.savedFileNames)
+        // The 'fl' needs to be stored in order to reset current filename upon
+        // consecutive 'fn' calls
+        this.currentFunctionFile = this.filename
         break
       }
 
       case 'fn': {
+        // the file for a function defined with 'fn' always comes from 'fl'
+        // It also resets the current filename to previous 'fl' value, as in KCacheGrind:
+        // https://github.com/KDE/kcachegrind/blob/ea4314db2785cb8f279fe884ee7f82445642b692/libcore/cachegrindloader.cpp#L808
+        if (this.filename !== this.currentFunctionFile) this.filename = this.currentFunctionFile
         this.functionName = this.parseNameWithCompression(value, this.savedFunctionNames)
+        // store function file associated with 'fn' function
+        this.functionFile = this.filename
         break
       }
 
@@ -548,9 +562,7 @@ class CallgrindParser {
   private prevCostLineNumbers: number[] = []
 
   private parseCostLine(line: string, costType: 'self' | 'child'): boolean {
-    // TODO(jlfwong): Allow hexadecimal encoding
-
-    const parts = line.split(/\s+/)
+    const parts = line.trim().split(/\s+/)
     const nums: number[] = []
 
     for (let i = 0; i < parts.length; i++) {
@@ -560,7 +572,7 @@ class CallgrindParser {
         return false
       }
 
-      if (part === '*' || part[0] === '-' || part[1] === '+') {
+      if (part === '*' || part[0] === '-' || part[0] === '+') {
         // This handles "Subposition compression"
         // See: https://valgrind.org/docs/manual/cl-format.html#cl-format.overview.compression2
         if (this.prevCostLineNumbers.length <= i) {
@@ -585,7 +597,7 @@ class CallgrindParser {
           nums.push(prevCostForSubposition + offset)
         }
       } else {
-        const asNum = parseInt(part)
+        const asNum = /^0x[0-9a-fA-F]+$/.test(part) ? parseInt(part, 16) : parseInt(part, 10)
         if (isNaN(asNum)) {
           return false
         }
@@ -597,8 +609,7 @@ class CallgrindParser {
       return false
     }
 
-    // TODO(jlfwong): Handle custom positions format w/ multiple parts
-    const numPositionFields = 1
+    const numPositionFields = this.numPositionFields
 
     // NOTE: We intentionally do not include the line number here because
     // callgrind uses the line number of the function invocation, not the
