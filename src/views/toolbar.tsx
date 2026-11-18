@@ -7,7 +7,7 @@ import {
 } from '../lib/profile-transformations'
 import {ApplicationProps} from './application'
 import {h, JSX, Fragment} from 'preact'
-import {useCallback, useState, useEffect} from 'preact/hooks'
+import {useCallback, useState, useEffect, useRef} from 'preact/hooks'
 import {StyleSheet, css} from 'aphrodite'
 import {Sizes, FontFamily, FontSize, Duration} from './style'
 import {ProfileSelect} from './profile-select'
@@ -19,6 +19,7 @@ import {viewModeAtom} from '../app-state'
 import {ProfileGroupState} from '../app-state/profile-group'
 import {colorSchemeAtom} from '../app-state/color-scheme'
 import {useAtom} from '../lib/atom'
+import {ProfileFilterDialog} from './profile-filter-dialog'
 
 interface ToolbarProps extends ApplicationProps {
   browseForFile(): void
@@ -188,6 +189,15 @@ function ToolbarCenterContent(props: ToolbarProps): JSX.Element {
 }
 
 function ToolbarRightContent(props: ToolbarProps) {
+  const latestProps = useRef(props)
+  latestProps.current = props
+  const [filterSource, setFilterSource] = useState<{profile: Profile; originals: Profile[]} | null>(
+    null,
+  )
+  useEffect(() => {
+    if (filterSource && !props.profileGroup?.profiles.some(p => p.profile === filterSource.profile))
+      setFilterSource(null)
+  }, [props.profileGroup, filterSource])
   const style = getStyle(useTheme())
   const colorScheme = useAtom(colorSchemeAtom)
   const originals = props.profileGroup?.profiles.filter(p => !isDerivedProfile(p.profile)) || []
@@ -197,6 +207,13 @@ function ToolbarRightContent(props: ToolbarProps) {
     select.value = ''
     const {activeProfileState, profileGroup} = props
     if (!activeProfileState || !profileGroup || props.loading || !action) return
+    if (action === 'filter') {
+      setFilterSource({
+        profile: activeProfileState.profile,
+        originals: profileGroup.profiles.map(p => p.profile),
+      })
+      return
+    }
     props.setLoading(true)
     try {
       // Paint the existing loading indicator before processing a large profile.
@@ -286,12 +303,40 @@ function ToolbarRightContent(props: ToolbarProps) {
           </option>
           <option value="invert">Invert stacks</option>
           <option value="file">Group by file</option>
+          <option value="filter">Filter frames…</option>
         </select>
       )}
       {props.activeProfileState && exportFile}
       {importFile}
       {colorSchemeToggle}
       {help}
+      {filterSource && (
+        <ProfileFilterDialog
+          profile={filterSource.profile}
+          onClose={() => setFilterSource(null)}
+          onApply={derived => {
+            const current = latestProps.current
+            const group = current.profileGroup
+            if (
+              current.loading ||
+              !group ||
+              group.profiles.length !== filterSource.originals.length ||
+              group.profiles.some((p, i) => p.profile !== filterSource.originals[i])
+            )
+              throw new Error('The source profiles changed. Close this filter and try again.')
+            current.setProfileGroup({
+              name: group.name,
+              indexToView: group.profiles.length,
+              profiles: [...group.profiles.map(p => p.profile), derived],
+            })
+            current.setViewMode(
+              current.viewMode === ViewMode.CALL_TREE
+                ? ViewMode.CALL_TREE
+                : ViewMode.LEFT_HEAVY_FLAME_GRAPH,
+            )
+          }}
+        />
+      )}
     </div>
   )
 }

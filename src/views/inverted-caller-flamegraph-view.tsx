@@ -47,6 +47,7 @@ const getInvertedCallerFlamegraph = memoizeByShallowEquality(
       getTotalWeight: invertedCallerProfile.getTotalNonIdleWeight.bind(invertedCallerProfile),
       forEachCall: invertedCallerProfile.forEachCallGrouped.bind(invertedCallerProfile),
       formatValue: invertedCallerProfile.formatValue.bind(invertedCallerProfile),
+      getWeightUnit: invertedCallerProfile.getWeightUnit.bind(invertedCallerProfile),
       getColorBucketForFrame,
     })
   },

@@ -2,6 +2,7 @@ import {
   CallTreeNode,
   CallTreeProfileBuilder,
   FrameInfo,
+  Frame,
   Profile,
   StackListProfileBuilder,
 } from './profile'
@@ -110,4 +111,101 @@ export function groupProfileByFile(profile: Profile): Profile {
     builder.appendSampleWithWeight(files, weight)
   })
   return finish(builder.build(), profile, `${profile.getName()} [grouped by file]`)
+}
+
+export interface ProfileFilterRules {
+  field: 'file' | 'name' | 'either'
+  include: string[]
+  exclude: string[]
+}
+export interface ProfileFilterOptions {
+  signal?: AbortSignal
+  onProgress?: () => void
+  yieldControl?: () => Promise<void>
+}
+
+// Hide individual frames, retaining the weight of each remaining stack. A
+// removed leaf contributes self weight to its nearest remaining ancestor.
+// Fully removed stacks (and source idle weight) are omitted, never invented.
+export async function filterProfile(
+  source: Profile,
+  rules: ProfileFilterRules,
+  options: ProfileFilterOptions = {},
+): Promise<Profile> {
+  const field = rules.field
+  if (!['file', 'name', 'either'].includes(field)) throw new Error('Invalid filter field')
+  const include = rules.include.map(s => s.trim()).filter(Boolean)
+  const exclude = rules.exclude.map(s => s.trim()).filter(Boolean)
+  if (!include.length && !exclude.length) throw new Error('Enter an include or exclude rule')
+  if (include.length + exclude.length > 128 || [...include, ...exclude].join('\n').length > 4096)
+    throw new Error('Use at most 128 rules and 4,096 characters')
+  const normalize = (value: string) => value.replace(/\\/g, '/').toLocaleLowerCase()
+  const includePatterns = include.map(normalize)
+  const excludePatterns = exclude.map(normalize)
+  const matches = (frame: Frame, patterns: string[]) => {
+    if (!patterns.length) return false
+    const values: string[] = []
+    if (field !== 'file') values.push(normalize(frame.name))
+    if (field !== 'name' && frame.file) values.push(normalize(frame.file))
+    return patterns.some(pattern => values.some(value => value.includes(pattern)))
+  }
+  const cache = new Map<Frame, boolean>()
+  const keep = (frame: Frame) => {
+    let result = cache.get(frame)
+    if (result === undefined) {
+      result =
+        (!includePatterns.length || matches(frame, includePatterns)) &&
+        !matches(frame, excludePatterns)
+      cache.set(frame, result)
+    }
+    return result
+  }
+  const checkAbort = () => {
+    if (options.signal?.aborted) throw new DOMException('Filter cancelled', 'AbortError')
+  }
+  const pause = async () => {
+    checkAbort()
+    options.onProgress?.()
+    checkAbort()
+    await (options.yieldControl
+      ? options.yieldControl()
+      : new Promise(resolve => setTimeout(resolve, 0)))
+    checkAbort()
+  }
+  await pause()
+  const builder = new StackListProfileBuilder()
+  const path: FrameInfo[] = []
+  const visit = [{node: source.getGroupedCalltreeRoot(), index: -1, kept: false}]
+  let work = 0
+  while (visit.length) {
+    const current = visit[visit.length - 1]
+    if (current.index === -1) {
+      current.kept = !current.node.isRoot() && keep(current.node.frame)
+      if (current.kept) path.push(current.node.frame)
+      const weight = current.node.getSelfWeight()
+      if (path.length && weight > 0) {
+        builder.appendSampleWithWeight(path, weight)
+        work += path.length
+      }
+      current.index = 0
+    }
+    if (current.index < current.node.children.length) {
+      visit.push({node: current.node.children[current.index++], index: -1, kept: false})
+    } else {
+      if (current.kept) path.pop()
+      visit.pop()
+    }
+    if (++work >= 8192) {
+      work = 0
+      await pause()
+    }
+  }
+  await pause()
+  const description = [
+    include.length ? `include ${JSON.stringify(include)}` : '',
+    exclude.length ? `exclude ${JSON.stringify(exclude)}` : '',
+  ]
+    .filter(Boolean)
+    .join('; ')
+  return finish(builder.build(), source, `${source.getName()} [filter ${field}: ${description}]`)
 }

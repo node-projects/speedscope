@@ -78,6 +78,7 @@ export const getChronoViewFlamechart = memoizeByShallowEquality(
       getTotalWeight: profile.getTotalWeight.bind(profile),
       forEachCall: profile.forEachCall.bind(profile),
       formatValue: profile.formatValue.bind(profile),
+      getWeightUnit: profile.getWeightUnit.bind(profile),
       getColorBucketForFrame,
     })
   },
@@ -163,6 +164,7 @@ export const getLeftHeavyFlamechart = memoizeByShallowEquality(
       getTotalWeight: profile.getTotalNonIdleWeight.bind(profile),
       forEachCall: profile.forEachCallGrouped.bind(profile),
       formatValue: profile.formatValue.bind(profile),
+      getWeightUnit: profile.getWeightUnit.bind(profile),
       getColorBucketForFrame,
     })
   },

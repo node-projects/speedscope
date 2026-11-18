@@ -127,7 +127,10 @@ Profile trees and rendering remain in-memory operations. Unsupported formats
 still use the original full-document importer. UI hydration and rendering have
 costs, and transferring work can increase overall elapsed time even while making
 the interface responsive. This does not fix every OOM report. Derived
-transformations remain synchronous. Export retains the final
+transformations other than frame filtering remain synchronous. Frame filtering
+visits grouped paths and yields during traversal, with cancellation; final tree
+sorting remains synchronous. See [filter behavior and limits](PROFILE_FILTERS.md).
+Export retains the final
 Blob bytes and source profile while bounding temporary serialization chunks
 (apart from an individually huge string). An out-of-core model, heap budgets,
 worker-backed transforms, signed comparisons and synchronized timelines remain

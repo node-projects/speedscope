@@ -42,6 +42,7 @@
     "src/lib/file-format-spec.ts",
     "docs/RELEASING.md",
     "docs/LARGE_TRACE_PERFORMANCE.md",
+    "docs/PROFILE_FILTERS.md",
     "bin/cli.mjs",
     "bin/server.mjs",
     "dist/release/**",

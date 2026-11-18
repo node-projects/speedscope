@@ -1077,11 +1077,11 @@
       "url": "https://github.com/jlfwong/speedscope/issues/246",
       "kind": "feature",
       "usefulness": "yes",
-      "status": "planned",
+      "status": "implemented",
       "priority": "P2",
       "workstream": "Search and navigation",
-      "evidence": "Include/exclude and subtree filtering need clearly defined total/self denominators and a visible transform history. Crop, file grouping and inversion establish non-destructive derived profiles first.",
-      "remaining": "Include/exclude and subtree filtering need clearly defined total/self denominators and a visible transform history. Crop, file grouping and inversion establish non-destructive derived profiles first."
+      "evidence": "Profile actions now creates non-destructive aggregate frame filters with include/exclude literal rules for file paths, names or either. Exclusions win; empty stacks/idle are omitted and retained-stack weights/self reattribution are documented. Originals, rule history and derived flags survive export. Iterative grouped traversal yields and cancels; tests cover deep trees and UI cancellation/paste isolation.",
+      "remaining": "No additional work selected for the requested include/exclude frame-filtering scope. Chronological filtering and subtree-removal semantics would be separate features."
     },
     {
       "id": 245,
@@ -1257,11 +1257,11 @@
       "url": "https://github.com/jlfwong/speedscope/issues/192",
       "kind": "feature",
       "usefulness": "yes",
-      "status": "planned",
+      "status": "implemented",
       "priority": "P2",
       "workstream": "Search and navigation",
-      "evidence": "Include/exclude and subtree filtering need clearly defined total/self denominators and a visible transform history. Crop, file grouping and inversion establish non-destructive derived profiles first.",
-      "remaining": "Include/exclude and subtree filtering need clearly defined total/self denominators and a visible transform history. Crop, file grouping and inversion establish non-destructive derived profiles first."
+      "evidence": "Profile actions now creates non-destructive aggregate frame filters with include/exclude literal rules for file paths, names or either. Exclusions win; empty stacks/idle are omitted and retained-stack weights/self reattribution are documented. Originals, rule history and derived flags survive export. Iterative grouped traversal yields and cancels; tests cover deep trees and UI cancellation/paste isolation.",
+      "remaining": "No additional work selected for the requested include/exclude frame-filtering scope. Chronological filtering and subtree-removal semantics would be separate features."
     },
     {
       "id": 189,
@@ -1593,11 +1593,11 @@
       "url": "https://github.com/jlfwong/speedscope/issues/35",
       "kind": "feature",
       "usefulness": "yes",
-      "status": "planned",
+      "status": "implemented",
       "priority": "P2",
       "workstream": "Search and navigation",
-      "evidence": "Nice binary byte tick spacing needs explicit formatter/tick-step tests; the issue is a screenshot-only proposal. Existing byte units remain correctly labeled.",
-      "remaining": "Nice binary byte tick spacing needs explicit formatter/tick-step tests; the issue is a screenshot-only proposal. Existing byte units remain correctly labeled."
+      "evidence": "Byte-aware tick spacing uses powers of two in the main graph and minimap, with zoom-dependent precision, overlap suppression and bounded indexed ticks. Time/raw units retain decimal spacing. Tests cover bytes through TiB scales, fractional zoom and the formatter labels; browser memory-profile smoke check verified binary-aligned axes.",
+      "remaining": "No additional work selected for the reviewed scope."
     },
     {
       "id": 16,
