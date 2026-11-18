@@ -8,7 +8,7 @@ Source: [upstream issues](https://github.com/jlfwong/speedscope/issues). [Machin
 
 | Kind | Implemented | Already supported | Partial | Planned | Needs reproduction | Declined | Obsolete | Total |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| bug | 16 | 9 | 14 | 10 | 6 | 0 | 1 | 56 |
+| bug | 17 | 9 | 15 | 8 | 6 | 0 | 1 | 56 |
 | feature | 13 | 8 | 8 | 37 | 0 | 4 | 0 | 70 |
 | maintenance | 2 | 1 | 1 | 3 | 0 | 1 | 0 | 8 |
 
@@ -16,7 +16,7 @@ Source: [upstream issues](https://github.com/jlfwong/speedscope/issues). [Machin
 
 P1: correctness/large-profile failures. P2: valuable product work. P3: lower-priority maintenance, integration or presentation. These priorities are engineering judgments, not upstream labels. Useful architectural work still includes broader worker coverage, streaming import, signed comparisons and synchronized tracks.
 
-## Remaining useful bugs (24)
+## Remaining useful bugs (23)
 
 | Issue | Kind | Useful? | Status | Priority | Work / evidence |
 | --- | --- | --- | --- | --- | --- |
@@ -30,8 +30,7 @@ P1: correctness/large-profile failures. P2: valuable product work. P3: lower-pri
 | [#508](https://github.com/jlfwong/speedscope/issues/508) RuntimeError: memory access out of bounds | bug | yes | partial | P2 | Native demangler exceptions preserve/cache original symbols instead of aborting loading. The public #507 compressed reproduction imports and completes demangling with warnings. This does not fix the native decoder itself. |
 | [#507](https://github.com/jlfwong/speedscope/issues/507) Index out of bounds when demangling rust symbol | bug | yes | partial | P2 | Native demangler exceptions preserve/cache original symbols instead of aborting loading. The public #507 compressed reproduction imports and completes demangling with warnings. This does not fix the native decoder itself. |
 | [#384](https://github.com/jlfwong/speedscope/issues/384) Some Instruments files don't load | bug | yes | planned | P2 | New Instruments .symbols binary storage needs a versioned decoder, not plist assumptions. Public archive was collected; no speculative reinterpretation of binary structures applied. |
-| [#199](https://github.com/jlfwong/speedscope/issues/199) Increase unit precision when zoomed in far enough for markers to be identical | bug | yes | planned | P2 | Adaptive tick precision should prevent duplicate labels based on the visible step, including large absolute timestamps. Needs shared time/byte/raw formatting tests and label-overlap checks. |
-| [#446](https://github.com/jlfwong/speedscope/issues/446) souremaps arent being applied | bug | yes | planned | P3 | V8 log postprocessing does not consistently populate frame source positions required for sourcemap lookup. Preserve file/line/column before adding asynchronous sourcemap fetching and CORS handling. |
+| [#446](https://github.com/jlfwong/speedscope/issues/446) souremaps arent being applied | bug | yes | partial | P3 | Automatic linked-map discovery/fetching and CORS handling remain unimplemented. Logs without source positions and ambiguous relative paths containing spaces still need producer-specific handling; the original Node/esbuild automatic-loading case is not claimed fixed. |
 | [#404](https://github.com/jlfwong/speedscope/issues/404) Use fetch instead of uint8array-json-parser for parsing JSON balls larger than the string limit | bug | yes | partial | P3 | Streaming now covers duration-event arrays and supported traceEvents wrappers. CPU/sample/native formats and unrecognized wrappers retain their ordinary detector. Sorting, profile trees, snapshots and rendering still consume memory proportional to the capture; limits bound input complexity, not total browser heap. A true out-of-core model, bounded rendering and validation of the original reported capture remain open. |
 | [#402](https://github.com/jlfwong/speedscope/issues/402) format: Chrome Trace with instant samples | bug | yes | partial | P3 | Trailing commas and B/E trace events work. Instant events and custom stack-bearing event fields require a defined point-event presentation; inventing positive duration would misrepresent them. |
 | [#381](https://github.com/jlfwong/speedscope/issues/381) Rendering bugs | bug | yes | partial | P3 | Public TimeProfiler trace imports quickly, but emits mismatched-end warnings. Epoch-rounding handling fixes the tested adjacency case; the remaining non-laminar intervals need an explicit overlap/track policy. |
@@ -115,7 +114,7 @@ P1: correctness/large-profile failures. P2: valuable product work. P3: lower-pri
 | [#269](https://github.com/jlfwong/speedscope/issues/269) Table view doesn't update at 60fps during scrolling | bug | conditional | needs-reproduction | P3 | Original slow scrolling report references a 2013 Mac. Iterative traversals and bounded Call Tree improve scale; no evidence that the exact older scrolling problem is fixed. |
 | [#42](https://github.com/jlfwong/speedscope/issues/42) Low framerate in Chrome 66 on MBP | bug | conditional | needs-reproduction | P3 | Report targets Chrome 66 compositor behavior. Current supported browsers differ; need a current profile and rendering trace before applying historical GPU workarounds. |
 
-## Implemented or already supported (49)
+## Implemented or already supported (50)
 
 | Issue | Kind | Useful? | Status | Priority | Work / evidence |
 | --- | --- | --- | --- | --- | --- |
@@ -168,6 +167,7 @@ P1: correctness/large-profile failures. P2: valuable product work. P3: lower-pri
 | [#89](https://github.com/jlfwong/speedscope/issues/89) Display progress bar on export | feature | yes | implemented | none | Interactive exports serialize lazy call events into Blob chunks with progress, event-loop yields and cancellation. No full duplicate event tree or trace-sized JS string is built. Completed downloads revoke their object URLs. Native output bytes and source profiles remain in memory. |
 | [#62](https://github.com/jlfwong/speedscope/issues/62) Feature request: see the duration of a run in the UI | feature | yes | implemented | none | Active profile total duration/weight appears beside its name and in the Call Tree caption. |
 | [#39](https://github.com/jlfwong/speedscope/issues/39) Add support for crop | feature | yes | implemented | none | Crop to current time view creates a new rebased profile, clips nested calls at both boundaries and retains idle range duration. Original profiles remain unchanged. |
+| [#199](https://github.com/jlfwong/speedscope/issues/199) Increase unit precision when zoomed in far enough for markers to be identical | bug | yes | implemented | P2 | Axis labels use precision derived from the visible tick step across time, bytes and raw units. Bounded indexed ticks avoid duplicate/non-advancing values at large origins; canvas labels skip overlap. Tests cover zoom precision, minute rollover, negative times, invalid views and sub-ULP intervals. |
 
 ## Not selected or obsolete (6)
 

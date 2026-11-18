@@ -56,14 +56,17 @@ export async function importJavaScriptSourceMapSymbolRemapper(
     sourceMap.default.SourceMapConsumer.GENERATED_ORDER,
   )
 
-  const sourceMapFileNameWithoutExt = sourceMapFileName.replace(/\.[^/]*$/, '')
+  if (!mappingItems.length) return null
+
+  const sourceMapFileNameWithoutExt = sourceMapFileName.replace(/\\/g, '/').replace(/\.[^/]*$/, '')
 
   return (frame: Frame) => {
+    const frameFile = frame.file?.replace(/\\/g, '/')
     let fileMatches = false
-    if (contents?.file && contents?.file === frame.file) {
+    if (contents?.file && contents.file.replace(/\\/g, '/') === frameFile) {
       fileMatches = true
     } else if (
-      ('/' + frame.file?.replace(/\.[^/]*$/, '')).endsWith('/' + sourceMapFileNameWithoutExt)
+      ('/' + frameFile?.replace(/\.[^/]*$/, '')).endsWith('/' + sourceMapFileNameWithoutExt)
     ) {
       fileMatches = true
     }
@@ -116,11 +119,10 @@ export async function importJavaScriptSourceMapSymbolRemapper(
       // to apply the very last mapping.
       mappingIndex = mappingItems.length - 1
     } else if (mappingIndex === 0) {
-      // If the very first index in mappingItems is beyond the location in the
-      // profile, it means the name we're looking for doesn't have a
-      // corresponding entry in the source-map (this can happen if the
-      // source-map isn't the right source-map)
-      return null
+      // An exact first mapping is usable even though there is no preceding
+      // symbol. Keep the existing opening-paren heuristic for later mappings.
+      const first = mappingItems[0]
+      if (first.generatedLine !== frame.line || first.generatedColumn !== frame.col) return null
     } else {
       mappingIndex--
     }

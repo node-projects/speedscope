@@ -168,7 +168,7 @@
       "status": "partial",
       "priority": "P1",
       "workstream": "Large profiles and responsiveness",
-      "evidence": "Cursor queues, iterative builders and cancellable workers address identified performance failures. Duration traces now stream plain/gzip bytes without a whole decoded JSON string or full parsed input document, with event/byte/depth limits and exact PLC export equality. A local import-only comparison measured 999 to 623 MiB peak RSS at a latency cost; see docs/LARGE_TRACE_PERFORMANCE.md for methodology and limits.",
+      "evidence": "Cancellable streaming duration imports now frame one bounded event at a time for native JSON parsing, keeping byte/event/depth guards and format fallbacks. Three fresh-process PLC comparisons reduced median import time from 4336 to 2493 ms and median peak RSS from 613 to 579 MiB. Export equality verified; general out-of-core storage/rendering and original OOM cases remain open.",
       "remaining": "Streaming now covers duration-event arrays and supported traceEvents wrappers. CPU/sample/native formats and unrecognized wrappers retain their ordinary detector. Sorting, profile trees, snapshots and rendering still consume memory proportional to the capture; limits bound input complexity, not total browser heap. A true out-of-core model, bounded rendering and validation of the original reported capture remain open."
     },
     {
@@ -384,7 +384,7 @@
       "status": "partial",
       "priority": "P1",
       "workstream": "Large profiles and responsiveness",
-      "evidence": "Cursor queues, iterative builders and cancellable workers address identified performance failures. Duration traces now stream plain/gzip bytes without a whole decoded JSON string or full parsed input document, with event/byte/depth limits and exact PLC export equality. A local import-only comparison measured 999 to 623 MiB peak RSS at a latency cost; see docs/LARGE_TRACE_PERFORMANCE.md for methodology and limits.",
+      "evidence": "Cancellable streaming duration imports now frame one bounded event at a time for native JSON parsing, keeping byte/event/depth guards and format fallbacks. Three fresh-process PLC comparisons reduced median import time from 4336 to 2493 ms and median peak RSS from 613 to 579 MiB. Export equality verified; general out-of-core storage/rendering and original OOM cases remain open.",
       "remaining": "Streaming now covers duration-event arrays and supported traceEvents wrappers. CPU/sample/native formats and unrecognized wrappers retain their ordinary detector. Sorting, profile trees, snapshots and rendering still consume memory proportional to the capture; limits bound input complexity, not total browser heap. A true out-of-core model, bounded rendering and validation of the original reported capture remain open."
     },
     {
@@ -525,11 +525,11 @@
       "url": "https://github.com/jlfwong/speedscope/issues/446",
       "kind": "bug",
       "usefulness": "yes",
-      "status": "planned",
+      "status": "partial",
       "priority": "P3",
       "workstream": "Import formats and correctness",
-      "evidence": "V8 log postprocessing does not consistently populate frame source positions required for sourcemap lookup. Preserve file/line/column before adding asynchronous sourcemap fetching and CORS handling.",
-      "remaining": "V8 log postprocessing does not consistently populate frame source positions required for sourcemap lookup. Preserve file/line/column before adding asynchronous sourcemap fetching and CORS handling."
+      "evidence": "V8 log import now preserves source coordinates for Unicode/spaced method names, Windows paths, URLs and absolute paths containing spaces. Sourcemap matching normalizes Windows separators and accepts an exact first mapping; an end-to-end local-map regression verifies remapped names and positions.",
+      "remaining": "Automatic linked-map discovery/fetching and CORS handling remain unimplemented. Logs without source positions and ambiguous relative paths containing spaces still need producer-specific handling; the original Node/esbuild automatic-loading case is not claimed fixed."
     },
     {
       "id": 445,
@@ -624,7 +624,7 @@
       "status": "partial",
       "priority": "P3",
       "workstream": "Large profiles and responsiveness",
-      "evidence": "Cursor queues, iterative builders and cancellable workers address identified performance failures. Duration traces now stream plain/gzip bytes without a whole decoded JSON string or full parsed input document, with event/byte/depth limits and exact PLC export equality. A local import-only comparison measured 999 to 623 MiB peak RSS at a latency cost; see docs/LARGE_TRACE_PERFORMANCE.md for methodology and limits.",
+      "evidence": "Cancellable streaming duration imports now frame one bounded event at a time for native JSON parsing, keeping byte/event/depth guards and format fallbacks. Three fresh-process PLC comparisons reduced median import time from 4336 to 2493 ms and median peak RSS from 613 to 579 MiB. Export equality verified; general out-of-core storage/rendering and original OOM cases remain open.",
       "remaining": "Streaming now covers duration-event arrays and supported traceEvents wrappers. CPU/sample/native formats and unrecognized wrappers retain their ordinary detector. Sorting, profile trees, snapshots and rendering still consume memory proportional to the capture; limits bound input complexity, not total browser heap. A true out-of-core model, bounded rendering and validation of the original reported capture remain open."
     },
     {
@@ -696,7 +696,7 @@
       "status": "partial",
       "priority": "P1",
       "workstream": "Large profiles and responsiveness",
-      "evidence": "Cursor queues, iterative builders and cancellable workers address identified performance failures. Duration traces now stream plain/gzip bytes without a whole decoded JSON string or full parsed input document, with event/byte/depth limits and exact PLC export equality. A local import-only comparison measured 999 to 623 MiB peak RSS at a latency cost; see docs/LARGE_TRACE_PERFORMANCE.md for methodology and limits.",
+      "evidence": "Cancellable streaming duration imports now frame one bounded event at a time for native JSON parsing, keeping byte/event/depth guards and format fallbacks. Three fresh-process PLC comparisons reduced median import time from 4336 to 2493 ms and median peak RSS from 613 to 579 MiB. Export equality verified; general out-of-core storage/rendering and original OOM cases remain open.",
       "remaining": "Streaming now covers duration-event arrays and supported traceEvents wrappers. CPU/sample/native formats and unrecognized wrappers retain their ordinary detector. Sorting, profile trees, snapshots and rendering still consume memory proportional to the capture; limits bound input complexity, not total browser heap. A true out-of-core model, bounded rendering and validation of the original reported capture remain open."
     },
     {
@@ -912,7 +912,7 @@
       "status": "partial",
       "priority": "P1",
       "workstream": "Large profiles and responsiveness",
-      "evidence": "Cursor queues, iterative builders and cancellable workers address identified performance failures. Duration traces now stream plain/gzip bytes without a whole decoded JSON string or full parsed input document, with event/byte/depth limits and exact PLC export equality. A local import-only comparison measured 999 to 623 MiB peak RSS at a latency cost; see docs/LARGE_TRACE_PERFORMANCE.md for methodology and limits.",
+      "evidence": "Cancellable streaming duration imports now frame one bounded event at a time for native JSON parsing, keeping byte/event/depth guards and format fallbacks. Three fresh-process PLC comparisons reduced median import time from 4336 to 2493 ms and median peak RSS from 613 to 579 MiB. Export equality verified; general out-of-core storage/rendering and original OOM cases remain open.",
       "remaining": "Streaming now covers duration-event arrays and supported traceEvents wrappers. CPU/sample/native formats and unrecognized wrappers retain their ordinary detector. Sorting, profile trees, snapshots and rendering still consume memory proportional to the capture; limits bound input complexity, not total browser heap. A true out-of-core model, bounded rendering and validation of the original reported capture remain open."
     },
     {
@@ -1221,11 +1221,11 @@
       "url": "https://github.com/jlfwong/speedscope/issues/199",
       "kind": "bug",
       "usefulness": "yes",
-      "status": "planned",
+      "status": "implemented",
       "priority": "P2",
       "workstream": "Search and navigation",
-      "evidence": "Adaptive tick precision should prevent duplicate labels based on the visible step, including large absolute timestamps. Needs shared time/byte/raw formatting tests and label-overlap checks.",
-      "remaining": "Adaptive tick precision should prevent duplicate labels based on the visible step, including large absolute timestamps. Needs shared time/byte/raw formatting tests and label-overlap checks."
+      "evidence": "Axis labels use precision derived from the visible tick step across time, bytes and raw units. Bounded indexed ticks avoid duplicate/non-advancing values at large origins; canvas labels skip overlap. Tests cover zoom precision, minute rollover, negative times, invalid views and sub-ULP intervals.",
+      "remaining": "No additional work selected for the reviewed scope."
     },
     {
       "id": 196,

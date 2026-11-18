@@ -1,6 +1,7 @@
 import {Tokenizer, TokenParser, TokenType} from '@streamparser/json'
 import {ProfileGroup} from '../lib/profile'
 import {importTraceEvents, TraceEvent} from './trace-event'
+import {StringBackedTextFileContent} from './utils'
 
 // These are input-complexity limits, not measurements of browser heap usage.
 // Profile construction and rendering still need memory proportional to the trace.
@@ -55,6 +56,7 @@ export async function importDurationTraceStream(
   let depth = 0
   let started = false
   let leadingBytes = 0
+  let skippedBytes = 0
   let bomBytes = 0
   let previous: TokenType | undefined
   let rootKey = ''
@@ -67,6 +69,7 @@ export async function importDurationTraceStream(
   let retainedBytes = 0
   let count = 0
   let lastProgress = 0
+  let framedEvent: unknown
   const events: TraceEvent[] = []
 
   const acceptEvent = (value: unknown) => {
@@ -102,7 +105,7 @@ export async function importDurationTraceStream(
   }
   tokenizer.onToken = info => {
     const {token, value} = info
-    offset = info.offset + leadingBytes
+    offset = info.offset + leadingBytes + skippedBytes
     if (!parser) {
       if (token !== TokenType.LEFT_BRACKET && token !== TokenType.LEFT_BRACE)
         throw new NotDurationTrace()
@@ -111,7 +114,7 @@ export async function importDurationTraceStream(
         paths: rootArray ? ['$.*'] : ['$.traceEvents.*'],
         keepStack: false,
       })
-      parser.onValue = ({value}) => acceptEvent(value)
+      parser.onValue = ({value}) => acceptEvent(framedEvent ?? value)
     }
     if (
       !rootArray &&
@@ -157,6 +160,90 @@ export async function importDurationTraceStream(
     previous = token
   }
 
+  // Frame complete event objects with a cheap structural scan, then let native
+  // JSON.parse handle their fields. The token parser still validates the outer
+  // document and consumes each object as one value. No trace-sized string is
+  // constructed, and records spanning chunks stay within the same byte limits.
+  const decoder = new TextDecoder()
+  let scanDepth = 0
+  let inString = false
+  let escaped = false
+  let capturing = false
+  let captureDepth = 0
+  let captureStart = 0
+  const parts: Uint8Array[] = []
+  const writeOutside = (chunk: Uint8Array) => {
+    if (chunk.length) tokenizer.write(chunk)
+  }
+  const writeChunk = (chunk: Uint8Array, absoluteStart: number) => {
+    let segmentStart = 0
+    for (let i = 0; i < chunk.length; i++) {
+      const byte = chunk[i]
+      if (inString) {
+        if (escaped) escaped = false
+        else if (byte === 0x5c) escaped = true
+        else if (byte === 0x22) inString = false
+      } else if (byte === 0x22) inString = true
+      else if (byte === 0x7b || byte === 0x5b) {
+        if (!capturing && byte === 0x7b && (scanDepth === 1 || scanDepth === 2)) {
+          writeOutside(chunk.subarray(segmentStart, i))
+          segmentStart = i
+          if (
+            (rootArray && scanDepth === 1) ||
+            (!rootArray && rootKey === 'traceEvents' && scanDepth === 2)
+          ) {
+            capturing = true
+            captureDepth = scanDepth
+            captureStart = absoluteStart + i
+          }
+        }
+        scanDepth++
+        if (capturing && scanDepth > limits.maxDepth)
+          throw new TraceImportLimitError('JSON nesting depth')
+      } else if (byte === 0x7d || byte === 0x5d) {
+        scanDepth--
+        if (capturing && scanDepth === captureDepth) {
+          const last = chunk.subarray(segmentStart, i + 1)
+          let data = last
+          if (parts.length) {
+            data = new Uint8Array(absoluteStart + i + 1 - captureStart)
+            let cursor = 0
+            for (const part of parts) {
+              data.set(part, cursor)
+              cursor += part.length
+            }
+            data.set(last, cursor)
+          }
+          const text = decoder.decode(data)
+          let value
+          try {
+            value = JSON.parse(text)
+          } catch {
+            // Trailing commas are uncommon, so pay for the permissive retry
+            // only when native parsing fails. String literals remain intact.
+            value = new StringBackedTextFileContent(text).parseAsJSON()
+          }
+          eventStart = captureStart
+          // Validate this event's position in the outer JSON grammar with an
+          // opaque null placeholder; consume its already-parsed value above.
+          framedEvent = value
+          tokenizer.onToken({
+            token: TokenType.NULL,
+            value: null,
+            offset: absoluteStart + i - leadingBytes - skippedBytes,
+          })
+          framedEvent = undefined
+          skippedBytes += data.length
+          parts.length = 0
+          capturing = false
+          segmentStart = i + 1
+        }
+      }
+    }
+    if (capturing) parts.push(chunk.subarray(segmentStart))
+    else writeOutside(chunk.subarray(segmentStart))
+  }
+
   try {
     checkAbort(options.signal)
     while (true) {
@@ -185,7 +272,7 @@ export async function importDurationTraceStream(
           prefix++
           leadingBytes++
         }
-        if (started) tokenizer.write(chunk.subarray(prefix))
+        if (started) writeChunk(chunk.subarray(prefix), bytes - chunk.length + prefix)
       }
       if (bytes - lastProgress >= 8 * 1024 * 1024) {
         options.onProgress?.(bytes)
@@ -193,6 +280,7 @@ export async function importDurationTraceStream(
       }
     }
     if (!started) return null
+    if (capturing) throw new Error('Incomplete trace JSON value')
     tokenizer.end()
     // A producer can stop after a complete array event without writing ']'.
     // Unterminated strings, objects and other truncated values still fail.

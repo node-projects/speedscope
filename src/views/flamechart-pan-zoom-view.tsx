@@ -19,6 +19,7 @@ import {BatchCanvasTextRenderer, BatchCanvasRectRenderer} from '../lib/canvas-2d
 import {Color} from '../lib/color'
 import {Theme} from './themes/theme'
 import {minimapMousePositionAtom} from '../app-state'
+import {axisTicks} from '../lib/axis-ticks'
 
 interface FlamechartFrameLabel {
   configSpaceBounds: Rect
@@ -403,13 +404,18 @@ export class FlamechartPanZoomView extends Component<FlamechartPanZoomViewProps,
       ctx.fillStyle = Color.fromCSSHex(theme.bgPrimaryColor).withAlpha(0.8).toCSS()
       ctx.fillRect(0, y, physicalViewSize.x, physicalViewSpaceFrameHeight)
       ctx.textBaseline = 'top'
-      for (let x = Math.ceil(left / interval) * interval; x < right; x += interval) {
-        // TODO(jlfwong): Ensure that labels do not overlap
+      const ticks = axisTicks(left, right, interval)
+      let previousLabelRight = -Infinity
+      for (const x of ticks.positions) {
         const pos = Math.round(configToPhysical.transformPosition(new Vec2(x, 0)).x)
-        const labelText = this.props.flamechart.formatValue(x)
+        const labelText = this.props.flamechart.formatValue(x, ticks.interval)
         const textWidth = cachedMeasureTextWidth(ctx, labelText)
         ctx.fillStyle = theme.fgPrimaryColor
-        ctx.fillText(labelText, pos - textWidth - labelPaddingPx, y + labelPaddingPx)
+        const labelLeft = pos - textWidth - labelPaddingPx
+        if (labelLeft >= previousLabelRight + labelPaddingPx) {
+          ctx.fillText(labelText, labelLeft, y + labelPaddingPx)
+          previousLabelRight = pos - labelPaddingPx
+        }
         ctx.fillStyle = theme.fgSecondaryColor
         ctx.fillRect(pos, 0, 1, physicalViewSize.y)
       }

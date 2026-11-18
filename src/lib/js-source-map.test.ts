@@ -3,6 +3,39 @@ import * as path from 'path'
 import {importProfilesFromArrayBuffer} from '../import'
 import {importJavaScriptSourceMapSymbolRemapper} from './js-source-map'
 import {Frame} from './profile'
+import {importFromV8ProfLog} from '../import/v8proflog'
+
+test('a valid source map with no mappings is ignored', async () => {
+  expect(
+    await importJavaScriptSourceMapSymbolRemapper(
+      JSON.stringify({version: 3, sources: [], names: [], mappings: ''}),
+      'empty.js.map',
+    ),
+  ).toBeNull()
+})
+
+test('V8 Windows paths remap with a local map at an exact first generated position', async () => {
+  const profile = importFromV8ProfLog({
+    code: [{type: 'JS', name: 'minified C:\\project files\\app.js:1:1'}],
+    functions: [],
+    ticks: [{tm: 1000, vm: 0, s: [0, -1]}],
+  })
+  const remapper = await importJavaScriptSourceMapSymbolRemapper(
+    JSON.stringify({
+      version: 3,
+      sources: ['original.ts'],
+      names: ['originalName'],
+      mappings: 'AAAAA',
+    }),
+    'app.js.map',
+  )
+  expect(remapper).not.toBeNull()
+  profile.remapSymbols(remapper!)
+  const frames: Frame[] = []
+  profile.forEachFrame(f => frames.push(f))
+  expect(frames).toHaveLength(1)
+  expect(frames[0]).toMatchObject({name: 'originalName', file: 'original.ts', line: 1, col: 1})
+})
 
 async function checkSourceMapApplication(pathToProfile: string, pathToSourceMap: string) {
   const buffer = fs.readFileSync(pathToProfile)

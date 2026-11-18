@@ -169,3 +169,46 @@ test('truncated values and corrupt gzip fail without producing partial profiles'
     tryImportDurationTrace(Uint8Array.from([0x1f, 0x8b, 0, 0]).buffer, 'capture.trace.gz'),
   ).rejects.toThrow()
 })
+
+test('native event framing preserves complex arguments at every small chunk size', async () => {
+  const text = JSON.stringify({
+    otherData: {nested: [{ph: 'X', ts: 99, name: 'not an event'}]},
+    traceEvents: [
+      {
+        ph: 'X',
+        ts: -1.2e-5,
+        dur: 1.7,
+        name: '😀\\"{[]}',
+        args: {array: [null, {}, [1, -0.25e6, 'é\\']], text: '}]'},
+      },
+      {ph: 'X', ts: 10, dur: 1, name: 'second'},
+    ],
+    metadata: {later: {nested: [1, 2]}},
+  })
+  const expected = exportProfileGroup((await importProfileGroupFromText('trace.json', text))!)
+  for (let size = 1; size <= 41; size++) {
+    const actual = await importDurationTraceStream(source(text, size), 'trace.json')
+    expect(exportProfileGroup(actual!)).toEqual(expected)
+  }
+})
+
+test('large cross-chunk records preserve UTF-8 and reject unfinished later events', async () => {
+  const text = JSON.stringify([{ph: 'X', ts: 0, dur: 1, args: {text: 'é😀'.repeat(30000)}}])
+  const expected = await importProfileGroupFromText('trace.json', text)
+  const actual = await importDurationTraceStream(source(text, 65536), 'trace.json')
+  expect(exportProfileGroup(actual!)).toEqual(exportProfileGroup(expected!))
+  await expect(
+    importDurationTraceStream(source('[{"ph":"X","ts":0},{"ph":'), 'trace.json'),
+  ).rejects.toThrow('Incomplete')
+})
+
+test('native record parsing still rejects invalid record and outer-document grammar', async () => {
+  for (const text of [
+    '[{"ph":"X","ts":01}]',
+    '[{"ph":"X","ts":0 "dur":1}]',
+    '[{"ph":"X","ts":0} {"ph":"X","ts":1}]',
+    '[{"ph":"X","ts":0,"args":[}}]',
+    '{"traceEvents":[{"ph":"X","ts":0}] "otherData":{}}',
+  ])
+    await expect(importDurationTraceStream(source(text, 3), 'trace.json')).rejects.toThrow()
+})

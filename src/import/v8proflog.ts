@@ -78,7 +78,11 @@ function codeToFrameInfo(code: Code, v8log: V8LogProfile): FrameInfo {
       break
 
     case 'JS': {
-      const matches = name.match(/([a-zA-Z0-9\._\-$]*) ([a-zA-Z0-9\.\-_\/$]*):(\d+):(\d+)/)
+      // Parse the rightmost line/column suffix. Absolute paths and URLs can
+      // contain spaces; method names can contain Unicode and punctuation.
+      const matches = name.match(
+        /^(.*?) ((?:(?:[A-Za-z]:[\\/]|\/|[\w+.-]+:\/\/).*)|[^ ]*):(\d+):(\d+)$/,
+      )
       if (matches) {
         const file = matches[2]
         const line = parseInt(matches[3], 10)
