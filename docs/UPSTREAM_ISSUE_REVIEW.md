@@ -8,7 +8,7 @@ This pass implements the bounded fixes and features below. Useful larger changes
 
 ## Changes and limits
 
-New actions create derived profiles: crop the current time range, combine original profiles with compatible units, invert stacks and group by file. The Call Tree table supports native text, keyboard expansion, source locations and bounded row counts, including an initial WebGL failure fallback. Aggregate transformations sum busy weights; they do not synchronize wall clocks. Runtime derived profiles are excluded from repeated combines, but export/reimport currently loses that runtime provenance.
+New actions create derived profiles: crop the current time range, combine original profiles with compatible units, invert stacks and group by file. The Call Tree table supports native text, keyboard expansion, source locations and bounded row counts, including an initial WebGL failure fallback. Aggregate transformations sum busy weights; they do not synchronize wall clocks. Derived provenance now survives cloning and export/reimport, so repeated combines exclude derived profiles.
 
 Import fixes cover named trace IDs, unnamed end events, epoch rounding, hybrid perf cores, non-clock counters, folded fractional weights, Callgrind jump associations, inferred event bounds, optional demangling failures and visible load errors. Iterative traversals remove identified deep recursion; import still retains the parsed trace in memory and is not an out-of-core solution.
 
@@ -124,7 +124,7 @@ The highest-value remaining architectural work is synchronized tracks, signed co
 | [#193](https://github.com/jlfwong/speedscope/issues/193) | `perf script --hide-call-graph` output is not accepted | Improved diagnostics | Perf records without stacks now reject with instructions to record with -g and avoid --hide-call-graph, instead of producing an empty profile. |
 | [#192](https://github.com/jlfwong/speedscope/issues/192) | Allow to filter graph | Deferred: useful | Include/exclude and subtree filtering need clearly defined total/self denominators and a visible transform history. Crop, file grouping and inversion establish non-destructive derived profiles first. |
 | [#189](https://github.com/jlfwong/speedscope/issues/189) | Optimize fallback path when TextDecoder is not available | Fixed | Legacy ASCII decoder builds bounded pieces and joins per chunk instead of flattening the entire growing string for every byte. Chunk-boundary regression added. |
-| [#185](https://github.com/jlfwong/speedscope/issues/185) | Hide the time ordered view for profiles known to contain only aggregate information | Deferred: useful | Folded, inverted and combined profiles cannot promise chronological order. Derived views default to Left Heavy and README documents this; schema/profile capability flags are still needed to disable or relabel Time Order consistently. |
+| [#185](https://github.com/jlfwong/speedscope/issues/185) | Hide the time ordered view for profiles known to contain only aggregate information | Implemented in performance follow-up | Known aggregate importers and derived aggregates disable Time Order, including keyboard/profile-switch paths. Optional chronological/derived metadata survives export/reimport; legacy files retain their previous default. See the performance report for covered importers. |
 | [#173](https://github.com/jlfwong/speedscope/issues/173) | Format Support: concatenated output from many calls to jstack | Deferred: useful | jstack/Java thread dumps are snapshots, not elapsed durations. Need explicit sample ordering/weight policy and public format fixtures before adding another text parser. |
 | [#168](https://github.com/jlfwong/speedscope/issues/168) | Doesn't open browser in Windows | Already addressed | PR ports add --serve, a localhost binary profile endpoint, temporary subdirectories and correct platform file URLs. |
 | [#166](https://github.com/jlfwong/speedscope/issues/166) | Add support for color scheme controls | Already supported | Current viewer has system/dark/light themes and symbol/file color assignment; further alternative palettes need a concrete requested scheme and contrast validation. |
@@ -143,7 +143,7 @@ The highest-value remaining architectural work is synchronized tracks, signed co
 | [#107](https://github.com/jlfwong/speedscope/issues/107) | Share selected frame state between views | Deferred: useful | Sharing selected frame between views requires distinguishing a frame from a particular call-tree instance and handling transformed profiles. Do not retain invalid node identities across views. |
 | [#106](https://github.com/jlfwong/speedscope/issues/106) | Make CI run `npm run prepack` to ensure it doesn't break | Fixed in fork | Portable prepack creates an offline standalone ZIP, and CI builds/uploads it. Existing upstream release assets cannot be repaired by a local commit. |
 | [#97](https://github.com/jlfwong/speedscope/issues/97) | Trace files from Instruments can only be dragged, not opened | Deferred: useful | Instruments .trace is a directory package on macOS and cannot be read through a regular single-file input. Need directory/archive import UI and hierarchy-aware decoder support. |
-| [#89](https://github.com/jlfwong/speedscope/issues/89) | Display progress bar on export | Deferred: useful | Export progress requires chunked/worker serialization and cancellation; a progress bar around synchronous JSON.stringify would still freeze the UI. |
+| [#89](https://github.com/jlfwong/speedscope/issues/89) | Display progress bar on export | Implemented in performance follow-up | Interactive exports serialize lazy call events into Blob chunks with progress, event-loop yields and cancellation. No full duplicate event tree or trace-sized JS string is built. Completed downloads revoke their object URLs. Native output bytes and source profiles remain in memory. |
 | [#62](https://github.com/jlfwong/speedscope/issues/62) | Feature request: see the duration of a run in the UI | Implemented | Active profile total duration/weight appears beside its name and in the Call Tree caption. |
 | [#58](https://github.com/jlfwong/speedscope/issues/58) | Make www.speedscope.app work offline | Alternative implemented | Portable standalone ZIP works offline without service-worker caching. A hosted PWA remains optional and needs cache/version/update policy; not introduced automatically. |
 | [#47](https://github.com/jlfwong/speedscope/issues/47) | Subpixel anti-alias text | Not selected | Subpixel antialiasing is backend/display specific and can cause color fringes. Current atlas rendering remains; accessible text table provides a native text alternative. |
@@ -153,10 +153,27 @@ The highest-value remaining architectural work is synchronized tracks, signed co
 | [#35](https://github.com/jlfwong/speedscope/issues/35) | Place tickmarks at nicer locations when displaying memory profiles | Deferred: useful | Nice binary byte tick spacing needs explicit formatter/tick-step tests; the issue is a screenshot-only proposal. Existing byte units remain correctly labeled. |
 | [#16](https://github.com/jlfwong/speedscope/issues/16) | Allow speedscope to be used as a library instead of a standalone application | Deferred: useful | A supported embeddable instance API requires isolating global atoms, lifecycle/disposal and multiple viewers. CLI --serve and profileURL cover launch integrations; publishing internal classes now would freeze an unsuitable API. |
 
-## Validation
+## Initial-pass validation
 
 All **250 tests and 307 snapshots pass** across 41 Jest suites. Type checking, lint and the portable standalone release build pass. Three perf snapshots intentionally add `tid: 0` to the idle thread name. Snapshot output for raw weights now uses a fixed English locale in the test helper; application formatting continues to use the user's locale. This resolves the pre-existing PMCStat grouping-separator failures on this machine without changing measured weights or production formatting.
 
 Public attachments checked: #381, #345 (two), #470, #369 (three), #501 and #507. They are kept out of the repository; automated regression inputs are small synthetic or quoted issue examples. Timing measurements are local smoke checks, not cross-browser benchmarks. Browser smoke testing loaded the user's million-event PLC trace, displayed the semantic Call Tree, combined four original profiles and expanded the combined tree. A subsequent browser check verified successful inversion of the large PLC profile with its total preserved. Aggregate transforms visit grouped stacks, avoiding repeated occurrence processing. A local Node smoke check of all four PLC profiles measured combine at 379ms, combined-stack inversion at 5.17s, and file grouping at 28ms; these are machine-specific measurements. Actions paint a loading indicator before processing and disable duplicate action selection. Transformation computation remains synchronous and may still block interaction; worker/cancellation support remains useful.
 
+## Performance follow-up
 
+The next pass implements #89 and #185 and further reduces costs relevant to
+#519/#347 and the deep-stack reports #478/#386. It adds adaptive grouped-child
+indexes, skips zero-delta weight scans, streams folded samples and text lines,
+replaces recursive/materialized V8 heap paths, and avoids the heap importer's
+global frame cache. Export uses cancellable, cooperative Blob serialization;
+aggregate/derived metadata now survives cloning and export/reimport.
+
+All **269 tests and 307 snapshots pass** across 43 suites. Type checking, lint,
+the CLI server test and standalone release build also pass. Browser checks cover
+visible export progress, cancellation, completed downloads, aggregate controls
+and fast combined-stack inversion. The PLC download matches the standard exporter
+exactly and reimports with original totals. See
+[large-trace measurements and limits](LARGE_TRACE_PERFORMANCE.md) for reproducible
+benchmark commands and the throughput/memory tradeoff of cooperative export.
+Large JSON imports remain in-memory/main-thread operations; the OOM issues are
+still partially resolved, and synchronized tracks/comparisons remain deferred.

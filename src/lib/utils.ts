@@ -68,6 +68,10 @@ export interface HasKey {
 export class KeyedSet<T extends HasKey> implements Iterable<T> {
   private map = new Map<string | number, T>()
 
+  get(key: string | number): T | undefined {
+    return this.map.get(key)
+  }
+
   getOrInsert(t: T): T {
     const key = t.key
     const existing = this.map.get(key)

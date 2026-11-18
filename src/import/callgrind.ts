@@ -133,6 +133,7 @@ class CallGraph {
 
   toProfile(): Profile {
     const profile = new CallTreeProfileBuilder()
+    profile.setChronological(false)
 
     let unitMultiplier = 1
 

@@ -9,6 +9,7 @@ import {
 } from './profile'
 import {TimeFormatter, ByteFormatter, RawValueFormatter} from './value-formatters'
 import {FileFormat} from './file-format-spec'
+import {ExportOptions, exportProfileGroupToBlob} from './profile-export'
 
 export function exportProfileGroup(profileGroup: ProfileGroup): FileFormat.File {
   const frames: FileFormat.Frame[] = []
@@ -53,6 +54,8 @@ function exportProfile(profile: Profile, getIndexForFrame: (frame: Frame) => num
     unit: profile.getWeightUnit(),
     startValue: 0,
     endValue: profile.getTotalWeight(),
+    ...(!profile.isChronological() ? {isChronological: false} : {}),
+    ...(profile.isDerived() ? {isDerived: true} : {}),
     events: [],
   }
   const openFrame = (node: CallTreeNode, value: number) => {
@@ -97,6 +100,8 @@ function importSpeedscopeProfile(
         break
     }
     p.setName(name)
+    p.setChronological(serialized.isChronological !== false)
+    p.setDerived(serialized.isDerived === true)
   }
 
   function importEventedProfile(evented: FileFormat.EventedProfile) {
@@ -168,22 +173,30 @@ export function importSpeedscopeProfiles(serialized: FileFormat.File): ProfileGr
   }
 }
 
-export function saveToFile(profileGroup: ProfileGroup): void {
-  const file = exportProfileGroup(profileGroup)
-  const blob = new Blob([JSON.stringify(file)], {type: 'text/json'})
+export async function saveToFile(
+  profileGroup: ProfileGroup,
+  options?: ExportOptions,
+): Promise<void> {
+  const blob = await exportProfileGroupToBlob(profileGroup, options)
 
-  const nameWithoutExt = file.name ? file.name.split('.')[0]! : 'profile'
+  const nameWithoutExt = profileGroup.name ? profileGroup.name.split('.')[0]! : 'profile'
   const filename = `${nameWithoutExt.replace(/\W+/g, '_')}.speedscope.json`
 
   console.log('Saving', filename)
 
   const a = document.createElement('a')
   a.download = filename
-  a.href = window.URL.createObjectURL(blob)
+  const url = window.URL.createObjectURL(blob)
+  a.href = url
   a.dataset.downloadurl = ['text/json', a.download, a.href].join(':')
 
   // For this to work in Firefox, the <a> must be in the DOM
-  document.body.appendChild(a)
-  a.click()
-  document.body.removeChild(a)
+  try {
+    document.body.appendChild(a)
+    a.click()
+  } finally {
+    a.remove()
+    // Allow the browser to start the download before releasing its backing Blob.
+    setTimeout(() => window.URL.revokeObjectURL(url), 60000)
+  }
 }

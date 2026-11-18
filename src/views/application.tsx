@@ -8,6 +8,7 @@ import {ProfileGroup, SymbolRemapper} from '../lib/profile'
 import {FontFamily, FontSize, Duration} from './style'
 import {importEmscriptenSymbolMap as importEmscriptenSymbolRemapper} from '../lib/emscripten'
 import {saveToFile} from '../lib/file-format'
+import {ExportProgress} from '../lib/profile-export'
 import {ActiveProfileState} from '../app-state/active-profile-state'
 import {LeftHeavyFlamechartView, ChronoFlamechartView} from './flamechart-view-container'
 import {CanvasContext} from '../gl/canvas-context'
@@ -179,8 +180,13 @@ export type ApplicationProps = {
 
 export class Application extends StatelessComponent<ApplicationProps> {
   private loadError = ''
+  private exportController: AbortController | null = null
+  private exportProgress: ExportProgress | null = null
 
   private async loadProfile(loader: () => Promise<ProfileGroup | null>) {
+    this.exportController?.abort()
+    this.exportController = null
+    this.exportProgress = null
     this.loadError = ''
     this.props.setError(false)
     this.props.setLoading(true)
@@ -219,8 +225,17 @@ export class Application extends StatelessComponent<ApplicationProps> {
     }
     document.title = `${profileGroup.name} - speedscope`
 
-    if (this.props.hashParams.viewMode) {
+    if (this.props.hashParams.viewMode !== undefined) {
       this.props.setViewMode(this.props.hashParams.viewMode)
+    }
+
+    const selected = profileGroup.profiles[profileGroup.indexToView]
+    if (
+      selected &&
+      !selected.isChronological() &&
+      (this.props.hashParams.viewMode ?? this.props.viewMode) === ViewMode.CHRONO_FLAME_CHART
+    ) {
+      this.props.setViewMode(ViewMode.LEFT_HEAVY_FLAME_GRAPH)
     }
 
     try {
@@ -263,10 +278,11 @@ export class Application extends StatelessComponent<ApplicationProps> {
         // mapping to the already loaded profile. This can be use to take an opaque
         // profile and make it readable.
         const reader = new FileReader()
-        const fileContentsPromise = new Promise<string>(resolve => {
+        const fileContentsPromise = new Promise<string>((resolve, reject) => {
           reader.addEventListener('loadend', () => {
             if (typeof reader.result !== 'string') {
-              throw new Error('Expected reader.result to be a string')
+              reject(reader.error || new Error('Could not read symbol map'))
+              return
             }
             resolve(reader.result)
           })
@@ -363,7 +379,11 @@ export class Application extends StatelessComponent<ApplicationProps> {
 
   onWindowKeyPress = async (ev: KeyboardEvent) => {
     if (ev.key === '1') {
-      this.props.setViewMode(ViewMode.CHRONO_FLAME_CHART)
+      this.props.setViewMode(
+        this.props.activeProfileState?.profile.isChronological() === false
+          ? ViewMode.LEFT_HEAVY_FLAME_GRAPH
+          : ViewMode.CHRONO_FLAME_CHART,
+      )
     } else if (ev.key === '2') {
       this.props.setViewMode(ViewMode.LEFT_HEAVY_FLAME_GRAPH)
     } else if (ev.key === '3') {
@@ -386,7 +406,8 @@ export class Application extends StatelessComponent<ApplicationProps> {
     }
   }
 
-  private saveFile = () => {
+  private saveFile = async () => {
+    if (this.props.loading || this.exportController) return
     if (this.props.profileGroup) {
       const {name, indexToView, profiles} = this.props.profileGroup
       const profileGroup: ProfileGroup = {
@@ -394,7 +415,27 @@ export class Application extends StatelessComponent<ApplicationProps> {
         indexToView,
         profiles: profiles.map(p => p.profile),
       }
-      saveToFile(profileGroup)
+      const controller = new AbortController()
+      this.exportController = controller
+      try {
+        await saveToFile(profileGroup, {
+          signal: controller.signal,
+          onProgress: progress => {
+            if (this.exportController === controller) {
+              this.exportProgress = progress
+              this.forceUpdate()
+            }
+          },
+        })
+      } catch (error) {
+        if (!controller.signal.aborted) alert(`Export failed: ${String(error)}`)
+      } finally {
+        if (this.exportController === controller) {
+          this.exportController = null
+          this.exportProgress = null
+          this.forceUpdate()
+        }
+      }
     }
   }
 
@@ -440,6 +481,8 @@ export class Application extends StatelessComponent<ApplicationProps> {
 
   componentWillUnmount() {
     window.removeEventListener('keydown', this.onWindowKeyDown)
+    this.exportController?.abort()
+    this.exportController = null
     window.removeEventListener('keypress', this.onWindowKeyPress)
     document.removeEventListener('paste', this.onDocumentPaste)
   }
@@ -592,7 +635,8 @@ export class Application extends StatelessComponent<ApplicationProps> {
   }
 
   renderContent() {
-    const {viewMode, activeProfileState, error, loading, glCanvas} = this.props
+    const {activeProfileState, error, loading, glCanvas} = this.props
+    const viewMode = this.effectiveViewMode()
 
     if (error) {
       return this.renderError()
@@ -600,6 +644,37 @@ export class Application extends StatelessComponent<ApplicationProps> {
 
     if (loading) {
       return this.renderLoadingBar()
+    }
+
+    if (this.exportProgress) {
+      const progress = this.exportProgress
+      return (
+        <section
+          aria-label="Export progress"
+          style={{
+            height: '100%',
+            padding: 24,
+            boxSizing: 'border-box',
+            background: this.props.theme.bgPrimaryColor,
+            color: this.props.theme.fgPrimaryColor,
+          }}
+        >
+          <p role="status">
+            Exporting {progress.eventsWritten.toLocaleString()} events ·{' '}
+            {progress.profilesCompleted}/{progress.profileCount} profiles ·{' '}
+            {progress.framesWritten.toLocaleString()}/{progress.frameCount.toLocaleString()} source
+            frames
+          </p>
+          <progress
+            aria-label="Profiles exported"
+            value={progress.profilesCompleted}
+            max={Math.max(1, progress.profileCount)}
+          />
+          <button type="button" onClick={() => this.exportController?.abort()}>
+            Cancel export
+          </button>
+        </section>
+      )
     }
 
     if (activeProfileState && viewMode === ViewMode.CALL_TREE) {
@@ -625,6 +700,13 @@ export class Application extends StatelessComponent<ApplicationProps> {
     }
   }
 
+  private effectiveViewMode() {
+    return this.props.viewMode === ViewMode.CHRONO_FLAME_CHART &&
+      this.props.activeProfileState?.profile.isChronological() === false
+      ? ViewMode.LEFT_HEAVY_FLAME_GRAPH
+      : this.props.viewMode
+  }
+
   render() {
     const style = this.getStyle()
     return (
@@ -643,6 +725,8 @@ export class Application extends StatelessComponent<ApplicationProps> {
           saveFile={this.saveFile}
           browseForFile={this.browseForFile}
           {...(this.props as ApplicationProps)}
+          loading={this.props.loading || this.exportController !== null}
+          viewMode={this.effectiveViewMode()}
         />
         <div className={css(style.contentContainer)}>{this.renderContent()}</div>
         {this.props.dragActive && <div className={css(style.dragTarget)} />}

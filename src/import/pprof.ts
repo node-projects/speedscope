@@ -137,6 +137,7 @@ export function importAsPprofProfile(rawProfile: ArrayBuffer): Profile | null {
   const sampleType = sampleTypes[sampleTypeIndex]
 
   const profileBuilder = new StackListProfileBuilder()
+  profileBuilder.setChronological(false)
 
   switch (sampleType.unit) {
     case 'nanoseconds':
