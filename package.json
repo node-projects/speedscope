@@ -1,26 +1,45 @@
 {
-  "name": "speedscope",
-  "version": "1.25.0",
-  "description": "",
-  "repository": "jlfwong/speedscope",
-  "main": "index.js",
+  "name": "@node-projects/speedscope",
+  "version": "2.0.0",
+  "description": "A fast, interactive performance profile viewer with large-trace improvements, an accessible call tree and offline CLI.",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/node-projects/speedscope.git"
+  },
+  "homepage": "https://node-projects.github.io/speedscope/",
+  "bugs": {
+    "url": "https://github.com/node-projects/speedscope/issues"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "types": "src/lib/file-format-spec.ts",
   "bin": {
     "speedscope": "./bin/cli.mjs"
   },
   "scripts": {
-    "deploy": "./scripts/deploy.sh",
+    "build:pages": "node scripts/prepare-release.mjs --protocol http",
+    "deploy": "gh workflow run pages.yml --ref main",
+    "release:version": "node scripts/set-release-version.mjs",
     "prepack": "node scripts/prepare-release.mjs",
-    "prettier": "prettier --write 'src/**/*.ts' 'src/**/*.tsx'",
+    "prettier": "prettier --write \"src/**/*.ts\" \"src/**/*.tsx\"",
     "lint": "eslint \"src/**/*.ts\" \"src/**/*.tsx\"",
-    "jest": "./scripts/test-setup.sh && jest --runInBand",
+    "jest": "node scripts/test-setup.mjs && jest --runInBand",
     "coverage": "npm run jest -- --coverage",
     "typecheck": "tsc --noEmit",
-    "test": "./scripts/ci.sh",
+    "test:node": "node --test bin/server.test.mjs scripts/set-release-version.test.mjs",
+    "schema:check": "node scripts/generate-file-format-schema-json.js --check",
+    "test": "npm run typecheck && npm run lint && npm run jest && npm run test:node && npm run schema:check",
     "serve": "tsx scripts/dev-server.ts"
   },
   "files": [
     "src/lib/file-format-spec.ts",
+    "docs/RELEASING.md",
+    "docs/LARGE_TRACE_PERFORMANCE.md",
     "bin/cli.mjs",
     "bin/server.mjs",
     "dist/release/**",
@@ -30,7 +49,10 @@
     "last 2 Chrome versions",
     "last 2 Firefox versions"
   ],
-  "author": "",
+  "author": {
+    "name": "node-projects",
+    "url": "https://github.com/node-projects"
+  },
   "license": "MIT",
   "devDependencies": {
     "@types/jest": "22.2.3",

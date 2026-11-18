@@ -1,6 +1,18 @@
 English | [简体中文](./README-zh_CN.md)
-# 🔬speedscope 
-A fast, interactive web-based viewer for performance profiles. Supports import from a variety of profiles in a variety of languages (JS, Ruby, Python, Go & more). Try it here: https://www.speedscope.app
+# 🔬speedscope — node-projects fork
+
+[![CI](https://github.com/node-projects/speedscope/actions/workflows/ci.yml/badge.svg)](https://github.com/node-projects/speedscope/actions/workflows/ci.yml)
+[![Pages](https://github.com/node-projects/speedscope/actions/workflows/pages.yml/badge.svg)](https://node-projects.github.io/speedscope/)
+[![npm](https://img.shields.io/npm/v/%40node-projects%2Fspeedscope)](https://www.npmjs.com/package/@node-projects/speedscope)
+[![Release](https://github.com/node-projects/speedscope/actions/workflows/release.yml/badge.svg)](https://github.com/node-projects/speedscope/actions/workflows/release.yml)
+[![License: MIT](https://img.shields.io/github/license/node-projects/speedscope)](LICENSE)
+[![Sponsor](https://img.shields.io/badge/sponsor-jogibear9988-pink)](https://github.com/sponsors/jogibear9988)
+
+A fast, interactive web-based viewer for performance profiles (JavaScript, Ruby,
+Python, Go, native traces and more).
+**[Open the app](https://node-projects.github.io/speedscope/)** — profiles are processed
+in your browser. This fork builds on [jlfwong/speedscope](https://github.com/jlfwong/speedscope)
+and adds large-trace improvements, profile transformations and an accessible Call Tree.
 
 Given raw profiling data, speedscope allows you to interactively explore the data to get insight into what's slow in your application, or allocating all the memory, or whatever data is represented in the profiling data.
 
@@ -48,17 +60,26 @@ speedscope is designed to ingest profiles from a variety of different profilers 
 - [Importing from GHC (Haskell)](https://github.com/jlfwong/speedscope/wiki/Importing-from-Haskell)
 - [Importing from custom sources](https://github.com/jlfwong/speedscope/wiki/Importing-from-custom-sources)
 
-Contributions to add support for additional formats are welcome! See issues with the ["import source" tag](https://github.com/jlfwong/speedscope/issues?q=is%3Aissue+is%3Aopen+label%3A%22import+source%22).
+Contributions to add support for additional formats are welcome! Open an issue in
+[this fork](https://github.com/node-projects/speedscope/issues). The importer guides
+above are maintained upstream and remain useful for the supported file formats.
 # Usage
 
-Visit https://www.speedscope.app, then either browse to find a profile file or drag-and-drop one onto the page. The profiles are not uploaded anywhere -- the application is totally in-browser.
+Visit [the hosted app](https://node-projects.github.io/speedscope/), then browse for a
+profile file or drag it onto the page. Imported profiles stay in your browser.
 
 ## Command line usage
 
 For offline use, or convenience in the terminal, you can also install speedscope
 via npm:
 
-    npm install -g speedscope
+    npm install -g @node-projects/speedscope
+
+The npm package is scoped; the executable remains `speedscope`. If replacing a
+global upstream installation, run `npm uninstall -g speedscope` first. The CLI
+requires Node.js 22 or newer. You can also run it without a global installation:
+
+    npx --package @node-projects/speedscope speedscope --serve /path/to/profile
 
 Invoking `speedscope /path/to/profile` will load speedscope in your default browser.
 
@@ -77,7 +98,7 @@ For example, in PowerShell: `$env:SPEEDSCOPE_PORT='8080'; npm run serve`.
 ## Self-contained directory
 
 If you don't have npm or node installed, you can also download a
-self-contained version from https://github.com/jlfwong/speedscope/releases.
+self-contained version from [this fork's GitHub releases](https://github.com/node-projects/speedscope/releases).
 After you download the zip file from a release, simply unzip it and open the
 contained `index.html` in Chrome or Firefox.
 
@@ -167,10 +188,28 @@ See [large-trace measurements and limits](docs/LARGE_TRACE_PERFORMANCE.md) for t
 performance follow-up and benchmark commands.
 
 Run `npm run prepack` to build an offline viewer and
-`dist/speedscope-1.25.0.zip` on Windows, macOS, or Linux. Extract the ZIP and open
+`dist/speedscope-<version>.zip` on Windows, macOS, or Linux. Extract the ZIP and open
 `index.html`. This includes the JFR WebAssembly decoder without a network fetch.
 The npm package exposes the profile format with
-`import type {FileFormat} from 'speedscope'`; internal rendering APIs are not public.
+`import type {FileFormat} from '@node-projects/speedscope'`; internal rendering APIs are not public.
+
+## Hosting and releases
+
+GitHub Actions tests Node.js 22/24 on Windows and Linux. Pushes to `main` build and
+deploy the app to [GitHub Pages](https://node-projects.github.io/speedscope/).
+`npm run build:pages` builds the same site locally in `dist/pages` with relative
+asset URLs for the `/speedscope/` project path.
+
+Publishing a GitHub release tagged `vX.Y.Z` (or `X.Y.Z`) publishes
+`@node-projects/speedscope` with that version, after tests and packaging. Prerelease
+versions or releases marked as prereleases use npm's `next` tag. Stable releases
+use `latest`. The workflow attaches standalone ZIP and npm tarball downloads to
+the release. npm publishing requires one-time authorization; see
+[release setup and operation](docs/RELEASING.md).
+
+Support development via [GitHub Sponsors](https://github.com/sponsors/jogibear9988)
+or [Patreon](https://www.patreon.com/jogibear9988). Funding configuration is shared
+with [Web Component Designer](https://github.com/node-projects/web-component-designer).
 
 ## Contributing
 

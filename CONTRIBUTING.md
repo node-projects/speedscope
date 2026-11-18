@@ -1,70 +1,61 @@
-# Contributing to speedscope
+# Contributing to the node-projects speedscope fork
 
-Hi! This is a short guide & set of guidelines for contributing to speedscope.
-Contributors of all skill levels are welcome to submit pull requests.
+Contributors of all skill levels are welcome. This project builds on
+[jlfwong/speedscope](https://github.com/jlfwong/speedscope) and retains its MIT
+license and attribution. Please follow the [code of conduct](CODE_OF_CONDUCT.md).
 
-This project adheres to the Contributor Covenant [code of conduct](./CODE_OF_CONDUCT.md).
-All contributors are expected to uphold this code of conduct.
+## Development
 
-## Setting up for development
+Use Node.js 22 or 24 with npm. From Windows, macOS or Linux:
 
-To start running speedscope locally, run the following:
+```sh
+git clone https://github.com/node-projects/speedscope.git
+cd speedscope
+npm ci
+npm run serve
+```
 
-    git clone https://github.com/jlfwong/speedscope.git
-    cd speedscope
-    npm install
-    npm run serve
+Open `http://localhost:8000`. The development server uses esbuild and tsx;
+it prints its address in the terminal. Set `SPEEDSCOPE_PORT` to choose another
+port (PowerShell: `$env:SPEEDSCOPE_PORT='8080'; npm run serve`).
 
-This should open up a running version of speedscope in your default browser.
+Most application code is TypeScript. See [src/README.md](src/README.md) for an
+overview. Use `npm run prettier` or your editor's Prettier integration to format
+changes.
 
-In your terminal, you should see something like this:
+## Checks and builds
 
-    $ npm run serve
-    > speedscope@0.7.1 serve /Users/jlfwong/code/speedscope
-    > parcel assets/index.html --open --no-autoinstall
+```sh
+npm test
+npm run coverage
+npm run prepack
+npm run build:pages
+```
 
-    Server running at http://localhost:1234
-    ✨  Built in 7.30s.
+`npm test` runs type checking, lint, Jest, Node CLI/release tests and schema
+validation. The Node fixture setup script extracts non-Instruments sample ZIPs
+on all platforms. `npm run jest -- --testPathPatterns=profile` narrows Jest tests.
 
-Most of speedscope is written in TypeScript. If you're unfamiliar with
-TypeScript, then you can either just try to learn it as you go, then the
-[official TypeScript
-documentation](https://www.typescriptlang.org/docs/home.html) may be of use
-to you!
+`prepack` produces `dist/release` and `dist/speedscope-<version>.zip` for offline
+use and npm packaging. `build:pages` produces `dist/pages` for HTTP hosting.
+Serve it through any static HTTP server when checking the Pages build; the HTTP
+build uses modules and should not be opened through `file://`.
 
-If you're not sure where the code you want to modify lives, the [`README.md`
-in the `src/` directory](./src/README.md) might be helpful.
+For performance-sensitive changes, preserve measured totals and frame identity,
+include a meaningful regression and compare representative large profiles.
+See [benchmark commands and limits](docs/LARGE_TRACE_PERFORMANCE.md).
 
-## Code formatting
+## Pull requests and releases
 
-All TypeScript code in speedscope is automatically formatted with
-[Prettier](https://prettier.io/). This means that while you're writing your code,
-you don't have to worry about following a formatting guide, because a program will
-format your code for you!
+Open issues and PRs against [node-projects/speedscope](https://github.com/node-projects/speedscope).
+Explain the behavior change, its purpose and validation. Large features benefit
+from an issue describing the intended data model and UI first. Include screenshots
+for visual changes.
 
-The easiest way to use Prettier is via an editor integration. See the [Editor
-Integration](https://prettier.io/docs/en/editors.html) page from Prettier's
-documentation for help with that.
+The [upstream PR review](docs/UPSTREAM_PR_REVIEW.md) and
+[issue review](docs/UPSTREAM_ISSUE_REVIEW.md) record this fork's integration decisions.
+Keep upstream importer documentation links when they still describe the supported
+format. Do not rewrite historical changelog links as if this fork authored those releases.
 
-If you don't want to do that, you can alternatively run the autoformatter by
-running `npm run prettier`.
-
-## Running tests
-
-All TypeScript tests are written use [Jest](https://jestjs.io/). To run the
-tests, run `npm run jest`.
-
-## Contributing new features
-
-Before contributing code to implement a new feature, please open an issue to
-discuss it first. Large pull requests that are submitted without first getting
-maintainer buy-in are unlikely to be reviewed or merged.
-
-For features that will cause a visual change, please include visual mockups of
-the change you're planning on making.
-
-## Contributing bug fixes
-
-If you discover a bug, please file an issue. If the code change required to
-fix it is small (< ~20 lines), then feel free to just open a PR to fix the
-issue without trying to get buy-in ahead of time.
+GitHub Actions checks Linux and Windows on Node.js 22/24. Pages deploys from
+`main`; npm publishes from GitHub releases. See [release setup](docs/RELEASING.md).

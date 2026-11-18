@@ -593,7 +593,7 @@ export class Application extends StatelessComponent<ApplicationProps> {
             See the{' '}
             <a
               className={css(style.link)}
-              href="https://github.com/jlfwong/speedscope#usage"
+              href="https://github.com/node-projects/speedscope#usage"
               target="_blank"
             >
               documentation
@@ -607,7 +607,7 @@ export class Application extends StatelessComponent<ApplicationProps> {
             <a
               className={css(style.link)}
               target="_blank"
-              href="https://github.com/jlfwong/speedscope/issues"
+              href="https://github.com/node-projects/speedscope/issues"
             >
               report any issues on GitHub
             </a>

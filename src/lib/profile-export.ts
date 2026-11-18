@@ -72,7 +72,7 @@ export async function exportProfileGroupToBlob(
     await pause()
     write(
       JSON.stringify({
-        exporter: `speedscope@${require('../../package.json').version}`,
+        exporter: `${require('../../package.json').name}@${require('../../package.json').version}`,
         name: group.name,
         activeProfileIndex: group.indexToView,
         $schema: 'https://www.speedscope.app/file-format-schema.json',

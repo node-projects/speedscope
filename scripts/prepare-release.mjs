@@ -9,6 +9,15 @@ const require = createRequire(import.meta.url)
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
 process.chdir(root)
 const pkg = JSON.parse(await readFile('package.json', 'utf8'))
+const args = process.argv.slice(2)
+if (
+  args.length &&
+  (args.length !== 2 || args[0] !== '--protocol' || !['file', 'http'].includes(args[1]))
+) {
+  throw new Error('Usage: prepare-release.mjs [--protocol file|http]')
+}
+const protocol = args[1] || 'file'
+const target = protocol === 'http' ? 'dist/pages' : 'dist/release'
 // A fresh directory avoids stale hashed assets without deleting an existing build.
 const {mkdtemp, rename} = await import('node:fs/promises')
 await mkdir('dist', {recursive: true})
@@ -23,6 +32,7 @@ await writeFile(
   path.join(outdir, 'source-code-pro.LICENSE.md'),
   await readFile('assets/source-code-pro/LICENSE.md'),
 )
+await writeFile(path.join(outdir, 'LICENSE'), await readFile('LICENSE'))
 await writeFile(
   path.join(outdir, 'release.txt'),
   `${pkg.name}@${pkg.version}\n${new Date().toISOString()}\n${execFileSync(
@@ -37,16 +47,21 @@ console.log(
     '--outdir',
     outdir,
     '--protocol',
-    'file',
+    protocol,
   ]),
 )
 // Preserve earlier builds so this command is safe to rerun during development.
 try {
-  await rename('dist/release', `${outdir}-previous`)
+  await rename(target, `${outdir}-previous`)
 } catch (error) {
   if (error.code !== 'ENOENT') throw error
 }
-await rename(outdir, 'dist/release')
+await rename(outdir, target)
+if (protocol === 'http') {
+  await writeFile(path.join(target, '.nojekyll'), '')
+  console.log(`GitHub Pages site: ${target}`)
+  process.exit(0)
+}
 const zip = new JSZip()
 for (const entry of await readdir('dist/release', {withFileTypes: true})) {
   if (entry.isFile() && !entry.name.endsWith('.map'))

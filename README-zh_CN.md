@@ -1,6 +1,10 @@
 简体中文 | [English](./README.md)
 # 🔬speedscope
 
+此仓库是 [node-projects 分支](https://github.com/node-projects/speedscope)。
+[在线使用](https://node-projects.github.io/speedscope/) ·
+[最新英文文档](README.md) · [发布说明与配置](docs/RELEASING.md)。
+
 一个快速，交互式，基于网络的性能分析工具。 [FlameGraphs][1]（火焰图）的另一个替代品。它可以轻松显示数兆的配置文件并且不会使浏览器崩溃。
 
 给定原始分析数据，你就可以交互式的探索数据，了解应用程序中什么部分速度较慢，或者分配所有内存，或者对任何数据进行分析。
@@ -12,19 +16,19 @@
 
 # 使用
 
-访问 <https://www.speedscope.app> ，上传文件或者拖拽到页面上。配置文件不会上传到任何地方——应用程序完全在浏览器中。
+访问 <https://node-projects.github.io/speedscope/> ，选择文件或者拖拽到页面上。配置文件不会上传到任何地方——应用程序完全在浏览器中。
 
 ## 命令行中使用
 
 为了方便在不联网的情况下或者在终端中使用， 你可以使用npm下载speedscope:
 
-    npm install -g speedscope
+    npm install -g @node-projects/speedscope
 
 调用`speedscope /path/to/profile` 就可以在默认浏览器中加载speedscope。
 
 ## 独立使用
 
-如果你不想使用npm或者node下载，你也可以在这里下载独立的版本 <https://github.com/jlfwong/speedscope/releases>.
+如果你不想使用npm或者node下载，你也可以在这里下载独立的版本 <https://github.com/node-projects/speedscope/releases>.
 下载完一个版本的压缩文件之后，解压并在谷歌或者火狐浏览器中打开`index.html`文件即可。
 
 ## 支持的文件格式

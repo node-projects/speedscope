@@ -26,4 +26,4 @@ if (!jsonSchema.definitions['FileFormat.File']) {
 }
 
 jsonSchema['$ref'] = '#/definitions/FileFormat.File'
-console.log(JSON.stringify(jsonSchema, null, 4))
+if (!process.argv.includes('--check')) console.log(JSON.stringify(jsonSchema, null, 4))

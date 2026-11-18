@@ -256,7 +256,7 @@ function ToolbarRightContent(props: ToolbarProps) {
   const help = (
     <div className={css(style.toolbarTab)}>
       <a
-        href="https://github.com/jlfwong/speedscope#usage"
+        href="https://github.com/node-projects/speedscope#usage"
         className={css(style.noLinkStyle)}
         target="_blank"
       >
