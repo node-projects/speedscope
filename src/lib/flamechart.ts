@@ -1,4 +1,5 @@
 import {Frame, CallTreeNode} from './profile'
+import {FileFormat} from './file-format-spec'
 
 import {lastOf} from './utils'
 import {clamp, Rect, Vec2} from './math'
@@ -14,6 +15,7 @@ export interface FlamechartFrame {
 type StackLayer = FlamechartFrame[]
 
 interface FlamechartDataSource {
+  getWeightUnit?(): FileFormat.ValueUnit
   getTotalWeight(): number
 
   formatValue(v: number, step?: number): string
@@ -37,6 +39,9 @@ export class Flamechart {
   }
   getLayers() {
     return this.layers
+  }
+  getWeightUnit(): FileFormat.ValueUnit {
+    return this.source.getWeightUnit?.() || 'none'
   }
   getColorBucketForFrame(frame: Frame) {
     return this.source.getColorBucketForFrame(frame)

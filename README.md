@@ -72,6 +72,9 @@ Large JSON and trace captures import in the background with progress and a
 **Cancel import** button. This improves responsiveness; very large captures can
 still exceed browser memory limits. Search offers Contains, Whole word and Exact
 matching for function names and source paths.
+Use **Profile actions → Filter frames…** to include your code or exclude framework
+frames by file path or name. It creates a separate aggregate profile and keeps the
+original available. See [filter rules and weight semantics](docs/PROFILE_FILTERS.md).
 Duration traces stream plain/gzip input and discard unused events. Oversized
 captures stop with a clear limit error; see [import limits and measurements](docs/LARGE_TRACE_PERFORMANCE.md#streaming-duration-traces).
 

@@ -43,6 +43,7 @@ const getCalleeFlamegraph = memoizeByShallowEquality<
     getTotalWeight: calleeProfile.getTotalNonIdleWeight.bind(calleeProfile),
     forEachCall: calleeProfile.forEachCallGrouped.bind(calleeProfile),
     formatValue: calleeProfile.formatValue.bind(calleeProfile),
+    getWeightUnit: calleeProfile.getWeightUnit.bind(calleeProfile),
     getColorBucketForFrame,
   })
 })

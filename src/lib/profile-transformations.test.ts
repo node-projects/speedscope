@@ -1,10 +1,11 @@
-import {CallTreeProfileBuilder} from './profile'
+import {CallTreeProfileBuilder, StackListProfileBuilder} from './profile'
 import {exportProfileGroup, importSpeedscopeProfiles} from './file-format'
 import {
   combineProfiles,
   cropProfile,
   groupProfileByFile,
   invertProfile,
+  filterProfile,
 } from './profile-transformations'
 
 function profile(name = 'test', file = 'a.ts') {
@@ -72,4 +73,131 @@ test('file grouping preserves total weight and file-level self time (#339)', () 
   expect(root.frame.name).toBe('a.ts')
   expect(root.getSelfWeight()).toBe(6)
   expect(root.children[0].frame.name).toBe('b.ts')
+})
+
+test('frame filters retain remaining stack weights and reattribute hidden leaf self weight', async () => {
+  const original = profile()
+  const before = exportProfileGroup({name: 'group', indexToView: 0, profiles: [original]})
+  const outerOnly = await filterProfile(original, {field: 'file', include: ['A.TS'], exclude: []})
+  expect(outerOnly.getTotalWeight()).toBe(10) // 2 idle units omitted
+  const outer = outerOnly.getGroupedCalltreeRoot().children[0]
+  expect(outer.frame.name).toBe('outer')
+  expect(outer.getSelfWeight()).toBe(10) // includes the 4 hidden inner units
+  expect(outer.children).toHaveLength(0)
+  const innerOnly = await filterProfile(original, {field: 'name', include: [], exclude: ['outer']})
+  expect(innerOnly.getTotalWeight()).toBe(4) // outer-only stacks omitted
+  expect(innerOnly.getGroupedCalltreeRoot().children[0].frame.name).toBe('inner')
+  expect(innerOnly.isChronological()).toBe(false)
+  expect(innerOnly.isDerived()).toBe(true)
+  expect(exportProfileGroup({name: 'group', indexToView: 0, profiles: [original]})).toEqual(before)
+})
+
+test('include rules are ORed; excludes win, file separators normalize, and unknown paths do not match', async () => {
+  const builder = new StackListProfileBuilder()
+  builder.appendSampleWithWeight(
+    [
+      {key: 0, name: 'app', file: 'C:\\src\\app.ts'},
+      {key: '0', name: 'hidden', file: 'C:\\src\\vendor\\lib.ts'},
+      {key: 2, name: 'unmapped'},
+    ],
+    3,
+  )
+  const original = builder.build()
+  const filtered = await filterProfile(original, {
+    field: 'file',
+    include: ['missing/', 'C:/SRC/'],
+    exclude: ['vendor/'],
+  })
+  expect(filtered.getTotalWeight()).toBe(3)
+  expect(filtered.getGroupedCalltreeRoot().children[0].frame.name).toBe('app')
+  expect(filtered.getGroupedCalltreeRoot().children[0].children).toHaveLength(0)
+  const none = await filterProfile(original, {
+    field: 'either',
+    include: ['unmapped'],
+    exclude: ['unmapped'],
+  })
+  expect(none.getTotalWeight()).toBe(0)
+})
+
+test('filter descriptions, source identity, units and derived flags survive export/reimport', async () => {
+  const original = profile()
+  const derived = await filterProfile(original, {
+    field: 'either',
+    include: ['outer', 'b.ts'],
+    exclude: [],
+  })
+  const imported = importSpeedscopeProfiles(
+    exportProfileGroup({name: 'group', indexToView: 1, profiles: [original, derived]}),
+  )
+  expect(imported.profiles[1].getName()).toContain('filter either: include ["outer","b.ts"]')
+  expect(imported.profiles[1].isDerived()).toBe(true)
+  expect(imported.profiles[1].isChronological()).toBe(false)
+  expect(imported.profiles[1].getWeightUnit()).toBe(original.getWeightUnit())
+  expect(combineProfiles(imported.profiles).getTotalWeight()).toBe(10)
+})
+
+test('filters preserve distinct source identities for equal names and numeric/string keys', async () => {
+  const builder = new StackListProfileBuilder()
+  builder.appendSampleWithWeight([{key: 0, name: 'same', file: 'a.ts', line: 2, col: 3}], 2)
+  builder.appendSampleWithWeight([{key: '0', name: 'same', file: 'b.ts', line: 4, col: 5}], 3)
+  const result = await filterProfile(builder.build(), {
+    field: 'name',
+    include: ['same'],
+    exclude: [],
+  })
+  const nodes = result.getGroupedCalltreeRoot().children
+  expect(nodes).toHaveLength(2)
+  expect(
+    nodes.map(n => [n.frame.key, n.frame.file, n.frame.line, n.frame.col, n.getTotalWeight()]),
+  ).toEqual(
+    expect.arrayContaining([
+      [0, 'a.ts', 2, 3, 2],
+      ['0', 'b.ts', 4, 5, 3],
+    ]),
+  )
+})
+
+test('deep grouped filtering yields, supports cancellation, and avoids recursive traversal', async () => {
+  const builder = new StackListProfileBuilder()
+  builder.appendSampleWithWeight(
+    Array.from({length: 20000}, (_, i) => ({
+      key: i,
+      name: `f${i}`,
+      file: i % 2 ? 'vendor.ts' : 'app.ts',
+    })),
+    1,
+  )
+  const original = builder.build()
+  let yields = 0
+  const filtered = await filterProfile(
+    original,
+    {field: 'file', include: ['app.ts'], exclude: []},
+    {
+      yieldControl: async () => {
+        yields++
+      },
+    },
+  )
+  expect(yields).toBeGreaterThan(2)
+  let calls = 0
+  filtered.forEachCall(
+    () => calls++,
+    () => {},
+  )
+  expect(calls).toBe(10000)
+  const controller = new AbortController()
+  let pauses = 0
+  await expect(
+    filterProfile(
+      original,
+      {field: 'file', include: ['app.ts'], exclude: []},
+      {
+        signal: controller.signal,
+        yieldControl: async () => {
+          if (++pauses === 2) controller.abort()
+        },
+      },
+    ),
+  ).rejects.toMatchObject({name: 'AbortError'})
+  expect(original.getTotalWeight()).toBe(1)
 })

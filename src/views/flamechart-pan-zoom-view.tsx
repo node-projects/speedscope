@@ -19,7 +19,7 @@ import {BatchCanvasTextRenderer, BatchCanvasRectRenderer} from '../lib/canvas-2d
 import {Color} from '../lib/color'
 import {Theme} from './themes/theme'
 import {minimapMousePositionAtom} from '../app-state'
-import {axisTicks} from '../lib/axis-ticks'
+import {axisTicks, niceTickInterval} from '../lib/axis-ticks'
 
 interface FlamechartFrameLabel {
   configSpaceBounds: Rect
@@ -388,13 +388,7 @@ export class FlamechartPanZoomView extends Component<FlamechartPanZoomViewProps,
       this.configSpaceToPhysicalViewSpace().inverted() || new AffineTransform()
     ).times(this.logicalToPhysicalViewSpace())
     const targetInterval = logicalToConfig.transformVector(new Vec2(200, 1)).x
-    const minInterval = Math.pow(10, Math.floor(Math.log10(targetInterval)))
-    let interval = minInterval
-    if (targetInterval / interval > 5) {
-      interval *= 5
-    } else if (targetInterval / interval > 2) {
-      interval *= 2
-    }
+    const interval = niceTickInterval(targetInterval, this.props.flamechart.getWeightUnit())
 
     const theme = this.props.theme
 

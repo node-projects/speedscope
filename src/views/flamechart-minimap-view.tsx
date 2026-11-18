@@ -10,6 +10,7 @@ import {cachedMeasureTextWidth} from '../lib/text-utils'
 import {Color} from '../lib/color'
 import {Theme} from './themes/theme'
 import {minimapMousePositionAtom} from '../app-state'
+import {axisTicks, niceTickInterval} from '../lib/axis-ticks'
 
 interface FlamechartMinimapViewProps {
   theme: Theme
@@ -132,14 +133,7 @@ export class FlamechartMinimapView extends Component<FlamechartMinimapViewProps,
     ctx.font = `${physicalViewSpaceFontSize}px/${physicalViewSpaceFrameHeight}px ${FontFamily.MONOSPACE}`
     ctx.textBaseline = 'top'
 
-    const minInterval = Math.pow(10, Math.floor(Math.log10(targetInterval)))
-    let interval = minInterval
-
-    if (targetInterval / interval > 5) {
-      interval *= 5
-    } else if (targetInterval / interval > 2) {
-      interval *= 2
-    }
+    const interval = niceTickInterval(targetInterval, this.props.flamechart.getWeightUnit())
 
     const theme = this.props.theme
 
@@ -148,14 +142,19 @@ export class FlamechartMinimapView extends Component<FlamechartMinimapViewProps,
       ctx.fillRect(0, 0, physicalViewSize.x, physicalViewSpaceFrameHeight)
       ctx.textBaseline = 'top'
 
-      for (let x = Math.ceil(left / interval) * interval; x < right; x += interval) {
-        // TODO(jlfwong): Ensure that labels do not overlap
+      const ticks = axisTicks(left, right, interval)
+      let previousLabelRight = -Infinity
+      for (const x of ticks.positions) {
         const pos = Math.round(configToPhysical.transformPosition(new Vec2(x, 0)).x)
-        const labelText = this.props.flamechart.formatValue(x)
+        const labelText = this.props.flamechart.formatValue(x, ticks.interval)
         const textWidth = Math.ceil(cachedMeasureTextWidth(ctx, labelText))
 
         ctx.fillStyle = theme.fgPrimaryColor
-        ctx.fillText(labelText, pos - textWidth - labelPaddingPx, labelPaddingPx)
+        const labelLeft = pos - textWidth - labelPaddingPx
+        if (labelLeft >= previousLabelRight + labelPaddingPx) {
+          ctx.fillText(labelText, labelLeft, labelPaddingPx)
+          previousLabelRight = pos - labelPaddingPx
+        }
         ctx.fillStyle = theme.fgSecondaryColor
         ctx.fillRect(pos, 0, 1, physicalViewSize.y)
       }

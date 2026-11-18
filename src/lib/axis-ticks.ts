@@ -1,5 +1,15 @@
 // Index ticks instead of repeatedly adding a small float to a large origin.
 // Clamp below representable precision and cap work for degenerate viewports.
+import {FileFormat} from './file-format-spec'
+
+export function niceTickInterval(target: number, unit: FileFormat.ValueUnit = 'none'): number {
+  if (!Number.isFinite(target) || target <= 0) return 0
+  if (unit === 'bytes') return Math.pow(2, Math.floor(Math.log2(target)))
+  const base = Math.max(Number.MIN_VALUE, Math.pow(10, Math.floor(Math.log10(target))))
+  const ratio = target / base
+  return base * (ratio >= 5 ? 5 : ratio >= 2 ? 2 : 1)
+}
+
 export function axisTicks(left: number, right: number, interval: number) {
   const positions: number[] = []
   if (![left, right, interval].every(Number.isFinite) || right <= left || interval <= 0)
