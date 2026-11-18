@@ -24,6 +24,12 @@ jobs:
       - run: npm test
         env:
           CI: true
+      - name: Build standalone release
+        run: npm run prepack
+      - uses: actions/upload-artifact@v4
+        with:
+          name: standalone-${{ matrix.node-version }}
+          path: dist/speedscope-*.zip
       - name: Try CLI
         run: node bin/cli.mjs -v
       - name: Coveralls Parallel

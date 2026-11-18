@@ -139,9 +139,12 @@ async function _importProfileGroup(dataSource: ProfileDataSource): Promise<Profi
 
   // Second pass: Try to guess what file format it is based on structure
   let parsed: any
+  let jsonError: unknown
   try {
     parsed = contents.parseAsJSON()
-  } catch (e) {}
+  } catch (e) {
+    jsonError = e
+  }
   if (parsed) {
     if (parsed['$schema'] === 'https://www.speedscope.app/file-format-schema.json') {
       console.log('Importing as speedscope json file')
@@ -233,6 +236,7 @@ async function _importProfileGroup(dataSource: ProfileDataSource): Promise<Profi
   }
 
   // Unrecognized format
+  if (jsonError && /^\s*[\[{]/.test(contents.firstChunk())) throw jsonError
   return null
 }
 

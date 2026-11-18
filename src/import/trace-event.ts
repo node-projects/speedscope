@@ -143,13 +143,23 @@ type Trace = TraceEvent[] | TraceEventObject | TraceWithSamples
 // Some producers omit "pid" or "tid" (e.g. only emitting a tid to keep the file
 // small). Treat a missing value as 0 so that events, process names and thread
 // names still line up.
-function normalizeId(id: number | string | null | undefined): number {
-  return Number(id ?? 0)
+type TraceId = number | string
+
+function normalizeId(id: number | string | null | undefined): TraceId {
+  if (id == null) return 0
+  if (typeof id === 'string') {
+    const numeric = Number(id)
+    return id.trim() !== '' && Number.isSafeInteger(numeric) ? numeric : id
+  }
+  if (!Number.isFinite(id)) throw new Error('Trace IDs must be finite numbers or strings')
+  return id
 }
 
-function pidTidKey(pid: number, tid: number): string {
+function pidTidKey(pid: TraceId, tid: TraceId): string {
   // We zero-pad the PID and TID to make sorting them by pid/tid pair later easier.
-  return `${zeroPad('' + pid, 10)}:${zeroPad('' + tid, 10)}`
+  const part = (id: TraceId) =>
+    typeof id === 'number' ? zeroPad('' + id, 10) : `s${encodeURIComponent(id)}`
+  return `${part(pid)}:${part(tid)}`
 }
 
 function partitionByPidTid<T extends {tid?: number | string | null; pid?: number | string | null}>(
@@ -195,6 +205,7 @@ function selectQueueToTakeFromNext(
 function convertToEventQueues(events: ImportableTraceEvent[]): [BTraceEvent[], ETraceEvent[]] {
   const beginEvents: BTraceEvent[] = []
   const endEvents: ETraceEvent[] = []
+  let timestampPrecision = 0
 
   // Rebase all of the timestamps on the lowest timestamp
   if (events.length > 0) {
@@ -202,6 +213,8 @@ function convertToEventQueues(events: ImportableTraceEvent[]): [BTraceEvent[], E
     for (let ev of events) {
       firstTs = Math.min(firstTs, ev.ts)
     }
+    if (firstTs !== 0)
+      timestampPrecision = Math.pow(2, Math.floor(Math.log2(Math.abs(firstTs))) - 52)
     for (let ev of events) {
       ev.ts -= firstTs
     }
@@ -254,10 +267,26 @@ function convertToEventQueues(events: ImportableTraceEvent[]): [BTraceEvent[], E
     return 0
   })
 
+  const activeXEnds: ETraceEvent[] = []
   for (let x of xEvents) {
     const xDur = dur(x)
+    while (activeXEnds.length && activeXEnds[activeXEnds.length - 1].ts <= x.ts) activeXEnds.pop()
+    const previousEnd = lastOf(activeXEnds)
+    // Epoch-sized timestamps can round adjacent scopes into a tiny crossing
+    // overlap. Repair only crossings within one original timestamp ULP;
+    // genuinely nested scopes retain their original ordering and duration.
+    if (
+      previousEnd &&
+      previousEnd.ts - x.ts <= timestampPrecision &&
+      previousEnd.ts < x.ts + xDur
+    ) {
+      previousEnd.ts = x.ts
+      activeXEnds.pop()
+    }
     beginEvents.push({...x, ph: 'B'} as BTraceEvent)
-    endEvents.push({...x, ph: 'E', ts: x.ts + xDur} as ETraceEvent)
+    const end = {...x, ph: 'E', ts: x.ts + xDur} as ETraceEvent
+    endEvents.push(end)
+    activeXEnds.push(end)
   }
 
   function compareTimestamps(a: TraceEvent, b: TraceEvent) {
@@ -288,8 +317,8 @@ function filterIgnoredEventTypes(events: TraceEvent[]): ImportableTraceEvent[] {
   return ret
 }
 
-function getProcessNamesByPid(events: TraceEvent[]): Map<number, string> {
-  const processNamesByPid = new Map<number, string>()
+function getProcessNamesByPid(events: TraceEvent[]): Map<TraceId, string> {
+  const processNamesByPid = new Map<TraceId, string>()
   for (let ev of events) {
     if (ev.ph === 'M' && ev.name === 'process_name' && ev.args && ev.args.name) {
       processNamesByPid.set(normalizeId(ev.pid), ev.args.name)
@@ -356,8 +385,8 @@ function frameInfoForEvent(
 function getProfileName(
   processName: string | undefined,
   threadName: string | undefined,
-  pid: number,
-  tid: number,
+  pid: TraceId,
+  tid: TraceId,
 ): string {
   if (processName != null && threadName != null) {
     return `${processName} (pid ${pid}), ${threadName} (tid ${tid})`
@@ -473,14 +502,15 @@ function eventListToProfile(
     const eFrameInfo = frameInfoForEvent(e, exporterSource)
     const bFrameInfo = lastOf(frameInfoStack)!
 
-    if (e.name !== b.name) {
+    // Duration-end events may omit name and args: they close the current frame.
+    if (e.name != null && e.name !== b.name) {
       console.warn(
         `ts=${e.ts}: Tried to end "${eFrameInfo.key}" when "${bFrameInfo.key}" was on the top of the stack. Doing nothing instead.`,
       )
       return
     }
 
-    if (eFrameInfo.key !== bFrameInfo.key) {
+    if (e.name != null && eFrameInfo.key !== bFrameInfo.key) {
       console.warn(
         `ts=${e.ts}: Tried to end "${eFrameInfo.key}" when "${bFrameInfo.key}" was on the top of the stack. Ending ${bFrameInfo.key} instead.`,
       )

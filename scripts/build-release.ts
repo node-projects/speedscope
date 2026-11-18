@@ -39,6 +39,8 @@ async function main() {
       ? {
           format: 'iife',
           splitting: false,
+          target: 'es2020',
+          loader: {...buildOptions.loader, '.wasm': 'binary'},
         }
       : {}),
     outdir,

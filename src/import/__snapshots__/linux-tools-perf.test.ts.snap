@@ -228,7 +228,7 @@ exports[`importFromLinuxPerf forks.linux-perf.txt 2`] = `
       "totalWeight": 0.003918000002158806,
     },
   ],
-  "name": "swapper",
+  "name": "swapper tid: 0",
   "stacks": [
     "??? ([kernel.kallsyms]);??? ([unknown]);??? ([unknown]);??? ([unknown]);??? ([unknown]);??? ([unknown]);??? ([unknown]);??? ([unknown]);??? ([unknown]);??? ([unknown]);??? ([unknown]);??? ([unknown]);??? ([unknown]);??? ([unknown]);??? ([unknown]);??? ([unknown]);??? ([unknown]);??? ([unknown]);??? ([unknown]);??? ([kernel.kallsyms]);??? ([kernel.kallsyms]);??? ([kernel.kallsyms]);??? ([kernel.kallsyms]);??? ([kernel.kallsyms]);??? ([kernel.kallsyms]);??? ([kernel.kallsyms]);??? ([kernel.kallsyms]) 496.00µs",
     "??? ([kernel.kallsyms]);??? ([kernel.kallsyms]);??? ([kernel.kallsyms]);??? ([kernel.kallsyms]) 13.90ms",
@@ -1357,7 +1357,7 @@ exports[`importFromLinuxPerf system-wide.linux-perf.txt 2`] = `
       "totalWeight": 0.0014475000207312405,
     },
   ],
-  "name": "swapper",
+  "name": "swapper tid: 0",
   "stacks": [
     "??? ([kernel.kallsyms]);??? ([kernel.kallsyms]);??? ([kernel.kallsyms]) 17.00µs",
     "??? ([kernel.kallsyms]);??? ([kernel.kallsyms]);??? ([kernel.kallsyms]);??? ([kernel.kallsyms]) 9.55ms",
@@ -1615,7 +1615,7 @@ exports[`importFromLinuxPerf system-wide.linux-perf.txt chunked 2`] = `
       "totalWeight": 0.0014475000207312405,
     },
   ],
-  "name": "swapper",
+  "name": "swapper tid: 0",
   "stacks": [
     "??? ([kernel.kallsyms]);??? ([kernel.kallsyms]);??? ([kernel.kallsyms]) 17.00µs",
     "??? ([kernel.kallsyms]);??? ([kernel.kallsyms]);??? ([kernel.kallsyms]);??? ([kernel.kallsyms]) 9.55ms",

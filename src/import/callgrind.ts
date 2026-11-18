@@ -517,6 +517,21 @@ class CallgrindParser {
         break
       }
 
+      case 'jfi':
+      case 'jfl': {
+        this.parseNameWithCompression(value, this.savedFileNames)
+        break
+      }
+      case 'jfn': {
+        this.parseNameWithCompression(value, this.savedFunctionNames)
+        break
+      }
+      case 'jump':
+      case 'jcnd': {
+        // Jump records describe control flow, not additional execution costs.
+        break
+      }
+
       default: {
         console.log(`Ignoring assignment to unrecognized key "${line}" on line ${this.lineNum}`)
       }

@@ -14,7 +14,12 @@ export const enum ColorScheme {
 const localStorageKey = 'speedscope-color-scheme'
 
 function getStoredPreference(): ColorScheme {
-  const storedPreference = window.localStorage && window.localStorage[localStorageKey]
+  let storedPreference: string | undefined
+  try {
+    storedPreference = window.localStorage[localStorageKey]
+  } catch {
+    // Sandboxed embeds and browsers with storage disabled can still use the viewer.
+  }
   if (storedPreference === 'DARK') {
     return ColorScheme.DARK
   } else if (storedPreference === 'LIGHT') {
@@ -72,24 +77,27 @@ export const colorSchemeAtom = new ColorSchemeAtom(getStoredPreference(), 'color
 
 colorSchemeAtom.subscribe(() => {
   const value = colorSchemeAtom.get()
-
-  switch (value) {
-    case ColorScheme.DARK: {
-      window.localStorage[localStorageKey] = 'DARK'
-      break
+  try {
+    switch (value) {
+      case ColorScheme.DARK: {
+        window.localStorage[localStorageKey] = 'DARK'
+        break
+      }
+      case ColorScheme.LIGHT: {
+        window.localStorage[localStorageKey] = 'LIGHT'
+        break
+      }
+      case ColorScheme.SYSTEM: {
+        delete window.localStorage[localStorageKey]
+        break
+      }
+      default: {
+        const _exhaustiveCheck: never = value
+        return _exhaustiveCheck
+      }
     }
-    case ColorScheme.LIGHT: {
-      window.localStorage[localStorageKey] = 'LIGHT'
-      break
-    }
-    case ColorScheme.SYSTEM: {
-      delete window.localStorage[localStorageKey]
-      break
-    }
-    default: {
-      const _exhaustiveCheck: never = value
-      return _exhaustiveCheck
-    }
+  } catch {
+    // Keep the in-memory preference when persistent storage is unavailable.
   }
   return value
 })

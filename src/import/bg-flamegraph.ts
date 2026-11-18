@@ -12,14 +12,18 @@ function parseBGFoldedStacks(contents: TextFileContent): BGSample[] {
   const samples: BGSample[] = []
   for (const line of contents.splitLines()) {
     if (/^\s*#/.test(line)) continue
-    const match = /^(.*) (\d+)$/gm.exec(line)
+    const match = /^(.*\S)[ \t]+([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)[ \t]*\r?$/.exec(line)
     if (!match) continue
     const stack = match[1]
     const n = match[2]
 
+    const duration = Number(n)
+    if (!Number.isFinite(duration) || duration < 0) {
+      throw new Error('Folded-stack weights must be finite non-negative numbers')
+    }
     samples.push({
       stack: stack.split(';').map(name => ({key: name, name: name})),
-      duration: parseInt(n, 10),
+      duration,
     })
   }
 

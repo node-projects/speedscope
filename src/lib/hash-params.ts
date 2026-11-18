@@ -16,6 +16,8 @@ function getViewMode(value: string): ViewMode | null {
       return ViewMode.LEFT_HEAVY_FLAME_GRAPH
     case 'sandwich':
       return ViewMode.SANDWICH_VIEW
+    case 'call-tree':
+      return ViewMode.CALL_TREE
     default:
       return null
   }
@@ -29,8 +31,10 @@ export function getHashParams(hashContents = window.location.hash): HashParams {
     const components = hashContents.substr(1).split('&')
     const result: HashParams = {}
     for (const component of components) {
-      let [key, value] = component.split('=')
-      value = decodeURIComponent(value)
+      const equals = component.indexOf('=')
+      if (equals === -1) continue
+      const key = component.slice(0, equals)
+      const value = decodeURIComponent(component.slice(equals + 1))
       if (key === 'profileURL') {
         result.profileURL = value
       } else if (key === 'title') {

@@ -1,6 +1,9 @@
 import {getHashParams} from './hash-params'
 
 test('getHashParams', () => {
+  expect(getHashParams('#profileURL=data:application/json;base64,e30=')).toEqual({
+    profileURL: 'data:application/json;base64,e30=',
+  })
   expect(getHashParams('')).toEqual({})
   expect(getHashParams('#')).toEqual({})
   expect(getHashParams('#title=hello')).toEqual({title: 'hello'})

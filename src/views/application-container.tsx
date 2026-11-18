@@ -16,6 +16,7 @@ import {
 import {useAtom} from '../lib/atom'
 import {ProfileSearchContextProvider} from './search-view'
 import {Application} from './application'
+import {ViewMode} from '../lib/view-mode'
 
 export const ApplicationContainer = memo(() => {
   const canvas = useAtom(glCanvasAtom)
@@ -32,7 +33,7 @@ export const ApplicationContainer = memo(() => {
 
   useEffect(() => {
     if (canvasError) {
-      errorAtom.set(true)
+      viewModeAtom.set(ViewMode.CALL_TREE)
     }
   }, [canvasError])
 

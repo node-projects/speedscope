@@ -24,9 +24,14 @@ export function dumpProfile(profile: Profile): any {
 
   function maybeEmit(value: number) {
     if (lastValue != value) {
-      dump.stacks.push(
-        curStack.map(k => `${k}`).join(';') + ` ${profile.formatValue(value - lastValue)}`,
-      )
+      // Snapshots should compare weights independently of the test machine's locale.
+      // The application still formats raw values using the user's locale.
+      const weight = value - lastValue
+      const formatted =
+        profile.getWeightUnit() === 'none'
+          ? weight.toLocaleString('en-US')
+          : profile.formatValue(weight)
+      dump.stacks.push(curStack.map(k => `${k}`).join(';') + ` ${formatted}`)
       lastValue = value
     }
   }

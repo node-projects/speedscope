@@ -20,6 +20,7 @@ import {ProfileGroupState} from '../app-state/profile-group'
 import {HashParams} from '../lib/hash-params'
 import {StatelessComponent} from '../lib/preact-helpers'
 import {SandwichViewContainer} from './sandwich-view'
+import {CallTreeView} from './call-tree-view'
 
 const importModule = import('../import')
 
@@ -73,6 +74,7 @@ interface GLCanvasProps {
 }
 export class GLCanvas extends StatelessComponent<GLCanvasProps> {
   private canvas: HTMLCanvasElement | null = null
+  private resizing = false
 
   private ref = (canvas: Element | null) => {
     if (canvas instanceof HTMLCanvasElement) {
@@ -96,6 +98,7 @@ export class GLCanvas extends StatelessComponent<GLCanvasProps> {
   private maybeResize = () => {
     if (!this.container) return
     if (!this.props.canvasContext) return
+    if (this.resizing) return
 
     let {width, height} = this.container.getBoundingClientRect()
 
@@ -104,12 +107,17 @@ export class GLCanvas extends StatelessComponent<GLCanvasProps> {
     const widthInPixels = width * window.devicePixelRatio
     const heightInPixels = height * window.devicePixelRatio
 
-    this.props.canvasContext.gl.resize(
-      widthInPixels,
-      heightInPixels,
-      widthInAppUnits,
-      heightInAppUnits,
-    )
+    this.resizing = true
+    try {
+      this.props.canvasContext.gl.resize(
+        widthInPixels,
+        heightInPixels,
+        widthInAppUnits,
+        heightInAppUnits,
+      )
+    } finally {
+      this.resizing = false
+    }
   }
 
   onWindowResize = () => {
@@ -170,12 +178,13 @@ export type ApplicationProps = {
 }
 
 export class Application extends StatelessComponent<ApplicationProps> {
+  private loadError = ''
+
   private async loadProfile(loader: () => Promise<ProfileGroup | null>) {
+    this.loadError = ''
     this.props.setError(false)
     this.props.setLoading(true)
     await new Promise(resolve => setTimeout(resolve, 0))
-
-    if (!this.props.glCanvas) return
 
     console.time('import')
 
@@ -184,7 +193,10 @@ export class Application extends StatelessComponent<ApplicationProps> {
       profileGroup = await loader()
     } catch (e) {
       console.log('Failed to load format', e)
+      this.loadError = e instanceof Error ? e.message : String(e)
       this.props.setError(true)
+      this.props.setLoading(false)
+      console.timeEnd('import')
       return
     }
 
@@ -211,13 +223,16 @@ export class Application extends StatelessComponent<ApplicationProps> {
       this.props.setViewMode(this.props.hashParams.viewMode)
     }
 
-    for (let profile of profileGroup.profiles) {
-      await profile.demangle()
-    }
-
-    for (let profile of profileGroup.profiles) {
-      const title = this.props.hashParams.title || profile.getName()
-      profile.setName(title)
+    try {
+      for (let profile of profileGroup.profiles) {
+        await profile.demangle()
+      }
+    } catch (e) {
+      this.loadError = e instanceof Error ? e.message : String(e)
+      this.props.setError(true)
+      this.props.setLoading(false)
+      console.timeEnd('import')
+      return
     }
 
     console.timeEnd('import')
@@ -353,6 +368,8 @@ export class Application extends StatelessComponent<ApplicationProps> {
       this.props.setViewMode(ViewMode.LEFT_HEAVY_FLAME_GRAPH)
     } else if (ev.key === '3') {
       this.props.setViewMode(ViewMode.SANDWICH_VIEW)
+    } else if (ev.key === '4') {
+      this.props.setViewMode(ViewMode.CALL_TREE)
     } else if (ev.key === 'r') {
       const {flattenRecursion} = this.props
       this.props.setFlattenRecursion(!flattenRecursion)
@@ -445,7 +462,10 @@ export class Application extends StatelessComponent<ApplicationProps> {
         }
 
         const response: Response = await fetch(profileURL, fetchOpts)
-        let filename = new URL(profileURL, window.location.href).pathname
+        if (!response.ok) throw new Error(`Could not load profile: HTTP ${response.status}`)
+        let filename = profileURL.startsWith('data:')
+          ? 'profile'
+          : new URL(profileURL, window.location.href).pathname
         if (filename.includes('/')) {
           filename = filename.slice(filename.lastIndexOf('/') + 1)
         }
@@ -559,9 +579,9 @@ export class Application extends StatelessComponent<ApplicationProps> {
     const style = this.getStyle()
 
     return (
-      <div className={css(style.error)}>
+      <div className={css(style.error)} role="alert">
         <div>😿 Something went wrong.</div>
-        <div>Check the JS console for more details.</div>
+        <div>{this.loadError || 'Check the JS console for more details.'}</div>
       </div>
     )
   }
@@ -580,6 +600,10 @@ export class Application extends StatelessComponent<ApplicationProps> {
 
     if (loading) {
       return this.renderLoadingBar()
+    }
+
+    if (activeProfileState && viewMode === ViewMode.CALL_TREE) {
+      return <CallTreeView profile={activeProfileState.profile} />
     }
 
     if (!activeProfileState || !glCanvas) {

@@ -205,14 +205,13 @@ export class BufferBackedTextFileContent implements TextFileContent {
       // only exists for older browser support.
 
       console.warn('This browser does not support TextDecoder. Decoding text as ASCII.')
-      this.chunks.push('')
-      for (let i = 0; i < byteArray.length; i++) {
-        this.chunks[this.chunks.length - 1] += String.fromCharCode(byteArray[i])
-        ;(this.chunks[this.chunks.length - 1] as any) | 0 // This forces the string to be flattened
-
-        if (this.chunks[this.chunks.length - 1].length >= TEXT_FILE_CHUNK_SIZE) {
-          this.chunks.push('')
+      for (let offset = 0; offset < byteArray.length; offset += TEXT_FILE_CHUNK_SIZE) {
+        const end = Math.min(offset + TEXT_FILE_CHUNK_SIZE, byteArray.length)
+        const pieces: string[] = []
+        for (let i = offset; i < end; i += 8192) {
+          pieces.push(String.fromCharCode(...byteArray.subarray(i, Math.min(i + 8192, end))))
         }
+        this.chunks.push(pieces.join(''))
       }
     }
   }
@@ -341,11 +340,12 @@ export class MaybeCompressedDataReader implements ProfileDataSource {
   }
 
   static fromFile(file: File): MaybeCompressedDataReader {
-    const maybeCompressedDataPromise: Promise<ArrayBuffer> = new Promise(resolve => {
+    const maybeCompressedDataPromise: Promise<ArrayBuffer> = new Promise((resolve, reject) => {
       const reader = new FileReader()
       reader.addEventListener('loadend', () => {
         if (!(reader.result instanceof ArrayBuffer)) {
-          throw new Error('Expected reader.result to be an instance of ArrayBuffer')
+          reject(reader.error || new Error('Could not read profile file'))
+          return
         }
         resolve(reader.result)
       })
