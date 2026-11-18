@@ -3,11 +3,11 @@ import {h, createContext, ComponentChildren, Fragment} from 'preact'
 import {useCallback, useRef, useEffect, useMemo} from 'preact/hooks'
 import {memo} from 'preact/compat'
 import {Sizes, FontSize} from './style'
-import {ProfileSearchResults} from '../lib/profile-search'
+import {ProfileSearchResults, SearchMode} from '../lib/profile-search'
 import {Profile} from '../lib/profile'
 import {useActiveProfileState} from '../app-state/active-profile-state'
 import {useTheme, withTheme} from './themes/theme'
-import {searchIsActiveAtom, searchQueryAtom} from '../app-state'
+import {searchIsActiveAtom, searchQueryAtom, searchModeAtom} from '../app-state'
 import {useAtom} from '../lib/atom'
 
 function stopPropagation(ev: Event) {
@@ -21,13 +21,14 @@ export const ProfileSearchContextProvider = ({children}: {children: ComponentChi
   const profile: Profile | null = activeProfileState ? activeProfileState.profile : null
   const searchIsActive = useAtom(searchIsActiveAtom)
   const searchQuery = useAtom(searchQueryAtom)
+  const searchMode = useAtom(searchModeAtom)
 
   const searchResults = useMemo(() => {
     if (!profile || !searchIsActive || searchQuery.length === 0) {
       return null
     }
-    return new ProfileSearchResults(profile, searchQuery)
-  }, [searchIsActive, searchQuery, profile])
+    return new ProfileSearchResults(profile, searchQuery, searchMode)
+  }, [searchIsActive, searchQuery, searchMode, profile])
 
   return (
     <ProfileSearchContext.Provider value={searchResults}>{children}</ProfileSearchContext.Provider>
@@ -47,6 +48,7 @@ export const SearchView = memo(
     const style = getStyle(theme)
     const searchIsActive = useAtom(searchIsActiveAtom)
     const searchQuery = useAtom(searchQueryAtom)
+    const searchMode = useAtom(searchModeAtom)
     const setSearchQuery = searchQueryAtom.set
     const setSearchIsActive = searchIsActiveAtom.set
 
@@ -135,6 +137,19 @@ export const SearchView = memo(
     return (
       <div className={css(style.searchView)}>
         <span className={css(style.icon)}>🔍</span>
+        <select
+          aria-label="Search match mode"
+          value={searchMode}
+          onChange={ev =>
+            searchModeAtom.set((ev.currentTarget as HTMLSelectElement).value as SearchMode)
+          }
+          onKeyDown={stopPropagation}
+          onKeyPress={stopPropagation}
+        >
+          <option value={SearchMode.SUBSTRING}>Contains</option>
+          <option value={SearchMode.WHOLE_WORD}>Whole word</option>
+          <option value={SearchMode.EXACT}>Exact</option>
+        </select>
         <span className={css(style.inputContainer)}>
           <input
             aria-label="Search functions or files"
@@ -200,7 +215,8 @@ const getStyle = withTheme(theme =>
       top: 0,
       right: 10,
       height: Sizes.TOOLBAR_HEIGHT,
-      width: 16 * 13,
+      width: 360,
+      maxWidth: 'calc(100% - 20px)',
       borderWidth: 2,
       borderColor: theme.altFgPrimaryColor,
       borderStyle: 'solid',

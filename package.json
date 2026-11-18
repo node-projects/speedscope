@@ -22,6 +22,8 @@
     "speedscope": "./bin/cli.mjs"
   },
   "scripts": {
+    "backlog:generate": "node scripts/generate-issue-backlog.mjs",
+    "backlog:check": "node scripts/generate-issue-backlog.mjs --check",
     "build:pages": "node scripts/prepare-release.mjs --protocol http",
     "deploy": "gh workflow run pages.yml --ref main",
     "release:version": "node scripts/set-release-version.mjs",
@@ -33,7 +35,7 @@
     "typecheck": "tsc --noEmit",
     "test:node": "node --test bin/server.test.mjs scripts/set-release-version.test.mjs",
     "schema:check": "node scripts/generate-file-format-schema-json.js --check",
-    "test": "npm run typecheck && npm run lint && npm run jest && npm run test:node && npm run schema:check",
+    "test": "npm run typecheck && npm run lint && npm run jest && npm run test:node && npm run schema:check && npm run backlog:check",
     "serve": "tsx scripts/dev-server.ts"
   },
   "files": [
