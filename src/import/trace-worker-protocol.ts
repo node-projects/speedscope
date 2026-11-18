@@ -7,6 +7,7 @@ export interface TraceWorkerRequest {
 export type ImportPhase =
   | 'Reading profile'
   | 'Parsing profile'
+  | 'Streaming profile'
   | 'Building profile'
   | 'Preparing view'
 export interface ImportProgress {

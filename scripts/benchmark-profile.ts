@@ -1,6 +1,8 @@
 import fs from 'fs'
 import path from 'path'
+import {Readable} from 'stream'
 import {importProfilesFromArrayBuffer} from '../src/import'
+import {importDurationTraceStream} from '../src/import/streaming-trace'
 import {
   combineProfiles,
   invertProfile,
@@ -11,18 +13,35 @@ import {exportProfileGroupToBlob} from '../src/lib/profile-export'
 
 async function main() {
   const [filename, action = 'all'] = process.argv.slice(2)
-  if (!['all', 'import', 'export', 'legacy-export'].includes(action))
+  if (!['all', 'import', 'stream-import', 'export', 'legacy-export'].includes(action))
     throw new Error(`Unknown action: ${action}`)
-  const input = fs.readFileSync(filename)
   const start = Date.now()
-  const group = await importProfilesFromArrayBuffer(
-    path.basename(filename),
-    input.buffer.slice(input.byteOffset, input.byteOffset + input.byteLength),
-  )
+  let group
+  if (action === 'stream-import') {
+    const header = new Uint8Array(2)
+    const fd = fs.openSync(filename, 'r')
+    try {
+      fs.readSync(fd, header)
+    } finally {
+      fs.closeSync(fd)
+    }
+    let stream: ReadableStream<Uint8Array<ArrayBuffer>> = (Readable as any).toWeb(
+      fs.createReadStream(filename, {highWaterMark: 64 * 1024}),
+    )
+    if (header[0] === 0x1f && header[1] === 0x8b)
+      stream = stream.pipeThrough(new DecompressionStream('gzip'))
+    group = await importDurationTraceStream(stream, path.basename(filename))
+  } else {
+    const input = fs.readFileSync(filename)
+    group = await importProfilesFromArrayBuffer(
+      path.basename(filename),
+      input.buffer.slice(input.byteOffset, input.byteOffset + input.byteLength),
+    )
+  }
   if (!group) throw new Error('Unrecognized profile')
   console.log(
     JSON.stringify({
-      action: 'import',
+      action: action === 'stream-import' ? action : 'import',
       ms: Date.now() - start,
       profiles: group.profiles.length,
       totals: group.profiles.map(p => p.getTotalWeight()),
@@ -30,7 +49,7 @@ async function main() {
       maxRssMB: Math.round(process.resourceUsage().maxRSS / 1024),
     }),
   )
-  if (action === 'import') return
+  if (action === 'import' || action === 'stream-import') return
   ;(globalThis as any).gc?.()
   if (action === 'all') {
     let timer = Date.now()

@@ -1,18 +1,25 @@
 import {importProfilesFromArrayBuffer} from './index'
 import {TraceWorkerRequest, TraceWorkerResponse, ImportPhase} from './trace-worker-protocol'
 import {snapshotTransferables} from '../lib/profile-snapshot'
+import {tryImportDurationTrace} from './streaming-trace'
 
 export async function processTraceInWorker(
   request: TraceWorkerRequest,
   progress: (phase: ImportPhase) => void,
 ): Promise<TraceWorkerResponse> {
   progress('Reading profile')
-  const buffer =
-    request.input instanceof ArrayBuffer ? request.input : await request.input.arrayBuffer()
-  let group
+  progress('Streaming profile')
+  let group = await tryImportDurationTrace(request.input, request.name, {
+    onProgress: () => progress('Streaming profile'),
+  })
+  let buffer: ArrayBuffer | undefined
   try {
-    progress('Parsing profile')
-    group = await importProfilesFromArrayBuffer(request.name, buffer)
+    if (!group) {
+      buffer =
+        request.input instanceof ArrayBuffer ? request.input : await request.input.arrayBuffer()
+      progress('Parsing profile')
+      group = await importProfilesFromArrayBuffer(request.name, buffer)
+    }
   } catch (error) {
     // Some host-specific formats need DOM APIs unavailable in a worker. Return
     // ownership of the bytes before trying the original main-thread importer.
@@ -21,6 +28,7 @@ export async function processTraceInWorker(
     throw error
   }
   if (!group) return {type: 'fallback', buffer}
+  progress('Building profile')
   for (const profile of group.profiles) await profile.demangle()
   progress('Preparing view')
   return {type: 'result', group: {...group, profiles: group.profiles.map(p => p.toSnapshot())}}

@@ -168,8 +168,8 @@
       "status": "partial",
       "priority": "P1",
       "workstream": "Large profiles and responsiveness",
-      "evidence": "Removed major quadratic trace queue operations, recursive traversals and ASCII decoding flattening; bounded call-tree DOM added. These are not a general out-of-core importer. Multi-GB/private OOM cases still require worker/streaming and memory-budget work.",
-      "remaining": "Large JSON/trace imports now run in a cancellable worker, with compact transferable trees and chunked UI hydration. True streaming and bounded total memory are still missing; large captures can still exhaust memory."
+      "evidence": "Cursor queues, iterative builders and cancellable workers address identified performance failures. Duration traces now stream plain/gzip bytes without a whole decoded JSON string or full parsed input document, with event/byte/depth limits and exact PLC export equality. A local import-only comparison measured 999 to 623 MiB peak RSS at a latency cost; see docs/LARGE_TRACE_PERFORMANCE.md for methodology and limits.",
+      "remaining": "Streaming now covers duration-event arrays and supported traceEvents wrappers. CPU/sample/native formats and unrecognized wrappers retain their ordinary detector. Sorting, profile trees, snapshots and rendering still consume memory proportional to the capture; limits bound input complexity, not total browser heap. A true out-of-core model, bounded rendering and validation of the original reported capture remain open."
     },
     {
       "id": 518,
@@ -384,8 +384,8 @@
       "status": "partial",
       "priority": "P1",
       "workstream": "Large profiles and responsiveness",
-      "evidence": "Grouped traversal, caller/callee extraction, search and label/outline rendering use explicit stacks. Active-frame membership avoids repeated linear ancestor searches. A 20,000-frame regression covers build, traversal and focused extraction; arbitrary memory exhaustion remains possible.",
-      "remaining": "Identified recursive paths and UI-thread import blocking are mitigated, including deep V8 heaps and worker imports. The original broad failure still needs complete fixture-backed validation; memory limits remain."
+      "evidence": "Cursor queues, iterative builders and cancellable workers address identified performance failures. Duration traces now stream plain/gzip bytes without a whole decoded JSON string or full parsed input document, with event/byte/depth limits and exact PLC export equality. A local import-only comparison measured 999 to 623 MiB peak RSS at a latency cost; see docs/LARGE_TRACE_PERFORMANCE.md for methodology and limits.",
+      "remaining": "Streaming now covers duration-event arrays and supported traceEvents wrappers. CPU/sample/native formats and unrecognized wrappers retain their ordinary detector. Sorting, profile trees, snapshots and rendering still consume memory proportional to the capture; limits bound input complexity, not total browser heap. A true out-of-core model, bounded rendering and validation of the original reported capture remain open."
     },
     {
       "id": 477,
@@ -624,8 +624,8 @@
       "status": "partial",
       "priority": "P3",
       "workstream": "Large profiles and responsiveness",
-      "evidence": "Native JSON is preferred across decoded chunks, with byte-backed fallback beyond the engine string limit. Response.json does not remove the object-memory or engine-limit problem; multi-GB parsing still needs streaming/worker design.",
-      "remaining": "Worker imports avoid blocking the UI, and native JSON is preferred with a byte fallback. Parsed objects and raw input are still retained during import; workers do not remove the engine string limit or provide out-of-core parsing."
+      "evidence": "Cursor queues, iterative builders and cancellable workers address identified performance failures. Duration traces now stream plain/gzip bytes without a whole decoded JSON string or full parsed input document, with event/byte/depth limits and exact PLC export equality. A local import-only comparison measured 999 to 623 MiB peak RSS at a latency cost; see docs/LARGE_TRACE_PERFORMANCE.md for methodology and limits.",
+      "remaining": "Streaming now covers duration-event arrays and supported traceEvents wrappers. CPU/sample/native formats and unrecognized wrappers retain their ordinary detector. Sorting, profile trees, snapshots and rendering still consume memory proportional to the capture; limits bound input complexity, not total browser heap. A true out-of-core model, bounded rendering and validation of the original reported capture remain open."
     },
     {
       "id": 402,
@@ -696,8 +696,8 @@
       "status": "partial",
       "priority": "P1",
       "workstream": "Large profiles and responsiveness",
-      "evidence": "Grouped traversal, caller/callee extraction, search and label/outline rendering use explicit stacks. Active-frame membership avoids repeated linear ancestor searches. A 20,000-frame regression covers build, traversal and focused extraction; arbitrary memory exhaustion remains possible.",
-      "remaining": "Identified recursive paths and UI-thread import blocking are mitigated, including deep V8 heaps and worker imports. The original broad failure still needs complete fixture-backed validation; memory limits remain."
+      "evidence": "Cursor queues, iterative builders and cancellable workers address identified performance failures. Duration traces now stream plain/gzip bytes without a whole decoded JSON string or full parsed input document, with event/byte/depth limits and exact PLC export equality. A local import-only comparison measured 999 to 623 MiB peak RSS at a latency cost; see docs/LARGE_TRACE_PERFORMANCE.md for methodology and limits.",
+      "remaining": "Streaming now covers duration-event arrays and supported traceEvents wrappers. CPU/sample/native formats and unrecognized wrappers retain their ordinary detector. Sorting, profile trees, snapshots and rendering still consume memory proportional to the capture; limits bound input complexity, not total browser heap. A true out-of-core model, bounded rendering and validation of the original reported capture remain open."
     },
     {
       "id": 384,
@@ -912,8 +912,8 @@
       "status": "partial",
       "priority": "P1",
       "workstream": "Large profiles and responsiveness",
-      "evidence": "Removed major quadratic trace queue operations, recursive traversals and ASCII decoding flattening; bounded call-tree DOM added. These are not a general out-of-core importer. Multi-GB/private OOM cases still require worker/streaming and memory-budget work.",
-      "remaining": "Large JSON/trace imports now run in a cancellable worker, with compact transferable trees and chunked UI hydration. True streaming and bounded total memory are still missing; large captures can still exhaust memory."
+      "evidence": "Cursor queues, iterative builders and cancellable workers address identified performance failures. Duration traces now stream plain/gzip bytes without a whole decoded JSON string or full parsed input document, with event/byte/depth limits and exact PLC export equality. A local import-only comparison measured 999 to 623 MiB peak RSS at a latency cost; see docs/LARGE_TRACE_PERFORMANCE.md for methodology and limits.",
+      "remaining": "Streaming now covers duration-event arrays and supported traceEvents wrappers. CPU/sample/native formats and unrecognized wrappers retain their ordinary detector. Sorting, profile trees, snapshots and rendering still consume memory proportional to the capture; limits bound input complexity, not total browser heap. A true out-of-core model, bounded rendering and validation of the original reported capture remain open."
     },
     {
       "id": 346,

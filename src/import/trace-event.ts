@@ -25,7 +25,7 @@ import {TimeFormatter} from '../lib/value-formatters'
 //
 // Spec: https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU/preview
 
-interface TraceEvent {
+export interface TraceEvent {
   // The process ID for the process that output this event.
   pid?: number | string | null
 
