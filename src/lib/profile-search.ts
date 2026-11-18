@@ -1,6 +1,7 @@
 import {Profile, Frame, CallTreeNode} from './profile'
 import {Flamechart, FlamechartFrame} from './flamechart'
 import {Rect, Vec2} from './math'
+import {visitTree} from './utils'
 
 export enum FlamechartType {
   CHRONO_FLAME_CHART,
@@ -21,6 +22,7 @@ export enum FlamechartType {
 //
 // Return ranges for all matches in order to highlight them.
 export function exactMatchStrings(text: string, pattern: string): [number, number][] {
+  if (!pattern.length) return []
   const lowerText = text.toLocaleLowerCase()
   const lowerPattern = pattern.toLocaleLowerCase()
 
@@ -100,15 +102,11 @@ export class FlamechartSearchResults {
           indexForNode.set(node, matches.length)
           matches.push({configSpaceBounds, node})
         }
-
-        frame.children.forEach(child => {
-          visit(child, depth + 1)
-        })
       }
 
       const layers = this.flamechart.getLayers()
       if (layers.length > 0) {
-        layers[0].forEach(frame => visit(frame, 0))
+        visitTree(layers[0], visit)
       }
 
       this.matches = {matches, indexForNode}

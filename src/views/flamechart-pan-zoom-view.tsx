@@ -1,3 +1,4 @@
+import {visitTree} from '../lib/utils'
 import {Rect, AffineTransform, Vec2, clamp} from '../lib/math'
 import {CallTreeNode} from '../lib/profile'
 import {Flamechart, FlamechartFrame} from '../lib/flamechart'
@@ -202,14 +203,14 @@ export class FlamechartPanZoomView extends Component<FlamechartPanZoomViewProps,
       const y = this.props.renderInverted ? this.configSpaceSize().y - 1 - depth : depth
       const configSpaceBounds = new Rect(new Vec2(frame.start, y), new Vec2(width, 1))
 
-      if (width < minConfigSpaceWidthToRender) return
-      if (configSpaceBounds.left() > this.props.configSpaceViewportRect.right()) return
-      if (configSpaceBounds.right() < this.props.configSpaceViewportRect.left()) return
+      if (width < minConfigSpaceWidthToRender) return false
+      if (configSpaceBounds.left() > this.props.configSpaceViewportRect.right()) return false
+      if (configSpaceBounds.right() < this.props.configSpaceViewportRect.left()) return false
 
       if (this.props.renderInverted) {
-        if (configSpaceBounds.bottom() < this.props.configSpaceViewportRect.top()) return
+        if (configSpaceBounds.bottom() < this.props.configSpaceViewportRect.top()) return false
       } else {
-        if (configSpaceBounds.top() > this.props.configSpaceViewportRect.bottom()) return
+        if (configSpaceBounds.top() > this.props.configSpaceViewportRect.bottom()) return false
       }
 
       if (configSpaceBounds.hasIntersectionWith(this.props.configSpaceViewportRect)) {
@@ -282,9 +283,6 @@ export class FlamechartPanZoomView extends Component<FlamechartPanZoomViewProps,
           })
         }
       }
-      for (let child of frame.children) {
-        renderFrameLabelAndChildren(child, depth + 1)
-      }
     }
 
     const frameOutlineWidth = 2 * window.devicePixelRatio
@@ -294,15 +292,15 @@ export class FlamechartPanZoomView extends Component<FlamechartPanZoomViewProps,
     ).x
 
     const renderSpecialFrameOutlines = (frame: FlamechartFrame, depth = 0) => {
-      if (!this.props.selectedNode && this.props.searchResults == null) return
+      if (!this.props.selectedNode && this.props.searchResults == null) return false
       const width = frame.end - frame.start
       const y = this.props.renderInverted ? this.configSpaceSize().y - 1 - depth : depth
       const configSpaceBounds = new Rect(new Vec2(frame.start, y), new Vec2(width, 1))
 
-      if (width < minConfigSpaceWidthToRenderOutline) return
-      if (configSpaceBounds.left() > this.props.configSpaceViewportRect.right()) return
-      if (configSpaceBounds.right() < this.props.configSpaceViewportRect.left()) return
-      if (configSpaceBounds.top() > this.props.configSpaceViewportRect.bottom()) return
+      if (width < minConfigSpaceWidthToRenderOutline) return false
+      if (configSpaceBounds.left() > this.props.configSpaceViewportRect.right()) return false
+      if (configSpaceBounds.right() < this.props.configSpaceViewportRect.left()) return false
+      if (configSpaceBounds.top() > this.props.configSpaceViewportRect.bottom()) return false
 
       if (configSpaceBounds.hasIntersectionWith(this.props.configSpaceViewportRect)) {
         if (this.props.searchResults?.getMatchForFrame(frame.node.frame)) {
@@ -330,18 +328,11 @@ export class FlamechartPanZoomView extends Component<FlamechartPanZoomViewProps,
           })
         }
       }
-      for (let child of frame.children) {
-        renderSpecialFrameOutlines(child, depth + 1)
-      }
     }
 
-    for (let frame of this.props.flamechart.getLayers()[0] || []) {
-      renderSpecialFrameOutlines(frame)
-    }
+    visitTree(this.props.flamechart.getLayers()[0] || [], renderSpecialFrameOutlines)
 
-    for (let frame of this.props.flamechart.getLayers()[0] || []) {
-      renderFrameLabelAndChildren(frame)
-    }
+    visitTree(this.props.flamechart.getLayers()[0] || [], renderFrameLabelAndChildren)
 
     const theme = this.props.theme
 

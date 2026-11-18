@@ -13,6 +13,22 @@ function arrayBuffer(bytes: Uint8Array): ArrayBuffer {
 
 const text = '[{"name":"work","ph":"B","ts":1}]'
 
+test('ASCII fallback decodes bounded pieces across chunk boundaries', async () => {
+  const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'TextDecoder')!
+  Object.defineProperty(globalThis, 'TextDecoder', {configurable: true, value: undefined})
+  jest.spyOn(console, 'warn').mockImplementation(() => {})
+  try {
+    await withMockedFileChunkSizeForTests(10000, () => {
+      const input = 'abc\n'.repeat(8000)
+      const content = new BufferBackedTextFileContent(arrayBuffer(Buffer.from(input)))
+      expect(Array.from(content.splitLines())).toEqual(input.split('\n'))
+    })
+  } finally {
+    Object.defineProperty(globalThis, 'TextDecoder', descriptor)
+    jest.restoreAllMocks()
+  }
+})
+
 test('reads gzip with native decompression', async () => {
   expect(typeof DecompressionStream).toBe('function')
   const reader = MaybeCompressedDataReader.fromArrayBuffer('trace.gz', arrayBuffer(pako.gzip(text)))

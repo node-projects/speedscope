@@ -1,6 +1,6 @@
 import {StackListProfileBuilder, ProfileGroup} from '../lib/profile'
 import {itMap, getOrInsert} from '../lib/utils'
-import {TimeFormatter} from '../lib/value-formatters'
+import {TimeFormatter, RawValueFormatter} from '../lib/value-formatters'
 import {TextFileContent} from './utils'
 
 // This imports the output of the "perf script" command on linux.
@@ -20,7 +20,16 @@ interface PerfEvent {
   threadID: number | null
   time: number | null
   eventType: string
+  period: number | null
   stack: PerfStackFrame[]
+}
+
+function normalizeEventType(eventType: string): string {
+  // Hybrid CPUs name otherwise identical events after their core PMU.
+  return eventType.replace(
+    /^cpu_(?:core|atom)\/(.+)\/([a-zA-Z]*)$/,
+    (_, name, flags) => name + (flags ? `:${flags}` : ''),
+  )
 }
 
 function* parseEvents(contents: TextFileContent): Generator<PerfEvent | null> {
@@ -45,6 +54,7 @@ function parseEvent(rawEvent: string[]): PerfEvent | null {
     threadID: null,
     time: null,
     eventType: '',
+    period: null,
     stack: [],
   }
 
@@ -54,7 +64,7 @@ function parseEvent(rawEvent: string[]): PerfEvent | null {
   // Note: command name may contain spaces, e.g.
   //
   //  V8 WorkerThread 25607 4794564.109216: cycles:
-  const eventStartMatch = /^(\S.+?)\s+(\d+)(?:\/?(\d+))?\s+/.exec(firstLine)
+  const eventStartMatch = /^(\S.*?)\s+(\d+)(?:\/(\d+))?\s+/.exec(firstLine)
   if (!eventStartMatch) return null
 
   event.command = eventStartMatch[1]
@@ -70,11 +80,13 @@ function parseEvent(rawEvent: string[]): PerfEvent | null {
   const timeMatch = /\s+(\d+\.\d+):\s+/.exec(firstLine)
   if (timeMatch) {
     event.time = parseFloat(timeMatch[1])
+    const period = /^(\d+)\s+\S+:/.exec(firstLine.slice(timeMatch.index + timeMatch[0].length))
+    if (period) event.period = Number(period[1])
   }
 
   const evName = /(\S+):\s*$/.exec(firstLine)
   if (evName) {
-    event.eventType = evName[1]
+    event.eventType = normalizeEventType(evName[1])
   }
 
   for (let line of lines) {
@@ -95,49 +107,66 @@ function parseEvent(rawEvent: string[]): PerfEvent | null {
 }
 
 export function importFromLinuxPerf(contents: TextFileContent): ProfileGroup | null {
-  const profiles = new Map<string, StackListProfileBuilder>()
-
-  let eventType: string | null = null
+  const profiles = new Map<
+    string,
+    {builder: StackListProfileBuilder; name: string; type: string; counter: boolean}
+  >()
+  const eventTypes = new Set<string>()
+  let missingStacks = false
 
   for (let event of parseEvents(contents)) {
     if (event == null) continue
-    if (eventType != null && eventType != event.eventType) continue
     if (event.time == null) continue
-    eventType = event.eventType
+    if (event.stack.length === 0) {
+      missingStacks = true
+      continue
+    }
+    eventTypes.add(event.eventType)
 
     let profileNameParts = []
     if (event.command) profileNameParts.push(event.command)
-    if (event.processID) profileNameParts.push(`pid: ${event.processID}`)
-    if (event.threadID) profileNameParts.push(`tid: ${event.threadID}`)
+    if (event.processID != null) profileNameParts.push(`pid: ${event.processID}`)
+    if (event.threadID != null) profileNameParts.push(`tid: ${event.threadID}`)
     const profileName = profileNameParts.join(' ')
-    const builderState = getOrInsert(profiles, profileName, () => {
-      const builder = new StackListProfileBuilder()
-      builder.setName(profileName)
-      builder.setValueFormatter(new TimeFormatter('seconds'))
-      return builder
-    })
-
-    const builder = builderState
-
-    builder.appendSampleWithTimestamp(
-      event.stack.map(({symbolName, file}) => {
-        return {
-          key: `${symbolName} (${file})`,
-          name: symbolName === '[unknown]' ? `??? (${file})` : symbolName,
-          file: file,
-        }
-      }),
-      event.time!,
+    const counter = !/^(?:cycles|cpu-clock|task-clock)(?::.*)?$/.test(event.eventType)
+    const builderState = getOrInsert(
+      profiles,
+      JSON.stringify([profileName, event.eventType]),
+      () => {
+        const builder = new StackListProfileBuilder()
+        builder.setName(profileName)
+        builder.setValueFormatter(counter ? new RawValueFormatter() : new TimeFormatter('seconds'))
+        return {builder, name: profileName, type: event.eventType, counter}
+      },
     )
+
+    const builder = builderState.builder
+    const stack = event.stack.map(({symbolName, file}) => {
+      return {
+        key: `${symbolName} (${file})`,
+        name: symbolName === '[unknown]' ? `??? (${file})` : symbolName,
+        file: file,
+      }
+    })
+    if (counter) builder.appendSampleWithWeight(stack, event.period ?? 1)
+    else builder.appendSampleWithTimestamp(stack, event.time)
   }
 
   if (profiles.size === 0) {
+    if (missingStacks)
+      throw new Error(
+        'perf output contains no call stacks. Record with -g and use perf script without --hide-call-graph.',
+      )
     return null
   }
 
+  for (const state of profiles.values()) {
+    if (eventTypes.size > 1 || state.counter) state.builder.setName(`${state.name} [${state.type}]`)
+  }
+
   return {
-    name: profiles.size === 1 ? Array.from(profiles.keys())[0] : '',
+    name: profiles.size === 1 ? Array.from(profiles.values())[0].builder.getName() : '',
     indexToView: 0,
-    profiles: Array.from(itMap(profiles.values(), builder => builder.build())),
+    profiles: Array.from(itMap(profiles.values(), state => state.builder.build())),
   }
 }

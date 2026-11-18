@@ -17,7 +17,13 @@ function cached(demangle: (name: string) => string): (name: string) => string {
     if (result !== undefined) {
       name = result
     } else {
-      result = demangle(name)
+      try {
+        result = demangle(name)
+      } catch (error) {
+        // Symbol decoding is optional. A malformed symbol must not discard a profile.
+        console.warn('Could not demangle symbol; preserving its original name', name, error)
+        result = name
+      }
       result = result === '' ? name : result
       cache.set(name, result)
       name = result

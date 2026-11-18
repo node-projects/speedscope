@@ -2,6 +2,26 @@ export function lastOf<T>(ts: T[]): T | null {
   return ts[ts.length - 1] || null
 }
 
+// Depth-first traversal with subtree pruning and O(depth) auxiliary storage.
+// Returning false skips a node's children while retaining all following siblings.
+export function visitTree<T extends {children: T[]}>(
+  roots: T[],
+  visit: (node: T, depth: number) => boolean | void,
+): void {
+  const pending = [{nodes: roots, index: 0, depth: 0}]
+  while (pending.length) {
+    const current = pending[pending.length - 1]
+    if (current.index === current.nodes.length) {
+      pending.pop()
+      continue
+    }
+    const node = current.nodes[current.index++]
+    if (visit(node, current.depth) !== false && node.children.length) {
+      pending.push({nodes: node.children, index: 0, depth: current.depth + 1})
+    }
+  }
+}
+
 export function sortBy<T>(ts: T[], key: (t: T) => number | string): void {
   function comparator(a: T, b: T) {
     const keyA = key(a)

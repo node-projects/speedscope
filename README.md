@@ -148,6 +148,24 @@ match highlights the frame without marking characters in its symbol name.
 * `t`: Open the profile/thread selector if available
 * `Cmd+F`/`Ctrl+F`: to open search. While open, `Enter` and `Shift+Enter` cycle through results
 
+## Additional views in this fork
+
+`4` opens the keyboard-accessible **Call Tree** table, with total/self weights,
+source locations, expandable callees, and bounded rows for large profiles.
+It is also the fallback when WebGL cannot initialize.
+
+The **Profile actions** menu creates a new profile while preserving the originals:
+crop the visible Time Order range, combine original profiles with matching units,
+invert stacks, or group stacks by source file. Combining adds busy-stack weights;
+it does not align threads on a shared wall-clock timeline. Inversion and file grouping
+are aggregate views, so inspect them in Left Heavy or Call Tree.
+
+Run `npm run prepack` to build an offline viewer and
+`dist/speedscope-1.25.0.zip` on Windows, macOS, or Linux. Extract the ZIP and open
+`index.html`. This includes the JFR WebAssembly decoder without a network fetch.
+The npm package exposes the profile format with
+`import type {FileFormat} from 'speedscope'`; internal rendering APIs are not public.
+
 ## Contributing
 
 Do you want to contribute to speedscope? Sweeeeet. Check out [CONTRIBUTING.md](./CONTRIBUTING.md) for instructions on setting up your dev environment.

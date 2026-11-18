@@ -100,7 +100,12 @@ function importSpeedscopeProfile(
   }
 
   function importEventedProfile(evented: FileFormat.EventedProfile) {
-    const {startValue, endValue, events} = evented
+    const {events} = evented
+    const startValue = evented.startValue ?? (events.length ? events[0].at : 0)
+    const endValue = evented.endValue ?? (events.length ? events[events.length - 1].at : startValue)
+    if (!Number.isFinite(startValue) || !Number.isFinite(endValue) || endValue < startValue) {
+      throw new Error('Profile bounds must be finite, with endValue >= startValue')
+    }
 
     const profile = new CallTreeProfileBuilder(endValue - startValue)
     setCommonProperties(profile)

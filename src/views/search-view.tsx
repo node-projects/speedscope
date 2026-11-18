@@ -137,6 +137,7 @@ export const SearchView = memo(
         <span className={css(style.icon)}>🔍</span>
         <span className={css(style.inputContainer)}>
           <input
+            aria-label="Search functions or files"
             className={css(style.input)}
             value={searchQuery}
             onInput={onInput}
@@ -151,28 +152,42 @@ export const SearchView = memo(
             <span className={css(style.resultCount)}>
               {resultIndex == null ? '?' : resultIndex + 1}/{numResults}
             </span>
-            <button className={css(style.icon, style.button)} onClick={selectPrev}>
+            <button
+              aria-label="Previous match"
+              className={css(style.icon, style.button)}
+              onClick={selectPrev}
+            >
               ⬅️
             </button>
-            <button className={css(style.icon, style.button)} onClick={selectNext}>
+            <button
+              aria-label="Next match"
+              className={css(style.icon, style.button)}
+              onClick={selectNext}
+            >
               ➡️
             </button>
           </Fragment>
         )}
-        <svg
-          className={css(style.icon)}
+        <button
+          type="button"
+          aria-label="Close search"
           onClick={close}
-          width="16"
-          height="16"
-          viewBox="0 0 16 16"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
+          className={css(style.icon, style.button)}
         >
-          <path
-            d="M4.99999 4.16217L11.6427 10.8048M11.6427 4.16217L4.99999 10.8048"
-            stroke={theme.altFgSecondaryColor}
-          />
-        </svg>
+          <svg
+            className={css(style.icon)}
+            width="16"
+            height="16"
+            viewBox="0 0 16 16"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <path
+              d="M4.99999 4.16217L11.6427 10.8048M11.6427 4.16217L4.99999 10.8048"
+              stroke={theme.altFgSecondaryColor}
+            />
+          </svg>
+        </button>
       </div>
     )
   },
@@ -197,11 +212,14 @@ const getStyle = withTheme(theme =>
       alignItems: 'center',
     },
     inputContainer: {
+      minWidth: 0,
       flexShrink: 1,
       flexGrow: 1,
       display: 'flex',
     },
     input: {
+      minWidth: 0,
+      boxSizing: 'border-box',
       width: '100%',
       border: 'none',
       background: 'none',

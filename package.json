@@ -4,14 +4,15 @@
   "description": "",
   "repository": "jlfwong/speedscope",
   "main": "index.js",
+  "types": "src/lib/file-format-spec.ts",
   "bin": {
     "speedscope": "./bin/cli.mjs"
   },
   "scripts": {
     "deploy": "./scripts/deploy.sh",
-    "prepack": "./scripts/prepack.sh --outdir \"$(pwd)/dist/release\" --protocol file",
+    "prepack": "node scripts/prepare-release.mjs",
     "prettier": "prettier --write 'src/**/*.ts' 'src/**/*.tsx'",
-    "lint": "eslint 'src/**/*.ts' 'src/**/*.tsx'",
+    "lint": "eslint \"src/**/*.ts\" \"src/**/*.tsx\"",
     "jest": "./scripts/test-setup.sh && jest --runInBand",
     "coverage": "npm run jest -- --coverage",
     "typecheck": "tsc --noEmit",
@@ -19,6 +20,7 @@
     "serve": "tsx scripts/dev-server.ts"
   },
   "files": [
+    "src/lib/file-format-spec.ts",
     "bin/cli.mjs",
     "bin/server.mjs",
     "dist/release/**",

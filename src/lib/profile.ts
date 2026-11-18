@@ -1,4 +1,4 @@
-import {lastOf, KeyedSet} from './utils'
+import {lastOf, KeyedSet, visitTree} from './utils'
 import {ValueFormatter, RawValueFormatter} from './value-formatters'
 import {FileFormat} from './file-format-spec'
 
@@ -202,23 +202,24 @@ export class Profile {
     openFrame: (node: CallTreeNode, value: number) => void,
     closeFrame: (node: CallTreeNode, value: number) => void,
   ) {
-    function visit(node: CallTreeNode, start: number) {
-      if (node.frame !== Frame.root) {
-        openFrame(node, start)
+    const stack = [{node: this.groupedCalltreeRoot, start: 0, childTime: 0, index: -1}]
+    while (stack.length) {
+      const current = stack[stack.length - 1]
+      if (current.index === -1) {
+        if (!current.node.isRoot()) openFrame(current.node, current.start)
+        current.index = 0
       }
-
-      let childTime = 0
-
-      node.children.forEach(function (child) {
-        visit(child, start + childTime)
-        childTime += child.getTotalWeight()
-      })
-
-      if (node.frame !== Frame.root) {
-        closeFrame(node, start + node.getTotalWeight())
+      if (current.index < current.node.children.length) {
+        const child = current.node.children[current.index++]
+        const start = current.start + current.childTime
+        current.childTime += child.getTotalWeight()
+        stack.push({node: child, start, childTime: 0, index: -1})
+      } else {
+        if (!current.node.isRoot())
+          closeFrame(current.node, current.start + current.node.getTotalWeight())
+        stack.pop()
       }
     }
-    visit(this.groupedCalltreeRoot, 0)
   }
 
   forEachCall(
@@ -226,6 +227,7 @@ export class Profile {
     closeFrame: (node: CallTreeNode, value: number) => void,
   ) {
     let prevStack: CallTreeNode[] = []
+    const activeNodes = new Set<CallTreeNode>()
     let value = 0
 
     let sampleIndex = 0
@@ -237,13 +239,14 @@ export class Profile {
       // so hopefully this isn't much of a problem
       for (
         lca = stackTop;
-        lca && lca.frame != Frame.root && prevStack.indexOf(lca) === -1;
+        lca && lca.frame != Frame.root && !activeNodes.has(lca);
         lca = lca.parent
       ) {}
 
       // Close frames that are no longer open
       while (prevStack.length > 0 && lastOf(prevStack) != lca) {
         const node = prevStack.pop()!
+        activeNodes.delete(node)
         closeFrame(node, value)
       }
 
@@ -260,9 +263,9 @@ export class Profile {
 
       for (let node of toOpen) {
         openFrame(node, value)
+        activeNodes.add(node)
+        prevStack.push(node)
       }
-
-      prevStack = prevStack.concat(toOpen)
       value += this.weights[sampleIndex++]
     }
 
@@ -340,17 +343,12 @@ export class Profile {
     // construction time rather than on demand.
     const nodes: CallTreeNode[] = []
 
-    function visit(node: CallTreeNode) {
+    visitTree([this.appendOrderCalltreeRoot], node => {
       if (node.frame === focalFrame) {
         nodes.push(node)
-      } else {
-        for (let child of node.children) {
-          visit(child)
-        }
+        return false
       }
-    }
-
-    visit(this.appendOrderCalltreeRoot)
+    })
 
     for (let node of nodes) {
       const stack: FrameInfo[] = []
@@ -373,29 +371,19 @@ export class Profile {
     function recordSubtree(focalFrameNode: CallTreeNode) {
       const stack: FrameInfo[] = []
 
-      function visit(node: CallTreeNode) {
+      visitTree([focalFrameNode], (node, depth) => {
+        stack.length = depth
         stack.push(node.frame)
         builder.appendSampleWithWeight(stack, node.getSelfWeight())
-        for (let child of node.children) {
-          visit(child)
-        }
-        stack.pop()
-      }
-
-      visit(focalFrameNode)
+      })
     }
 
-    function findCalls(node: CallTreeNode) {
+    visitTree([this.appendOrderCalltreeRoot], node => {
       if (node.frame === focalFrame) {
         recordSubtree(node)
-      } else {
-        for (let child of node.children) {
-          findCalls(child)
-        }
+        return false
       }
-    }
-
-    findCalls(this.appendOrderCalltreeRoot)
+    })
 
     const ret = builder.build()
     ret.name = this.name

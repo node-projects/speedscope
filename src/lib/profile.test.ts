@@ -35,6 +35,14 @@ test('builds a grouped call tree deeper than the JavaScript call stack', () => {
   }
   expect(actualDepth).toBe(depth)
   expect(profile.getTotalWeight()).toBe(1)
+  let groupedOpens = 0
+  profile.forEachCallGrouped(
+    () => groupedOpens++,
+    () => {},
+  )
+  expect(groupedOpens).toBe(depth)
+  expect(profile.getInvertedProfileForCallersOf(frames[depth - 1]).getTotalWeight()).toBe(1)
+  expect(profile.getProfileForCalleesOf(frames[0]).getTotalWeight()).toBe(1)
 })
 
 function toStackList(profile: Profile, grouped: boolean): string[] {

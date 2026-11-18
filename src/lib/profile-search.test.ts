@@ -20,6 +20,9 @@ function assertNoMatch(text: string, pattern: string) {
 }
 
 describe('exactMatchStrings', () => {
+  test('empty search terminates without matches', () => {
+    expect(exactMatchStrings('anything', '')).toEqual([])
+  })
   test('no match', () => {
     assertNoMatch('a', 'b')
     assertNoMatch('aa', 'ab')

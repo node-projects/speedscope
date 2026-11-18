@@ -1,3 +1,10 @@
+import {
+  cropProfile,
+  combineProfiles,
+  invertProfile,
+  groupProfileByFile,
+  isDerivedProfile,
+} from '../lib/profile-transformations'
 import {ApplicationProps} from './application'
 import {h, JSX, Fragment} from 'preact'
 import {useCallback, useState, useEffect} from 'preact/hooks'
@@ -28,11 +35,14 @@ function ToolbarLeftContent(props: ToolbarProps) {
   const setLeftHeavyFlameGraph = useSetViewMode(viewModeAtom.set, ViewMode.LEFT_HEAVY_FLAME_GRAPH)
   const setSandwichView = useSetViewMode(viewModeAtom.set, ViewMode.SANDWICH_VIEW)
 
+  const setCallTree = useSetViewMode(viewModeAtom.set, ViewMode.CALL_TREE)
+
   if (!props.activeProfileState) return null
 
   return (
     <div className={css(style.toolbarLeft)}>
-      <div
+      <button
+        type="button"
         className={css(
           style.toolbarTab,
           props.viewMode === ViewMode.CHRONO_FLAME_CHART && style.toolbarTabActive,
@@ -40,8 +50,9 @@ function ToolbarLeftContent(props: ToolbarProps) {
         onClick={setChronoFlameChart}
       >
         <span className={css(style.emoji)}>🕰</span>Time Order
-      </div>
-      <div
+      </button>
+      <button
+        type="button"
         className={css(
           style.toolbarTab,
           props.viewMode === ViewMode.LEFT_HEAVY_FLAME_GRAPH && style.toolbarTabActive,
@@ -49,8 +60,9 @@ function ToolbarLeftContent(props: ToolbarProps) {
         onClick={setLeftHeavyFlameGraph}
       >
         <span className={css(style.emoji)}>⬅️</span>Left Heavy
-      </div>
-      <div
+      </button>
+      <button
+        type="button"
         className={css(
           style.toolbarTab,
           props.viewMode === ViewMode.SANDWICH_VIEW && style.toolbarTabActive,
@@ -58,7 +70,17 @@ function ToolbarLeftContent(props: ToolbarProps) {
         onClick={setSandwichView}
       >
         <span className={css(style.emoji)}>🥪</span>Sandwich
-      </div>
+      </button>
+      <button
+        type="button"
+        className={css(
+          style.toolbarTab,
+          props.viewMode === ViewMode.CALL_TREE && style.toolbarTabActive,
+        )}
+        onClick={setCallTree}
+      >
+        Call Tree
+      </button>
     </div>
   )
 }
@@ -115,31 +137,34 @@ function ToolbarCenterContent(props: ToolbarProps): JSX.Element {
     }
   }, [setProfileSelectShown])
 
-  useEffect(() => {
-    const onWindowKeyPress = (ev: KeyboardEvent) => {
-      if (ev.key === 't') {
-        ev.preventDefault()
-        setProfileSelectShown(true)
-      }
-    }
-    window.addEventListener('keypress', onWindowKeyPress)
-    return () => {
-      window.removeEventListener('keypress', onWindowKeyPress)
-    }
-  }, [setProfileSelectShown])
+  const duration = activeProfileState
+    ? activeProfileState.profile.formatValue(activeProfileState.profile.getTotalWeight())
+    : ''
 
   if (activeProfileState && profileGroup && profiles) {
     if (profileGroup.profiles.length === 1) {
-      return <Fragment>{activeProfileState.profile.getName()}</Fragment>
+      return (
+        <Fragment>
+          {activeProfileState.profile.getName()} · {duration}
+        </Fragment>
+      )
     } else {
       return (
         <div className={css(style.toolbarCenter)} onMouseLeave={closeProfileSelect}>
-          <span onMouseOver={openProfileSelect}>
+          <button
+            type="button"
+            className={css(style.profileButton)}
+            onMouseOver={openProfileSelect}
+            onClick={openProfileSelect}
+            aria-label={`Choose from ${profiles.length} profiles`}
+            aria-expanded={profileSelectShown}
+          >
             {activeProfileState.profile.getName()}{' '}
             <span className={css(style.toolbarProfileIndex)}>
-              ({activeProfileState.index + 1}/{profileGroup.profiles.length})
+              {activeProfileState.index + 1} / {profileGroup.profiles.length} profiles ▾ ·{' '}
+              {duration}
             </span>
-          </span>
+          </button>
           <div style={{display: profileSelectShown ? 'block' : 'none'}}>
             <ProfileSelect
               setProfileIndexToView={props.setProfileIndexToView}
@@ -159,25 +184,67 @@ function ToolbarCenterContent(props: ToolbarProps): JSX.Element {
 function ToolbarRightContent(props: ToolbarProps) {
   const style = getStyle(useTheme())
   const colorScheme = useAtom(colorSchemeAtom)
+  const originals = props.profileGroup?.profiles.filter(p => !isDerivedProfile(p.profile)) || []
+  const onProfileAction = async (ev: Event) => {
+    const select = ev.currentTarget as HTMLSelectElement
+    const action = select.value
+    select.value = ''
+    const {activeProfileState, profileGroup} = props
+    if (!activeProfileState || !profileGroup || props.loading || !action) return
+    props.setLoading(true)
+    try {
+      // Paint the existing loading indicator before processing a large profile.
+      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))
+      const profile = activeProfileState.profile
+      let derived: Profile
+      if (action === 'crop') {
+        const rect = activeProfileState.chronoViewState.configSpaceViewportRect
+        derived = cropProfile(profile, rect.origin.x, rect.origin.x + rect.size.x)
+      } else if (action === 'combine') {
+        derived = combineProfiles(profileGroup.profiles.map(p => p.profile))
+      } else if (action === 'invert') {
+        derived = invertProfile(profile)
+      } else if (action === 'file') {
+        derived = groupProfileByFile(profile)
+      } else return
+      props.setProfileGroup({
+        name: profileGroup.name,
+        indexToView: profileGroup.profiles.length,
+        profiles: [...profileGroup.profiles.map(p => p.profile), derived],
+      })
+      props.setViewMode(
+        action === 'crop' ? ViewMode.CHRONO_FLAME_CHART : ViewMode.LEFT_HEAVY_FLAME_GRAPH,
+      )
+    } catch (error) {
+      alert(error instanceof Error ? error.message : String(error))
+    } finally {
+      props.setLoading(false)
+    }
+  }
 
   const exportFile = (
-    <div className={css(style.toolbarTab)} onClick={props.saveFile}>
+    <button type="button" className={css(style.toolbarTab)} onClick={props.saveFile}>
       <span className={css(style.emoji)}>⤴️</span>Export
-    </div>
+    </button>
   )
   const importFile = (
-    <div className={css(style.toolbarTab)} onClick={props.browseForFile}>
+    <button type="button" className={css(style.toolbarTab)} onClick={props.browseForFile}>
       <span className={css(style.emoji)}>⤵️</span>Import
-    </div>
+    </button>
   )
 
   const colorSchemeToggle = (
-    <div className={css(style.toolbarTab)} onClick={colorSchemeAtom.cycleToNextColorScheme}>
+    <button
+      type="button"
+      aria-label="Change color scheme"
+      className={css(style.toolbarTab)}
+      onClick={colorSchemeAtom.cycleToNextColorScheme}
+    >
       <span className={css(style.emoji)}>🎨</span>
       <span className={css(style.toolbarTabColorSchemeToggle)}>
         {colorSchemeToString(colorScheme)}
       </span>
-    </div>
+    </button>
   )
 
   const help = (
@@ -194,6 +261,27 @@ function ToolbarRightContent(props: ToolbarProps) {
 
   return (
     <div className={css(style.toolbarRight)}>
+      {props.activeProfileState && (
+        <select
+          disabled={props.loading}
+          aria-label="Profile actions"
+          value=""
+          onChange={onProfileAction}
+          className={css(style.toolbarTab)}
+        >
+          <option value="" disabled>
+            Profile actions
+          </option>
+          <option value="crop" disabled={props.viewMode !== ViewMode.CHRONO_FLAME_CHART}>
+            Crop to current time view
+          </option>
+          <option value="combine" disabled={originals.length < 2}>
+            Combine original profiles
+          </option>
+          <option value="invert">Invert stacks</option>
+          <option value="file">Group by file</option>
+        </select>
+      )}
       {props.activeProfileState && exportFile}
       {importFile}
       {colorSchemeToggle}
@@ -207,7 +295,9 @@ export function Toolbar(props: ToolbarProps) {
   return (
     <div className={css(style.toolbar)}>
       <ToolbarLeftContent {...props} />
-      <ToolbarCenterContent {...props} />
+      <div className={css(style.toolbarCenter)}>
+        <ToolbarCenterContent {...props} />
+      </div>
       <ToolbarRightContent {...props} />
     </div>
   )
@@ -216,6 +306,7 @@ export function Toolbar(props: ToolbarProps) {
 const getStyle = withTheme(theme =>
   StyleSheet.create({
     toolbar: {
+      display: 'flex',
       height: Sizes.TOOLBAR_HEIGHT,
       flexShrink: 0,
       background: theme.altBgPrimaryColor,
@@ -227,7 +318,7 @@ const getStyle = withTheme(theme =>
       userSelect: 'none',
     },
     toolbarLeft: {
-      position: 'absolute',
+      flexShrink: 0,
       height: Sizes.TOOLBAR_HEIGHT,
       overflow: 'hidden',
       top: 0,
@@ -236,13 +327,17 @@ const getStyle = withTheme(theme =>
       textAlign: 'left',
     },
     toolbarCenter: {
+      flex: 1,
+      minWidth: 0,
+      whiteSpace: 'nowrap',
+      textOverflow: 'ellipsis',
       paddingTop: 1,
       height: Sizes.TOOLBAR_HEIGHT,
     },
     toolbarRight: {
+      flexShrink: 0,
       height: Sizes.TOOLBAR_HEIGHT,
       overflow: 'hidden',
-      position: 'absolute',
       top: 0,
       right: 0,
       marginRight: 2,
@@ -251,7 +346,24 @@ const getStyle = withTheme(theme =>
     toolbarProfileIndex: {
       color: theme.altFgSecondaryColor,
     },
+    profileButton: {
+      maxWidth: '100%',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      background: 'none',
+      border: 0,
+      color: 'inherit',
+      font: 'inherit',
+      cursor: 'pointer',
+    },
     toolbarTab: {
+      border: 0,
+      color: 'inherit',
+      font: 'inherit',
+      cursor: 'pointer',
+      paddingTop: 0,
+      paddingBottom: 0,
+      ':focus-visible': {outline: `2px solid ${theme.fgPrimaryColor}`, outlineOffset: -2},
       background: theme.altBgSecondaryColor,
       marginTop: Sizes.SEPARATOR_HEIGHT,
       height: Sizes.TOOLBAR_TAB_HEIGHT,

@@ -105,7 +105,7 @@ export class Flamechart {
     const size = configSpaceViewportRect.size.withX(width)
     const origin = Vec2.clamp(
       configSpaceViewportRect.origin,
-      new Vec2(0, renderInverted ? 0 : -1),
+      new Vec2(0, renderInverted || size.y >= configSpaceSize.y ? 0 : -1),
       Vec2.max(Vec2.zero, configSpaceSize.minus(size).plus(new Vec2(0, 1))),
     )
     return new Rect(origin, configSpaceViewportRect.size.withX(width))

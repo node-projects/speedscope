@@ -229,7 +229,10 @@ function shouldPlaceOnTopOfPreviousStack(functionName: string) {
 }
 
 export function importFromChromeCPUProfile(chromeProfile: CPUProfile): Profile {
-  const profile = new CallTreeProfileBuilder(chromeProfile.endTime - chromeProfile.startTime)
+  const duration = chromeProfile.endTime - chromeProfile.startTime
+  const profile = new CallTreeProfileBuilder(
+    Number.isFinite(duration) && duration >= 0 ? duration : 0,
+  )
 
   const nodeById = new Map<number, CPUProfileNode>()
   for (let node of chromeProfile.nodes) {
