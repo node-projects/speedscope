@@ -19,6 +19,7 @@ speedscope is designed to ingest profiles from a variety of different profilers 
   - [Importing from Safari](https://github.com/jlfwong/speedscope/wiki/Importing-from-Safari)
   - [Importing from Node.js](https://github.com/jlfwong/speedscope/wiki/Importing-from-Node.js)
   - [Importing from Hermes (for React Native)](https://github.com/jlfwong/speedscope/wiki/Importing-from-Hermes)
+  - JS Self-Profiling: import the JSON returned by `await profiler.stop()` from the [JS Self-Profiling API](https://wicg.github.io/js-self-profiling/).
 - Ruby
   - [Importing from stackprof](https://github.com/jlfwong/speedscope/wiki/Importing-from-stackprof-(ruby))
   - [Importing from rbspy](https://github.com/jlfwong/speedscope/wiki/Importing-from-rbspy-(ruby))
@@ -61,6 +62,18 @@ via npm:
 
 Invoking `speedscope /path/to/profile` will load speedscope in your default browser.
 
+Use `speedscope --serve /path/to/profile` to serve speedscope and the profile over
+HTTP on an available loopback port. This also works with stdin (`speedscope --serve -`).
+The server stays running until you press Ctrl+C. Profiles remain on your computer.
+Without `--serve`, profile wrappers are kept in separate directories under your
+system temporary directory's `speedscope` folder.
+
+## Development server
+
+Run `npm run serve` to start the development server on port 8000. Set
+`SPEEDSCOPE_PORT` to an integer from 1 through 65535 to choose another port.
+For example, in PowerShell: `$env:SPEEDSCOPE_PORT='8080'; npm run serve`.
+
 ## Self-contained directory
 
 If you don't have npm or node installed, you can also download a
@@ -71,6 +84,9 @@ contained `index.html` in Chrome or Firefox.
 ## Importing via URL
 
 To load a specific profile by URL, you can append a hash fragment like `#profileURL=[URL-encoded profile URL]&title=[URL-encoded custom title]`. Note that the server hosting the profile must have CORS configured to allow AJAX requests from speedscope.
+
+If the endpoint requires a particular representation, add
+`&profileAccepts=application%2Fjson` to send an `Accept: application/json` header.
 
 ## Views
 
@@ -90,14 +106,17 @@ In the "Left Heavy" view, identical stacks are grouped together, regardless of w
 ### 🥪 Sandwich
 ![Sandwich View](https://user-images.githubusercontent.com/150329/42108467-76a57baa-7b8f-11e8-815f-1df7b6ac3ede.png)
 
-The Sandwich view is a table view in which you can find a list of all functions and their associated times. You can sort by self time or total time.
-It's called "Sandwich" view because if you select one of the rows in the table, you can see flamegraphs for all the callers and callees of the selected
-row.
+The Sandwich view is a table view in which you can find a list of all functions and their associated times. It's called "Sandwich" view because if you select one of the rows in the table, you can see flamegraphs for all the callers and callees of the selected row. You can sort by total time or self time. Total time is the time spent in a function and all its callees. Self time is the time spent in a function, excluding its callees.
 
 
 ## Navigation
 
 Once a profile has loaded, the main view is split into two: the top area is the "minimap", and the bottom area is the "stack view".
+
+Colors follow the order of frames sorted by file path and symbol name. Frames
+near each other in that order have similar colors; colors do not indicate cost.
+Search matches both symbol names and file paths, ignoring case. A file-only
+match highlights the frame without marking characters in its symbol name.
 
 ### Minimap Navigation
 

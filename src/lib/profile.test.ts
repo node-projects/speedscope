@@ -21,6 +21,22 @@ const fc = getFrameInfo('c')
 const fd = getFrameInfo('d')
 const fe = getFrameInfo('e')
 
+test('builds a grouped call tree deeper than the JavaScript call stack', () => {
+  const builder = new StackListProfileBuilder()
+  const depth = 20000
+  const frames = Array.from({length: depth}, (_, i) => getFrameInfo(`${i}`))
+  builder.appendSampleWithWeight(frames, 1)
+  const profile = builder.build()
+  let node = profile.getGroupedCalltreeRoot()
+  let actualDepth = 0
+  while (node.children.length > 0) {
+    node = node.children[0]
+    actualDepth++
+  }
+  expect(actualDepth).toBe(depth)
+  expect(profile.getTotalWeight()).toBe(1)
+})
+
 function toStackList(profile: Profile, grouped: boolean): string[] {
   let stackList: string[] = []
   const curStack: (number | string)[] = []

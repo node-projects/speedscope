@@ -1,0 +1,136 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`Callgrind instruction and line position columns 1`] = `
+{
+  "frames": [
+    Frame {
+      "col": undefined,
+      "file": "file1.c",
+      "key": "file1.c:main",
+      "line": undefined,
+      "name": "main",
+      "selfWeight": 24,
+      "totalWeight": 824,
+    },
+    Frame {
+      "col": undefined,
+      "file": "file1.c",
+      "key": "file1.c:func1",
+      "line": undefined,
+      "name": "func1",
+      "selfWeight": 100,
+      "totalWeight": 400,
+    },
+    Frame {
+      "col": undefined,
+      "file": "file2.c",
+      "key": "file2.c:func2",
+      "line": undefined,
+      "name": "func2",
+      "selfWeight": 700,
+      "totalWeight": 700,
+    },
+  ],
+  "name": "callgrind.instr-line-positions.log -- Instructions",
+  "stacks": [
+    "main;func1;func2 300",
+    "main;func1 100",
+    "main;func2 400",
+    "main 24",
+  ],
+}
+`;
+
+exports[`Callgrind instruction and line position columns 2`] = `
+{
+  "frames": [
+    Frame {
+      "col": undefined,
+      "file": "file1.c",
+      "key": "file1.c:main",
+      "line": undefined,
+      "name": "main",
+      "selfWeight": 20,
+      "totalWeight": 820,
+    },
+    Frame {
+      "col": undefined,
+      "file": "file1.c",
+      "key": "file1.c:func1",
+      "line": undefined,
+      "name": "func1",
+      "selfWeight": 100,
+      "totalWeight": 400,
+    },
+    Frame {
+      "col": undefined,
+      "file": "file2.c",
+      "key": "file2.c:func2",
+      "line": undefined,
+      "name": "func2",
+      "selfWeight": 700,
+      "totalWeight": 700,
+    },
+  ],
+  "name": "callgrind.positions-instr.log -- Instructions",
+  "stacks": [
+    "main;func1;func2 300",
+    "main;func1 100",
+    "main;func2 400",
+    "main 20",
+  ],
+}
+`;
+
+exports[`Callgrind instruction and line position columns 3`] = `
+{
+  "frames": [
+    Frame {
+      "col": undefined,
+      "file": "file1.c",
+      "key": "file1.c:main",
+      "line": undefined,
+      "name": "main",
+      "selfWeight": 20,
+      "totalWeight": 820,
+    },
+    Frame {
+      "col": undefined,
+      "file": "file1.c",
+      "key": "file1.c:func1",
+      "line": undefined,
+      "name": "func1",
+      "selfWeight": 100,
+      "totalWeight": 400,
+    },
+    Frame {
+      "col": undefined,
+      "file": "file2.c",
+      "key": "file2.c:func2",
+      "line": undefined,
+      "name": "func2",
+      "selfWeight": 700,
+      "totalWeight": 700,
+    },
+  ],
+  "name": "callgrind.instr-line-subposition.log -- Instructions",
+  "stacks": [
+    "main;func1;func2 300",
+    "main;func1 100",
+    "main;func2 400",
+    "main 20",
+  ],
+}
+`;
+
+exports[`Callgrind instruction and line position columns: indexToView 1`] = `0`;
+
+exports[`Callgrind instruction and line position columns: indexToView 2`] = `0`;
+
+exports[`Callgrind instruction and line position columns: indexToView 3`] = `0`;
+
+exports[`Callgrind instruction and line position columns: profileGroup.name 1`] = `"callgrind.instr-line-positions.log"`;
+
+exports[`Callgrind instruction and line position columns: profileGroup.name 2`] = `"callgrind.positions-instr.log"`;
+
+exports[`Callgrind instruction and line position columns: profileGroup.name 3`] = `"callgrind.instr-line-subposition.log"`;
