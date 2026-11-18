@@ -1,6 +1,7 @@
 import {lastOf, KeyedSet, visitTree} from './utils'
-import {ValueFormatter, RawValueFormatter} from './value-formatters'
+import {ValueFormatter, RawValueFormatter, TimeFormatter, ByteFormatter} from './value-formatters'
 import {FileFormat} from './file-format-spec'
+import {ProfileSnapshot, HydrationOptions} from './profile-snapshot'
 
 export interface FrameInfo {
   key: string | number
@@ -191,6 +192,136 @@ export class Profile {
 
   constructor(totalWeight: number = 0) {
     this.totalWeight = totalWeight
+  }
+
+  toSnapshot(): ProfileSnapshot {
+    const frames = [...this.frames]
+    const frameIndexes = new Map(frames.map((frame, index) => [frame, index]))
+    const sampleIndexes = new Map<CallTreeNode, number>()
+    const frameWeights = new Float64Array(frames.length * 2)
+    frames.forEach((frame, index) => {
+      frameWeights[index * 2] = frame.getTotalWeight()
+      frameWeights[index * 2 + 1] = frame.getSelfWeight()
+    })
+    const encodeTree = (root: CallTreeNode, append: boolean) => {
+      let count = 0
+      visitTree([root], () => {
+        count++
+      })
+      const data = new Float64Array(count * 4)
+      const ancestors: number[] = []
+      let index = 0
+      visitTree([root], (node, depth) => {
+        if (append) sampleIndexes.set(node, index)
+        const offset = index * 4
+        data[offset] = node.isRoot() ? -1 : frameIndexes.get(node.frame)!
+        data[offset + 1] = depth ? ancestors[depth - 1] : -1
+        data[offset + 2] = node.getTotalWeight()
+        data[offset + 3] = node.getSelfWeight()
+        ancestors[depth] = index++
+      })
+      return data
+    }
+    const appendNodes = encodeTree(this.appendOrderCalltreeRoot, true)
+    const groupedNodes = encodeTree(this.groupedCalltreeRoot, false)
+    return {
+      name: this.name,
+      unit: this.getWeightUnit(),
+      totalWeight: this.totalWeight,
+      chronological: this.chronological,
+      derived: this.derived,
+      frames: frames.map(({key, name, file, line, col}) => ({key, name, file, line, col})),
+      frameWeights,
+      appendNodes,
+      groupedNodes,
+      samples: Uint32Array.from(this.samples, node => sampleIndexes.get(node)!),
+      weights: Float64Array.from(this.weights),
+    }
+  }
+
+  static async fromSnapshot(
+    data: ProfileSnapshot,
+    options: HydrationOptions = {},
+  ): Promise<Profile> {
+    const pause = async () => {
+      if (options.signal?.aborted) throw new DOMException('Import cancelled', 'AbortError')
+      await (options.yieldControl
+        ? options.yieldControl()
+        : new Promise(resolve => setTimeout(resolve, 0)))
+      if (options.signal?.aborted) throw new DOMException('Import cancelled', 'AbortError')
+    }
+    await pause()
+    if (
+      data.frameWeights.length !== data.frames.length * 2 ||
+      data.samples.length !== data.weights.length ||
+      !Number.isFinite(data.totalWeight) ||
+      data.totalWeight < 0
+    )
+      throw new Error('Invalid profile snapshot dimensions or total weight')
+    const profile = new Profile(data.totalWeight)
+    profile.setName(data.name)
+    profile.setChronological(data.chronological)
+    profile.setDerived(data.derived)
+    if (data.unit === 'bytes') profile.setValueFormatter(new ByteFormatter())
+    else if (data.unit === 'none') profile.setValueFormatter(new RawValueFormatter())
+    else profile.setValueFormatter(new TimeFormatter(data.unit))
+    const setWeights = (target: HasWeights, total: number, self: number) => {
+      if (!Number.isFinite(total) || !Number.isFinite(self) || total < 0 || self < 0)
+        throw new Error('Invalid profile snapshot weights')
+      target.addToTotalWeight(total)
+      target.addToSelfWeight(self)
+    }
+    const frames: Frame[] = []
+    for (let i = 0; i < data.frames.length; i++) {
+      const frame = Frame.getOrInsert(profile.frames, data.frames[i])
+      setWeights(frame, data.frameWeights[i * 2], data.frameWeights[i * 2 + 1])
+      frames.push(frame)
+      if ((i + 1) % 4096 === 0) await pause()
+    }
+    const decodeTree = async (tree: Float64Array): Promise<CallTreeNode[]> => {
+      if (!tree.length || tree.length % 4) throw new Error('Invalid profile snapshot tree')
+      const nodes: CallTreeNode[] = []
+      for (let i = 0; i < tree.length / 4; i++) {
+        const offset = i * 4
+        const frame = tree[offset],
+          parent = tree[offset + 1]
+        const total = tree[offset + 2],
+          self = tree[offset + 3]
+        if (
+          i === 0
+            ? frame !== -1 || parent !== -1
+            : !Number.isInteger(frame) ||
+              frame < 0 ||
+              frame >= frames.length ||
+              !Number.isInteger(parent) ||
+              parent < 0 ||
+              parent >= i
+        )
+          throw new Error('Invalid profile snapshot node reference')
+        const node = new CallTreeNode(i ? frames[frame] : Frame.root, i ? nodes[parent] : null)
+        setWeights(node, total, self)
+        if (node.parent) node.parent.children.push(node)
+        nodes.push(node)
+        if ((i + 1) % 16384 === 0) await pause()
+      }
+      return nodes
+    }
+    const appendNodes = await decodeTree(data.appendNodes)
+    profile.appendOrderCalltreeRoot = appendNodes[0]
+    profile.groupedCalltreeRoot = (await decodeTree(data.groupedNodes))[0]
+    for (let i = 0; i < data.samples.length; i++) {
+      if (
+        data.samples[i] >= appendNodes.length ||
+        !Number.isFinite(data.weights[i]) ||
+        data.weights[i] < 0
+      )
+        throw new Error('Invalid profile snapshot sample')
+      profile.samples.push(appendNodes[data.samples[i]])
+      profile.weights.push(data.weights[i])
+      if ((i + 1) % 16384 === 0) await pause()
+    }
+    await pause()
+    return profile
   }
 
   shallowClone(): Profile {

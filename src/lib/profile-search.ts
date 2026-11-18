@@ -8,6 +8,64 @@ export enum FlamechartType {
   LEFT_HEAVY_FLAME_GRAPH,
 }
 
+export enum SearchMode {
+  SUBSTRING = 'substring',
+  WHOLE_WORD = 'whole-word',
+  EXACT = 'exact',
+}
+
+function createTextMatcher(pattern: string, mode: SearchMode) {
+  if (mode === SearchMode.EXACT) {
+    const lowerPattern = pattern.toLocaleLowerCase()
+    const hasMatch = (text: string) => !!pattern && text.toLocaleLowerCase() === lowerPattern
+    return {
+      hasMatch,
+      ranges: (text: string): [number, number][] => (hasMatch(text) ? [[0, text.length]] : []),
+    }
+  }
+  if (mode === SearchMode.SUBSTRING) {
+    const lowerPattern = pattern.toLocaleLowerCase()
+    return {
+      hasMatch: (text: string) => !!pattern && text.toLocaleLowerCase().includes(lowerPattern),
+      ranges: (text: string): [number, number][] => {
+        if (!pattern) return []
+        const lowerText = text.toLocaleLowerCase()
+        const ranges: [number, number][] = []
+        let start = 0,
+          index: number
+        while ((index = lowerText.indexOf(lowerPattern, start)) !== -1) {
+          ranges.push([index, index + pattern.length])
+          start = index + pattern.length
+        }
+        return ranges
+      },
+    }
+  }
+  // User input is always literal. These fixed patterns have no nested
+  // quantifiers or user-provided expressions that could stall large searches.
+  const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const word = '\\p{L}\\p{N}\\p{M}_'
+  const regex = new RegExp(`(?<![${word}])(${escaped})(?![${word}])`, 'giu')
+  return {
+    hasMatch: (text: string) => {
+      regex.lastIndex = 0
+      return !!pattern && regex.test(text)
+    },
+    ranges: (text: string): [number, number][] => {
+      if (!pattern) return []
+      regex.lastIndex = 0
+      const ranges: [number, number][] = []
+      let match: RegExpExecArray | null
+      while ((match = regex.exec(text)) !== null) {
+        const length = match[1].length
+        const end = match.index + match[0].length
+        ranges.push([end - length, end])
+      }
+      return ranges
+    },
+  }
+}
+
 // In previous versions of speedscope, searching for strings within the profile
 // was done using fuzzy finding. As it turns out, this was surprising behavior
 // to most people, so we've switched to a more traditional substring search that
@@ -21,43 +79,35 @@ export enum FlamechartType {
 // See https://github.com/jlfwong/speedscope/issues/352
 //
 // Return ranges for all matches in order to highlight them.
-export function exactMatchStrings(text: string, pattern: string): [number, number][] {
-  if (!pattern.length) return []
-  const lowerText = text.toLocaleLowerCase()
-  const lowerPattern = pattern.toLocaleLowerCase()
-
-  let lastIndex = 0
-  const matchedRanges: Array<[number, number]> = []
-  while (true) {
-    let index = lowerText.indexOf(lowerPattern, lastIndex)
-    if (index === -1) {
-      return matchedRanges
-    }
-    matchedRanges.push([index, index + pattern.length])
-    lastIndex = index + pattern.length
-  }
+export function exactMatchStrings(
+  text: string,
+  pattern: string,
+  mode = SearchMode.SUBSTRING,
+): [number, number][] {
+  return createTextMatcher(pattern, mode).ranges(text)
 }
 
 // A utility class for storing cached search results to avoid recomputation when
 // the search results & profile did not change.
 export class ProfileSearchResults {
+  private readonly matcher: ReturnType<typeof createTextMatcher>
   constructor(
     readonly profile: Profile,
     readonly searchQuery: string,
-  ) {}
+    readonly searchMode = SearchMode.SUBSTRING,
+  ) {
+    this.matcher = createTextMatcher(searchQuery, searchMode)
+  }
 
   private matches: Map<Frame, [number, number][] | null> | null = null
   getMatchForFrame(frame: Frame): [number, number][] | null {
     if (!this.matches) {
       this.matches = new Map()
       this.profile.forEachFrame(frame => {
-        const match = exactMatchStrings(frame.name, this.searchQuery)
+        const match = this.matcher.ranges(frame.name)
         if (match.length > 0) {
           this.matches!.set(frame, match)
-        } else if (
-          frame.file != null &&
-          exactMatchStrings(frame.file, this.searchQuery).length > 0
-        ) {
+        } else if (frame.file != null && this.matcher.hasMatch(frame.file)) {
           // The frame matched by file only. Highlight ranges always index into
           // frame.name, so there's nothing to highlight, but an empty (truthy)
           // array still marks the frame as matched.

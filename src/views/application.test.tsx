@@ -10,6 +10,58 @@ import {CallTreeProfileBuilder} from '../lib/profile'
 import * as fileFormat from '../lib/file-format'
 import {ViewMode} from '../lib/view-mode'
 
+test('a superseded import cannot replace a newer profile or clear its loading state', async () => {
+  const group = (name: string) => ({
+    name,
+    indexToView: 0,
+    profiles: [new CallTreeProfileBuilder().build()],
+  })
+  let resolveOld!: (value: ReturnType<typeof group>) => void
+  const old = new Promise<ReturnType<typeof group>>(resolve => {
+    resolveOld = resolve
+  })
+  const setProfileGroup = jest.fn(),
+    setLoading = jest.fn()
+  const app = new Application({
+    setProfileGroup,
+    setLoading,
+    setError: jest.fn(),
+    hashParams: {},
+  } as any)
+  const first = (app as any).loadProfile(() => old)
+  await new Promise(resolve => setTimeout(resolve, 0))
+  await (app as any).loadProfile(async () => group('new'))
+  resolveOld(group('old'))
+  await first
+  expect(setProfileGroup).toHaveBeenCalledTimes(1)
+  expect(setProfileGroup.mock.calls[0][0].name).toBe('new')
+  expect(setLoading.mock.calls).toEqual([[true], [true], [false]])
+  expect(document.title).toBe('new - speedscope')
+})
+
+test('cancelled imports clear loading without discarding the previous profile or showing an error', async () => {
+  const setError = jest.fn(),
+    setLoading = jest.fn(),
+    setProfileGroup = jest.fn()
+  const app = new Application({setError, setLoading, setProfileGroup, hashParams: {}} as any)
+  app.forceUpdate = jest.fn()
+  const pending = (app as any).loadProfile(
+    (options: any) =>
+      new Promise((_resolve, reject) => {
+        options.onProgress({phase: 'Parsing profile', canCancel: true})
+        options.signal.addEventListener('abort', () =>
+          reject(new DOMException('cancelled', 'AbortError')),
+        )
+      }),
+  )
+  await new Promise(resolve => setTimeout(resolve, 0))
+  ;(app as any).importController.abort()
+  await pending
+  expect(setLoading.mock.calls[setLoading.mock.calls.length - 1]).toEqual([false])
+  expect(setProfileGroup).not.toHaveBeenCalled()
+  expect(setError.mock.calls).toEqual([[false]])
+})
+
 test('aggregate profiles cannot enter Time Order through shortcuts or profile switching', async () => {
   const builder = new CallTreeProfileBuilder()
   builder.setChronological(false)

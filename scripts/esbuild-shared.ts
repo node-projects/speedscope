@@ -1,10 +1,12 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import * as esbuild from 'esbuild'
+import {profileWorkerPlugin} from './profile-worker-plugin'
 
 const entryPoint = 'src/speedscope.tsx'
 
 export const buildOptions: esbuild.BuildOptions = {
+  plugins: [profileWorkerPlugin],
   entryPoints: [
     entryPoint,
 

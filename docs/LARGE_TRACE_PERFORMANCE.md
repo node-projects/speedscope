@@ -86,9 +86,49 @@ completed download, disabled Time Order for aggregates and combined-stack
 inversion. The downloaded JSON was compared exactly with the standard exporter,
 then reimported with all profile totals preserved.
 
-Import parsing and derived transformations still run on the main thread. They
-remain in-memory operations; lazy folded parsing does not make JSON or binary
-imports streaming. Export retains the final Blob bytes and source profile, while
-bounding temporary serialization chunks (apart from an individually huge string).
-Worker-backed import/transforms, cancellation during import, signed comparisons
-and synchronized multitrack timelines remain separate architectural follow-ups.
+## Worker import and search follow-up
+
+Large input files (at least 1 MiB of input bytes) named `.json`, `.trace`,
+`.cpuprofile` or `.heapprofile`, optionally gzip-compressed, now use a browser
+worker when available. The existing format detector is reused, preserving its
+dispatch order. HTTP/profileURL, local File and CLI base64 loading use this path.
+Input buffers and numeric profile tables transfer ownership instead of being
+JSON-serialized or cloned as full call-tree objects. File inputs can be read in
+the worker. Symbols are demangled there before returning immutable profile data.
+
+The UI shows import progress and cancellation. Cancellation terminates the worker;
+new loads and unmounts cancel old imports, and stale results cannot replace newer
+profiles or clear their loading state. The worker is released before UI object
+reconstruction, which yields between bounded batches so it can also be cancelled.
+Worker creation blocked by a host can fall back to the ordinary importer. An
+unexpected worker crash reports an error rather than trying a detached buffer.
+Small files and other filename extensions retain the ordinary importer; that
+synchronous fallback cannot be interrupted during parsing.
+
+The worker code is embedded by the build plugin, so both HTTP and offline builds
+can create it without fetching a worker script or WASM from an external host.
+The transport is an internal implementation detail, not a public interchange API.
+
+Tests cover numeric/string frame identity, recursion, source locations, formatting,
+aggregate/derived flags, idle ranges, transferred buffers, deep trees, invalid
+references, cancellation, worker cleanup, host fallback and stale-load races.
+The PLC worker import was cancelled interactively while parsing, then completed;
+its exported JSON matched the ordinary importer exactly (four profiles, 17,510
+frames and 1,039,656 call events). A local snapshot smoke check measured 214 ms to
+encode the PLC profiles and 34,602,732 bytes of numeric tables (excluding frame
+strings and metadata). Browser elapsed-time/peak-RSS speedups are not claimed.
+
+Search also supports literal whole-word and exact matching. Patterns are reused
+per query and file-only checks avoid allocating name highlight ranges. Unicode
+word boundaries, punctuation, escaped metacharacters and full-name/path matching
+have regressions. User-provided regex is still not enabled.
+
+Imports remain in-memory operations: raw input, parsed objects and construction
+trees can still exhaust memory inside the worker. UI hydration and rendering have
+costs, and transferring work can increase overall elapsed time even while making
+the interface responsive. This does not fix every OOM report or implement
+streaming. Derived transformations remain synchronous. Export retains the final
+Blob bytes and source profile while bounding temporary serialization chunks
+(apart from an individually huge string). True streaming/memory budgets,
+worker-backed transforms, signed comparisons and synchronized timelines remain
+separate follow-ups in [the maintained backlog](ISSUE_BACKLOG.md).

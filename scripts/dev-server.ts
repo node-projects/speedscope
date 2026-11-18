@@ -23,6 +23,7 @@ async function main() {
     write: false,
     metafile: true,
     plugins: [
+      ...(buildOptions.plugins || []),
       {
         name: 'speedscope-dev-server',
         setup(build) {

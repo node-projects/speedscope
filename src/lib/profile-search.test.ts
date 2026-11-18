@@ -1,5 +1,31 @@
-import {exactMatchStrings, ProfileSearchResults} from './profile-search'
+import {exactMatchStrings, ProfileSearchResults, SearchMode} from './profile-search'
 import {CallTreeProfileBuilder, Frame, FrameInfo} from './profile'
+
+test('whole-word search finds short symbols without matching surrounding identifiers', () => {
+  expect(exactMatchStrings('..', '.', SearchMode.WHOLE_WORD)).toEqual([
+    [0, 1],
+    [1, 2],
+  ])
+  expect(exactMatchStrings('io io(io) radio _io io2', 'io', SearchMode.WHOLE_WORD)).toEqual([
+    [0, 2],
+    [3, 5],
+    [6, 8],
+  ])
+  expect(exactMatchStrings('Éio io😀io 日本io io', 'io', SearchMode.WHOLE_WORD)).toEqual([
+    [4, 6],
+    [8, 10],
+    [16, 18],
+  ])
+})
+
+test('exact search treats metacharacters literally and preserves Unicode highlight offsets', () => {
+  expect(exactMatchStrings('A.*[😀]', 'a.*[😀]', SearchMode.EXACT)).toEqual([[0, 7]])
+  expect(exactMatchStrings('prefix A.*[😀]', 'a.*[😀]', SearchMode.EXACT)).toEqual([])
+  expect(exactMatchStrings('io\n', 'io', SearchMode.EXACT)).toEqual([])
+  expect(exactMatchStrings('(a+)+$', '(a+)+$', SearchMode.EXACT)).toEqual([[0, 6]])
+  for (const mode of [SearchMode.EXACT, SearchMode.WHOLE_WORD])
+    expect(exactMatchStrings('text', '', mode)).toEqual([])
+})
 
 function assertMatch(text: string, pattern: string, expected: string) {
   const match = exactMatchStrings(text, pattern)
@@ -82,6 +108,15 @@ describe('ProfileSearchResults', () => {
     expect(results.getMatchForFrame(frameFor(runA))).toEqual([])
     expect(results.getMatchForFrame(frameFor(runB))).toBeNull()
     expect(results.getMatchForFrame(frameFor(main))).toBeNull()
+  })
+
+  test('exact mode applies to full names and full source paths without name highlight offsets for file-only matches', () => {
+    const paths = new ProfileSearchResults(profile, 'SRC/MODULES/A.TS', SearchMode.EXACT)
+    expect(paths.getMatchForFrame(frameFor(runA))).toEqual([])
+    expect(paths.getMatchForFrame(frameFor(runB))).toBeNull()
+    const names = new ProfileSearchResults(profile, 'RUN', SearchMode.EXACT)
+    expect(names.getMatchForFrame(frameFor(runA))).toEqual([[0, 3]])
+    expect(names.getMatchForFrame(frameFor(main))).toBeNull()
   })
 
   test('matches by name with name ranges', () => {

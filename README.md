@@ -68,6 +68,11 @@ above are maintained upstream and remain useful for the supported file formats.
 Visit [the hosted app](https://node-projects.github.io/speedscope/), then browse for a
 profile file or drag it onto the page. Imported profiles stay in your browser.
 
+Large JSON and trace captures import in the background with progress and a
+**Cancel import** button. This improves responsiveness; very large captures can
+still exceed browser memory limits. Search offers Contains, Whole word and Exact
+matching for function names and source paths.
+
 ## Command line usage
 
 For offline use, or convenience in the terminal, you can also install speedscope
@@ -212,5 +217,10 @@ or [Patreon](https://www.patreon.com/jogibear9988). Funding configuration is sha
 with [Web Component Designer](https://github.com/node-projects/web-component-designer).
 
 ## Contributing
+
+The [maintained issue backlog](docs/ISSUE_BACKLOG.md) classifies all reviewed open
+upstream reports as bugs, features or maintenance, including usefulness,
+implementation status, remaining work and priorities. We have not fixed every
+upstream issue; partial and unverified reports stay explicit in that list.
 
 Do you want to contribute to speedscope? Sweeeeet. Check out [CONTRIBUTING.md](./CONTRIBUTING.md) for instructions on setting up your dev environment.

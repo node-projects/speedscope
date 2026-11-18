@@ -22,43 +22,54 @@ import {HashParams} from '../lib/hash-params'
 import {StatelessComponent} from '../lib/preact-helpers'
 import {SandwichViewContainer} from './sandwich-view'
 import {CallTreeView} from './call-tree-view'
+import {
+  importProfileFile,
+  importProfileBuffer,
+  importProfileBase64,
+  wereSymbolsLoaded,
+  ImportOptions,
+} from '../import/profile-loader'
+import {ImportProgress} from '../import/trace-worker-protocol'
 
-const importModule = import('../import')
+const importModule = () => import('../import')
 
 // Force eager loading of a few code-split modules.
 //
 // We put them all in one place so we can directly control the relative priority
 // of these.
-importModule.then(() => {})
-import('../lib/demangle').then(() => {})
 import('source-map').then(() => {})
 
 async function importProfilesFromText(
   fileName: string,
   contents: string,
 ): Promise<ProfileGroup | null> {
-  return (await importModule).importProfileGroupFromText(fileName, contents)
+  return (await importModule()).importProfileGroupFromText(fileName, contents)
 }
 
 async function importProfilesFromBase64(
   fileName: string,
   contents: string,
+  options?: ImportOptions,
 ): Promise<ProfileGroup | null> {
-  return (await importModule).importProfileGroupFromBase64(fileName, contents)
+  return importProfileBase64(fileName, contents, options)
 }
 
 async function importProfilesFromArrayBuffer(
   fileName: string,
   contents: ArrayBuffer,
+  options?: ImportOptions,
 ): Promise<ProfileGroup | null> {
-  return (await importModule).importProfilesFromArrayBuffer(fileName, contents)
+  return importProfileBuffer(fileName, contents, options)
 }
 
-async function importProfilesFromFile(file: File): Promise<ProfileGroup | null> {
-  return (await importModule).importProfilesFromFile(file)
+async function importProfilesFromFile(
+  file: File,
+  options?: ImportOptions,
+): Promise<ProfileGroup | null> {
+  return importProfileFile(file, options)
 }
 async function importFromFileSystemDirectoryEntry(entry: FileSystemDirectoryEntry) {
-  return (await importModule).importFromFileSystemDirectoryEntry(entry)
+  return (await importModule()).importFromFileSystemDirectoryEntry(entry)
 }
 
 declare function require(x: string): any
@@ -182,78 +193,73 @@ export class Application extends StatelessComponent<ApplicationProps> {
   private loadError = ''
   private exportController: AbortController | null = null
   private exportProgress: ExportProgress | null = null
+  private importController: AbortController | null = null
+  private importProgress: ImportProgress | null = null
+  private importSequence = 0
 
-  private async loadProfile(loader: () => Promise<ProfileGroup | null>) {
+  private async loadProfile(loader: (options: ImportOptions) => Promise<ProfileGroup | null>) {
+    this.importController?.abort()
+    const controller = new AbortController()
+    this.importController = controller
+    this.importProgress = null
     this.exportController?.abort()
     this.exportController = null
     this.exportProgress = null
     this.loadError = ''
     this.props.setError(false)
     this.props.setLoading(true)
-    await new Promise(resolve => setTimeout(resolve, 0))
-
-    console.time('import')
-
-    let profileGroup: ProfileGroup | null = null
+    const timer = `import ${++this.importSequence}`
+    console.time(timer)
     try {
-      profileGroup = await loader()
+      await new Promise(resolve => setTimeout(resolve, 0))
+      if (controller.signal.aborted) return
+      let profileGroup = await loader({
+        signal: controller.signal,
+        onProgress: progress => {
+          if (this.importController === controller) {
+            this.importProgress = progress
+            this.forceUpdate()
+          }
+        },
+      })
+      if (controller.signal.aborted || this.importController !== controller) return
+      if (profileGroup == null) {
+        alert('Unrecognized format! See documentation about supported formats.')
+        return
+      } else if (!profileGroup.profiles.length) {
+        alert("Successfully imported profile, but it's empty!")
+        return
+      }
+      if (!wereSymbolsLoaded(profileGroup)) {
+        for (const profile of profileGroup.profiles) await profile.demangle()
+      }
+      if (controller.signal.aborted || this.importController !== controller) return
+      if (this.props.hashParams.title)
+        profileGroup = {...profileGroup, name: this.props.hashParams.title}
+      document.title = `${profileGroup.name} - speedscope`
+      if (this.props.hashParams.viewMode !== undefined)
+        this.props.setViewMode(this.props.hashParams.viewMode)
+      const selected = profileGroup.profiles[profileGroup.indexToView]
+      if (
+        selected &&
+        !selected.isChronological() &&
+        (this.props.hashParams.viewMode ?? this.props.viewMode) === ViewMode.CHRONO_FLAME_CHART
+      ) {
+        this.props.setViewMode(ViewMode.LEFT_HEAVY_FLAME_GRAPH)
+      }
+      this.props.setProfileGroup(profileGroup)
     } catch (e) {
-      console.log('Failed to load format', e)
+      if (controller.signal.aborted || this.importController !== controller) return
       this.loadError = e instanceof Error ? e.message : String(e)
       this.props.setError(true)
-      this.props.setLoading(false)
-      console.timeEnd('import')
-      return
-    }
-
-    // TODO(jlfwong): Make these into nicer overlays
-    if (profileGroup == null) {
-      alert('Unrecognized format! See documentation about supported formats.')
-      this.props.setLoading(false)
-      return
-    } else if (profileGroup.profiles.length === 0) {
-      alert("Successfully imported profile, but it's empty!")
-      this.props.setLoading(false)
-      return
-    }
-
-    if (this.props.hashParams.title) {
-      profileGroup = {
-        ...profileGroup,
-        name: this.props.hashParams.title,
+    } finally {
+      console.timeEnd(timer)
+      if (this.importController === controller) {
+        this.importController = null
+        this.importProgress = null
+        this.props.setLoading(false)
       }
     }
-    document.title = `${profileGroup.name} - speedscope`
-
-    if (this.props.hashParams.viewMode !== undefined) {
-      this.props.setViewMode(this.props.hashParams.viewMode)
-    }
-
-    const selected = profileGroup.profiles[profileGroup.indexToView]
-    if (
-      selected &&
-      !selected.isChronological() &&
-      (this.props.hashParams.viewMode ?? this.props.viewMode) === ViewMode.CHRONO_FLAME_CHART
-    ) {
-      this.props.setViewMode(ViewMode.LEFT_HEAVY_FLAME_GRAPH)
-    }
-
-    try {
-      for (let profile of profileGroup.profiles) {
-        await profile.demangle()
-      }
-    } catch (e) {
-      this.loadError = e instanceof Error ? e.message : String(e)
-      this.props.setError(true)
-      this.props.setLoading(false)
-      console.timeEnd('import')
-      return
-    }
-
-    console.timeEnd('import')
-
-    this.props.setProfileGroup(profileGroup)
-    this.props.setLoading(false)
   }
 
   getStyle(): ReturnType<typeof getStyle> {
@@ -261,8 +267,8 @@ export class Application extends StatelessComponent<ApplicationProps> {
   }
 
   loadFromFile(file: File) {
-    this.loadProfile(async () => {
-      const profiles = await importProfilesFromFile(file)
+    this.loadProfile(async options => {
+      const profiles = await importProfilesFromFile(file, options)
       if (profiles) {
         for (let profile of profiles.profiles) {
           if (!profile.getName()) {
@@ -481,6 +487,8 @@ export class Application extends StatelessComponent<ApplicationProps> {
 
   componentWillUnmount() {
     window.removeEventListener('keydown', this.onWindowKeyDown)
+    this.importController?.abort()
+    this.importController = null
     this.exportController?.abort()
     this.exportController = null
     window.removeEventListener('keypress', this.onWindowKeyPress)
@@ -496,8 +504,9 @@ export class Application extends StatelessComponent<ApplicationProps> {
         )
         return
       }
-      this.loadProfile(async () => {
-        const fetchOpts: RequestInit = {}
+      this.loadProfile(async options => {
+        options.onProgress?.({phase: 'Reading profile', canCancel: true})
+        const fetchOpts: RequestInit = {signal: options.signal}
         if (profileAccepts) {
           fetchOpts['headers'] = {
             Accept: profileAccepts,
@@ -512,7 +521,7 @@ export class Application extends StatelessComponent<ApplicationProps> {
         if (filename.includes('/')) {
           filename = filename.slice(filename.lastIndexOf('/') + 1)
         }
-        return await importProfilesFromArrayBuffer(filename, await response.arrayBuffer())
+        return await importProfilesFromArrayBuffer(filename, await response.arrayBuffer(), options)
       })
     } else if (this.props.hashParams.localProfilePath) {
       // There isn't good cross-browser support for XHR of local files, even from
@@ -520,7 +529,7 @@ export class Application extends StatelessComponent<ApplicationProps> {
       // as a JavaScript file which will invoke a global function.
       ;(window as any)['speedscope'] = {
         loadFileFromBase64: (filename: string, base64source: string) => {
-          this.loadProfile(() => importProfilesFromBase64(filename, base64source))
+          this.loadProfile(options => importProfilesFromBase64(filename, base64source, options))
         },
       }
 
@@ -631,6 +640,27 @@ export class Application extends StatelessComponent<ApplicationProps> {
 
   renderLoadingBar() {
     const style = this.getStyle()
+    if (this.importProgress)
+      return (
+        <section
+          aria-label="Import progress"
+          style={{
+            height: '100%',
+            padding: 24,
+            boxSizing: 'border-box',
+            background: this.props.theme.bgPrimaryColor,
+            color: this.props.theme.fgPrimaryColor,
+          }}
+        >
+          <p role="status">{this.importProgress.phase}…</p>
+          <progress aria-label={this.importProgress.phase} />
+          {this.importProgress.canCancel && (
+            <button type="button" onClick={() => this.importController?.abort()}>
+              Cancel import
+            </button>
+          )}
+        </section>
+      )
     return <div className={css(style.loading)} />
   }
 

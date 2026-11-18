@@ -3,6 +3,7 @@ import {ViewMode} from '../lib/view-mode'
 import {getHashParams, HashParams} from '../lib/hash-params'
 import {ProfileGroupAtom} from './profile-group'
 import {Vec2} from '../lib/math'
+import {SearchMode} from '../lib/profile-search'
 
 // True if recursion should be flattened when viewing flamegraphs
 export const flattenRecursionAtom = new Atom<boolean>(false, 'flattenRecursion')
@@ -14,6 +15,7 @@ export const flattenRecursionAtom = new Atom<boolean>(false, 'flattenRecursion')
 // query even when the search input is closed.
 export const searchIsActiveAtom = new Atom<boolean>(false, 'searchIsActive')
 export const searchQueryAtom = new Atom<string>('', 'searchQueryAtom')
+export const searchModeAtom = new Atom<SearchMode>(SearchMode.SUBSTRING, 'searchMode')
 
 // Which top-level view should be displayed
 export const viewModeAtom = new Atom<ViewMode>(ViewMode.CHRONO_FLAME_CHART, 'viewMode')

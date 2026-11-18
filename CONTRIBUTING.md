@@ -54,6 +54,10 @@ for visual changes.
 
 The [upstream PR review](docs/UPSTREAM_PR_REVIEW.md) and
 [issue review](docs/UPSTREAM_ISSUE_REVIEW.md) record this fork's integration decisions.
+The [current backlog](docs/ISSUE_BACKLOG.md) separates completed scope from useful
+remaining bugs/features and reports needing reproduction. Update
+`docs/issue-backlog.json`, then run `npm run backlog:generate`; CI validates the
+generated document with `npm run backlog:check`.
 Keep upstream importer documentation links when they still describe the supported
 format. Do not rewrite historical changelog links as if this fork authored those releases.
 
