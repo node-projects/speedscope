@@ -204,8 +204,8 @@ Publishing a GitHub release tagged `vX.Y.Z` (or `X.Y.Z`) publishes
 `@node-projects/speedscope` with that version, after tests and packaging. Prerelease
 versions or releases marked as prereleases use npm's `next` tag. Stable releases
 use `latest`. The workflow attaches standalone ZIP and npm tarball downloads to
-the release. npm publishing requires one-time authorization; see
-[release setup and operation](docs/RELEASING.md).
+the release. npm trusted publishing is configured for this workflow; see
+[release operation and first-publish validation](docs/RELEASING.md).
 
 Support development via [GitHub Sponsors](https://github.com/sponsors/jogibear9988)
 or [Patreon](https://www.patreon.com/jogibear9988). Funding configuration is shared

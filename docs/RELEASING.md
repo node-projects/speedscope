@@ -34,9 +34,8 @@ gh workflow run pages.yml --repo node-projects/speedscope --ref main
 
 ## First publication: 2.0.0
 
-The first fork version is **2.0.0**, published manually by the maintainer. After
-the package has been prepared and checked, sign in to npm with an account allowed
-to publish under `@node-projects`, then run:
+The first fork version, **2.0.0**, was published manually by the maintainer on
+2026-11-18. The bootstrap process was:
 
 ```sh
 npm ci
@@ -44,22 +43,52 @@ npm test
 npm publish --access public
 ```
 
-`prepack` builds the offline app automatically. This first publication does not
-require GitHub OIDC. Once it succeeds, configure the trusted publisher below.
+`prepack` builds the offline app automatically. This first publication did not
+require GitHub OIDC. The trusted publisher below is now configured.
 Creating a `v2.0.0` GitHub release afterward is safe: the workflow detects the
 existing npm version, attaches its standalone ZIP and skips re-publishing npm.
 For a new version, it attaches the newly built npm tarball as well.
 
 ## npm trusted publishing after the first publication
 
-The workflow is prepared for npm trusted publishing (OIDC), with Node.js 24 and
-`id-token: write`. Configure the package's trusted publisher on npm with:
+The npm trusted publisher was created successfully on 2026-11-18 for
+`@node-projects/speedscope`. It authorizes the following GitHub Actions identity:
 
 - Organization/user: `node-projects`
 - Repository: `speedscope`
 - Workflow filename: `release.yml`
 - Environment: leave empty (the npm job does not use an environment)
 - Allow the `npm publish` action.
+
+The workflow already uses Node.js 24 and `id-token: write`, so future published
+GitHub releases can authenticate through OIDC without an npm token secret.
+The saved publisher also includes npm's default staging permission; the workflow
+uses direct publication. No GitHub environment restriction is configured because
+the publish job does not declare an environment.
+
+To inspect the configuration, an authorized npm maintainer can run:
+
+```sh
+npm trust list @node-projects/speedscope --json
+```
+
+For recovery/recreation, npm 11.15+ supports the equivalent CLI setup:
+
+```sh
+npm trust github @node-projects/speedscope --repository node-projects/speedscope --file release.yml --allow-publish
+```
+
+npm requires fresh two-factor authentication for these account operations. The
+setup was completed through the CLI's browser authentication flow; no credentials
+were added to the repository. Recreating an existing publisher is not a routine
+release step.
+
+New publisher configurations must complete their first successful automated
+publish within **two days**, otherwise npm expires them. Creating a GitHub release
+for an already-published version does not validate OIDC because this workflow
+skips the npm publish step for that version. Use the next new version (for example
+`v2.0.1`) when ready. Until that first workflow publish, setup is verified but an
+end-to-end OIDC publication has not been exercised.
 
 See [npm's trusted publisher setup](https://docs.npmjs.com/trusted-publishers/).
 The repository URL in package.json points to this fork, as required for provenance.
@@ -69,8 +98,8 @@ only be completed after the package exists and by an authorized npm maintainer.
 Keep the workflow filename and repository settings exact. Allow direct `npm publish`
 for this publisher. There is no npm credential included in this repository.
 
-The npm version badge and installation command become available after the first
-successful publication. Creating workflows alone does not register an npm package.
+Version 2.0.0 is available from npm, and the README's npm badge and installation
+command now refer to the published scoped package.
 
 ## Publish a release
 
