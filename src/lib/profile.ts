@@ -330,8 +330,8 @@ export class Profile {
     return profile
   }
 
-  formatValue(v: number) {
-    return this.valueFormatter.format(v)
+  formatValue(v: number, step?: number) {
+    return this.valueFormatter.format(v, step)
   }
   setValueFormatter(f: ValueFormatter) {
     this.valueFormatter = f

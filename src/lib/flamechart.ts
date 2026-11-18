@@ -16,7 +16,7 @@ type StackLayer = FlamechartFrame[]
 interface FlamechartDataSource {
   getTotalWeight(): number
 
-  formatValue(v: number): string
+  formatValue(v: number, step?: number): string
 
   forEachCall(
     openFrame: (node: CallTreeNode, value: number) => void,
@@ -44,8 +44,8 @@ export class Flamechart {
   getMinFrameWidth() {
     return this.minFrameWidth
   }
-  formatValue(v: number) {
-    return this.source.formatValue(v)
+  formatValue(v: number, step?: number) {
+    return this.source.formatValue(v, step)
   }
 
   getClampedViewportWidth(viewportWidth: number) {

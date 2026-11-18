@@ -200,3 +200,48 @@ import` and `node scripts/benchmark-profile.mjs <capture> stream-import`.
 Issues #519, #347, #478, #386 and #404 remain **partial** in the backlog: the
 specific original reproductions and a general bounded-memory profile model still
 need work.
+
+## Faster streaming event parsing
+
+CPU profiling of the first streaming implementation showed substantial time in
+token parsing, per-property assignment, selector matching and callbacks. The
+worker now scans structural bytes to frame each complete event object, then
+decodes and parses that one object with native `JSON.parse`. The token parser
+still validates the wrapper/array grammar and handles other values. The bounded
+event framing scan tracks string escapes and nesting; it does not interpret
+fields or split on text delimiters. A rare permissive retry retains the existing
+trailing-comma behavior.
+
+No whole-document string or inflated buffer is introduced. Events spanning read
+boundaries use a temporary buffer for that one event. The existing decompressed,
+pending, retained, event-count and depth limits remain in force, including while
+framing native records. Truncated later records cannot be silently dropped when
+repairing a producer's omitted final array bracket. Additional regressions cover
+all small chunk sizes, large records, split UTF-8/escapes, malformed inner and
+outer grammar, and the existing fallback/cancellation/limit cases.
+
+Three alternating fresh-process runs of the same PLC capture on Windows/Node 24
+compared the previous streaming bundle (`39b264b`) with native event framing:
+
+| Metric | Previous streaming | Native event framing |
+| --- | ---: | ---: |
+| Import times | 4,255 / 4,336 / 4,423 ms | 2,493 / 2,563 / 2,445 ms |
+| Median import time | 4,336 ms | 2,493 ms |
+| Peak RSS | 612 / 613 / 615 MiB | 579 / 573 / 581 MiB |
+| Median peak RSS | 613 MiB | 579 MiB |
+
+That is about 43% faster while retaining (and slightly improving) the previous
+memory reduction. These are import-only process measurements, not browser
+rendering or hydration measurements. Each revision's `benchmark-profile.ts` was
+bundled separately with esbuild (Node/CommonJS, ES2020, binary WASM) and run with
+the capture path and `stream-import` action, alternating revisions without
+explicit garbage collection. Captures and timing logs are not committed.
+The full exported profiles match the ordinary importer, including all four
+profiles, 17,510 frames, 1,039,656 call events and profile totals.
+
+The same follow-up fixes issue #199's deep-zoom axis labels: formatting receives
+the visible tick interval, tick generation clamps below floating-point precision,
+and overlapping labels are skipped. V8 source-path extraction and exact-first
+sourcemap matching (with empty maps ignored) improve #446, which remains partial
+because automatic linked map discovery/loading is still separate work. The
+maintained backlog records these completion boundaries explicitly.
