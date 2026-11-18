@@ -1,4 +1,5 @@
 import {CallTreeProfileBuilder} from './profile'
+import {exportProfileGroup, importSpeedscopeProfiles} from './file-format'
 import {
   combineProfiles,
   cropProfile,
@@ -46,6 +47,22 @@ test('inversion reverses complete stacks without losing self time (#497)', () =>
     .children.find(node => node.frame.name === 'inner')!
   expect(inner.children[0].frame.name).toBe('outer')
   expect(inner.getTotalWeight()).toBe(4)
+})
+
+test('aggregate and derived metadata survive cloning and export without double counting', () => {
+  const originals = [profile('one'), profile('two')]
+  const combined = combineProfiles(originals)
+  const exported = exportProfileGroup({
+    name: 'group',
+    indexToView: 2,
+    profiles: [...originals, combined],
+  })
+  const imported = importSpeedscopeProfiles(exported)
+  expect(imported.profiles[2].isChronological()).toBe(false)
+  expect(imported.profiles[2].shallowClone().isDerived()).toBe(true)
+  expect(combineProfiles(imported.profiles).getTotalWeight()).toBe(20)
+  expect(cropProfile(originals[0], 0, 2).isChronological()).toBe(true)
+  expect(groupProfileByFile(originals[0]).isChronological()).toBe(false)
 })
 
 test('file grouping preserves total weight and file-level self time (#339)', () => {

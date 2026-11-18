@@ -1,5 +1,4 @@
-import {Profile, FrameInfo, StackListProfileBuilder} from '../lib/profile'
-import {getOrInsert} from '../lib/utils'
+import {Profile, FrameInfo, CallTreeProfileBuilder} from '../lib/profile'
 import {ByteFormatter} from '../lib/value-formatters'
 
 /**
@@ -25,87 +24,71 @@ interface HeapProfileNode {
   callFrame: HeapProfileCallFrame
   selfSize: number
   children: HeapProfileNode[]
-  id: number
-  parent?: number
-  totalSize: number
 }
 
 interface HeapProfile {
   head: HeapProfileNode
 }
 
-const callFrameToFrameInfo = new Map<HeapProfileCallFrame, FrameInfo>()
-function frameInfoForCallFrame(callFrame: HeapProfileCallFrame) {
-  return getOrInsert(callFrameToFrameInfo, callFrame, callFrame => {
-    const file = callFrame.url
-    const line = callFrame.lineNumber
-    const col = callFrame.columnNumber
-    const name =
-      callFrame.functionName ||
-      (file ? `(anonymous ${file.split('/').pop()}:${line})` : '(anonymous)')
-    return {
-      key: `${name}:${file}:${line}:${col}`,
-      name,
-      file,
-      line,
-      col,
-    }
-  })
+function frameInfoForCallFrame(callFrame: HeapProfileCallFrame): FrameInfo {
+  const file = callFrame.url
+  const line = callFrame.lineNumber
+  const col = callFrame.columnNumber
+  const name =
+    callFrame.functionName ||
+    (file ? `(anonymous ${file.split('/').pop()}:${line})` : '(anonymous)')
+  return {
+    key: `${name}:${file}:${line}:${col}`,
+    name,
+    file,
+    line,
+    col,
+  }
 }
 
 export function importFromChromeHeapProfile(chromeProfile: HeapProfile): Profile {
-  const nodeById = new Map<number, HeapProfileNode>()
-  let currentId = 0
-  const computeId = (node: HeapProfileNode, parent?: HeapProfileNode) => {
-    node.id = currentId++
-    nodeById.set(node.id, node)
-    if (parent) {
-      node.parent = parent.id
+  const profile = new CallTreeProfileBuilder()
+  profile.setChronological(false)
+  let value = 0
+  // A preorder walk preserves the previous weighted stack order, without
+  // recursive passes, a parent/id map, or a materialized path for every node.
+  interface PendingNode {
+    node: HeapProfileNode
+    frame: FrameInfo | null
+    index: number
+  }
+  const stack: PendingNode[] = []
+  let openedDepth = 0
+  const enter = (node: HeapProfileNode) => {
+    stack.push({node, frame: null, index: 0})
+    const weight = node.selfSize ?? 0
+    if (!Number.isFinite(weight) || weight < 0)
+      throw new Error('Heap allocation sizes must be finite and non-negative')
+    // Delay opening zero-sized ancestors until a positive descendant needs
+    // them. Entire empty branches then add no frames/nodes, as before.
+    if (weight > 0) {
+      while (openedDepth < stack.length) {
+        const pending = stack[openedDepth++]
+        pending.frame = frameInfoForCallFrame(pending.node.callFrame)
+        profile.enterFrame(pending.frame, value)
+      }
     }
-
-    node.children.forEach(children => computeId(children, node))
+    value += weight
+    if (!Number.isFinite(value)) throw new Error('Heap allocation total must be finite')
   }
-  computeId(chromeProfile.head)
-
-  // Compute the total size
-  const computeTotalSize = (node: HeapProfileNode): number => {
-    if (node.children.length === 0) return node.selfSize || 0
-    const totalChild = node.children.reduce((total: number, children) => {
-      total += computeTotalSize(children)
-      return total
-    }, node.selfSize)
-    node.totalSize = totalChild
-    return totalChild
-  }
-  const total = computeTotalSize(chromeProfile.head)
-
-  // Compute all stacks by taking each last node and going upward
-  const stacks: HeapProfileNode[][] = []
-  for (let currentNode of nodeById.values()) {
-    let stack: HeapProfileNode[] = []
-    stack.push(currentNode)
-    // While we found a parent
-    while (true) {
-      if (currentNode.parent === undefined) break
-      const parent = nodeById.get(currentNode.parent)
-      if (parent === undefined) break
-      // Push the parent at the beginning of the stack
-      stack.unshift(parent)
-      currentNode = parent
+  enter(chromeProfile.head)
+  while (stack.length) {
+    const current = stack[stack.length - 1]
+    if (current.index < current.node.children.length) {
+      enter(current.node.children[current.index++])
+    } else {
+      if (current.frame) {
+        profile.leaveFrame(current.frame, value)
+        openedDepth--
+      }
+      stack.pop()
     }
-    stacks.push(stack)
   }
-
-  const profile = new StackListProfileBuilder(total)
-
-  for (let stack of stacks) {
-    const lastFrame = stack[stack.length - 1]
-    profile.appendSampleWithWeight(
-      stack.map(frame => frameInfoForCallFrame(frame.callFrame)),
-      lastFrame.selfSize,
-    )
-  }
-
   profile.setValueFormatter(new ByteFormatter())
   return profile.build()
 }

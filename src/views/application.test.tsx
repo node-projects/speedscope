@@ -7,6 +7,62 @@ jest.mock(
 
 import {Application, GLCanvas} from './application'
 import {CallTreeProfileBuilder} from '../lib/profile'
+import * as fileFormat from '../lib/file-format'
+import {ViewMode} from '../lib/view-mode'
+
+test('aggregate profiles cannot enter Time Order through shortcuts or profile switching', async () => {
+  const builder = new CallTreeProfileBuilder()
+  builder.setChronological(false)
+  const setViewMode = jest.fn()
+  const app = new Application({
+    activeProfileState: {profile: builder.build()},
+    viewMode: ViewMode.CHRONO_FLAME_CHART,
+    setViewMode,
+  } as any)
+  expect((app as any).effectiveViewMode()).toBe(ViewMode.LEFT_HEAVY_FLAME_GRAPH)
+  await app.onWindowKeyPress({key: '1'} as KeyboardEvent)
+  expect(setViewMode).toHaveBeenCalledWith(ViewMode.LEFT_HEAVY_FLAME_GRAPH)
+})
+
+test('exports expose progress, reject duplicate starts and cancel without discarding the profile', async () => {
+  const save = jest.spyOn(fileFormat, 'saveToFile')
+  const alert = jest.spyOn(window, 'alert').mockImplementation(() => {})
+  save.mockImplementation(
+    (_group, options) =>
+      new Promise((_resolve, reject) => {
+        options!.onProgress!({
+          profilesCompleted: 0,
+          profileCount: 1,
+          eventsWritten: 4096,
+          framesWritten: 0,
+          frameCount: 1,
+        })
+        options!.signal!.addEventListener('abort', () =>
+          reject(new DOMException('Cancelled', 'AbortError')),
+        )
+      }),
+  )
+  const group = {
+    name: 'test',
+    indexToView: 0,
+    profiles: [{profile: new CallTreeProfileBuilder().build()}],
+  }
+  const app = new Application({profileGroup: group, loading: false} as any)
+  app.forceUpdate = jest.fn()
+  try {
+    const pending = (app as any).saveFile()
+    await (app as any).saveFile()
+    expect(save).toHaveBeenCalledTimes(1)
+    expect((app as any).exportProgress.eventsWritten).toBe(4096)
+    ;(app as any).exportController.abort()
+    await pending
+    expect((app as any).exportProgress).toBe(null)
+    expect(app.props.profileGroup).toBe(group)
+    expect(alert).not.toHaveBeenCalled()
+  } finally {
+    jest.restoreAllMocks()
+  }
+})
 
 test('a custom group title preserves thread names (#346)', async () => {
   const profiles = ['main', 'worker'].map(name => {
@@ -25,6 +81,24 @@ test('a custom group title preserves thread names (#346)', async () => {
   expect(profiles.map(p => p.getName())).toEqual(['main', 'worker'])
   expect(setProfileGroup.mock.calls[0][0].name).toBe('session')
   expect(document.title).toBe('session - speedscope')
+})
+
+test('an explicit Time Order hash selection is honored even though its enum value is zero', async () => {
+  const setViewMode = jest.fn()
+  const app = new Application({
+    setError: jest.fn(),
+    setLoading: jest.fn(),
+    setProfileGroup: jest.fn(),
+    hashParams: {viewMode: ViewMode.CHRONO_FLAME_CHART},
+    viewMode: ViewMode.LEFT_HEAVY_FLAME_GRAPH,
+    setViewMode,
+  } as any)
+  await (app as any).loadProfile(async () => ({
+    name: 'group',
+    indexToView: 0,
+    profiles: [new CallTreeProfileBuilder().build()],
+  }))
+  expect(setViewMode).toHaveBeenCalledWith(ViewMode.CHRONO_FLAME_CHART)
 })
 
 test('failed imports clear loading and retain an actionable message', async () => {

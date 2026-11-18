@@ -8,8 +8,7 @@ interface BGSample {
   duration: number
 }
 
-function parseBGFoldedStacks(contents: TextFileContent): BGSample[] {
-  const samples: BGSample[] = []
+function* parseBGFoldedStacks(contents: TextFileContent): IterableIterator<BGSample> {
   for (const line of contents.splitLines()) {
     if (/^\s*#/.test(line)) continue
     const match = /^(.*\S)[ \t]+([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)[ \t]*\r?$/.exec(line)
@@ -21,24 +20,20 @@ function parseBGFoldedStacks(contents: TextFileContent): BGSample[] {
     if (!Number.isFinite(duration) || duration < 0) {
       throw new Error('Folded-stack weights must be finite non-negative numbers')
     }
-    samples.push({
+    yield {
       stack: stack.split(';').map(name => ({key: name, name: name})),
       duration,
-    })
+    }
   }
-
-  return samples
 }
 
 export function importFromBGFlameGraph(contents: TextFileContent): Profile | null {
-  const parsed = parseBGFoldedStacks(contents)
-  const duration = parsed.reduce((prev: number, cur: BGSample) => prev + cur.duration, 0)
-  const profile = new StackListProfileBuilder(duration)
-  if (parsed.length === 0) {
-    return null
-  }
-  for (let sample of parsed) {
+  const profile = new StackListProfileBuilder()
+  profile.setChronological(false)
+  let count = 0
+  for (const sample of parseBGFoldedStacks(contents)) {
     profile.appendSampleWithWeight(sample.stack, sample.duration)
+    count++
   }
-  return profile.build()
+  return count ? profile.build() : null
 }

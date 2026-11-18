@@ -160,6 +160,12 @@ invert stacks, or group stacks by source file. Combining adds busy-stack weights
 it does not align threads on a shared wall-clock timeline. Inversion and file grouping
 are aggregate views, so inspect them in Left Heavy or Call Tree.
 
+Known aggregate profiles disable Time Order. Aggregate/derived flags survive this
+fork's exports so combining original captures after reimport does not count derived
+views again. Export shows progress and a Cancel button while writing JSON chunks.
+See [large-trace measurements and limits](docs/LARGE_TRACE_PERFORMANCE.md) for the
+performance follow-up and benchmark commands.
+
 Run `npm run prepack` to build an offline viewer and
 `dist/speedscope-1.25.0.zip` on Windows, macOS, or Linux. Extract the ZIP and open
 `index.html`. This includes the JFR WebAssembly decoder without a network fetch.

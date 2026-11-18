@@ -49,6 +49,11 @@ export namespace FileFormat {
   }
 
   export interface IProfile {
+    // Optional fork metadata. Aggregate-only profiles have no time-order axis.
+    // Omitted values preserve compatibility with existing speedscope files.
+    isChronological?: boolean
+    // Derived profiles are excluded when combining original captures again.
+    isDerived?: boolean
     // Type of profile. This will future proof the file format to allow many
     // different kinds of profiles to be contained and each type to be part of
     // a discriminated union.

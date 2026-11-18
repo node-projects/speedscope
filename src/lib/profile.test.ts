@@ -21,6 +21,56 @@ const fc = getFrameInfo('c')
 const fd = getFrameInfo('d')
 const fe = getFrameInfo('e')
 
+test('wide grouped nodes use bounded sibling scans and retain distinct frame identities', () => {
+  for (const sampled of [true, false]) {
+    const builder = sampled ? new StackListProfileBuilder() : new CallTreeProfileBuilder()
+    const root = builder.getGroupedCalltreeRoot()
+    const scan = jest.spyOn(root.children, 'find')
+    const count = 10000
+    for (let i = 0; i < count; i++) {
+      const frame = {key: i, name: 'same name'}
+      if (builder instanceof StackListProfileBuilder) builder.appendSampleWithWeight([frame], 1)
+      else {
+        builder.enterFrame(frame, i)
+        builder.leaveFrame(frame, i + 1)
+      }
+    }
+    const profile = builder.build()
+    expect(profile.getGroupedCalltreeRoot().children).toHaveLength(count)
+    expect(scan.mock.calls.length).toBeLessThanOrEqual(16)
+    expect(profile.getTotalWeight()).toBe(count)
+    expect(root.children.every(node => node.getSelfWeight() === 1)).toBe(true)
+    // Construction can resume after build/sort released its temporary indexes.
+    if (builder instanceof StackListProfileBuilder)
+      builder.appendSampleWithWeight([{key: 0, name: 'same name'}], 2)
+    else {
+      builder.enterFrame({key: 0, name: 'same name'}, count)
+      builder.leaveFrame({key: 0, name: 'same name'}, count + 2)
+    }
+    const rebuilt = builder.build()
+    expect(rebuilt.getGroupedCalltreeRoot().children).toHaveLength(count)
+    expect(rebuilt.getGroupedCalltreeRoot().children[0].getTotalWeight()).toBe(3)
+  }
+})
+
+test('deep evented profiles keep recursive frame totals correct at identical timestamps', () => {
+  const builder = new CallTreeProfileBuilder()
+  const count = 20000
+  for (let i = 0; i < count; i++) builder.enterFrame(fa, 0)
+  for (let i = 0; i < count; i++) builder.leaveFrame(fa, 1)
+  const profile = builder.build()
+  expect(profile.getTotalWeight()).toBe(1)
+  let total = 0
+  let self = 0
+  profile.forEachFrame(frame => {
+    total += frame.getTotalWeight()
+    self += frame.getSelfWeight()
+  })
+  expect(total).toBe(1)
+  expect(self).toBe(1)
+  expect(Array.from(profile.getCallEvents())).toHaveLength(count * 2)
+})
+
 test('builds a grouped call tree deeper than the JavaScript call stack', () => {
   const builder = new StackListProfileBuilder()
   const depth = 20000

@@ -81,11 +81,13 @@ export function importFromHaskell(haskellProfile: HaskellProfile): ProfileGroup 
   }
 
   const timeProfile = new CallTreeProfileBuilder(haskellProfile.total_ticks)
+  timeProfile.setChronological(false)
   addToProfile(haskellProfile.profile, 0, timeProfile, idToFrameInfo, tree => tree.ticks)
   timeProfile.setValueFormatter(new TimeFormatter('milliseconds'))
   timeProfile.setName(`${haskellProfile.program} time`)
 
   const allocProfile = new CallTreeProfileBuilder(haskellProfile.total_ticks)
+  allocProfile.setChronological(false)
   addToProfile(haskellProfile.profile, 0, allocProfile, idToFrameInfo, tree => tree.alloc)
   allocProfile.setValueFormatter(new ByteFormatter())
   allocProfile.setName(`${haskellProfile.program} allocation`)

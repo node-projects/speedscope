@@ -106,6 +106,7 @@ function getWeight(deepCopyRow: any): number {
 // Import from a deep copy made of a profile
 export function importFromInstrumentsDeepCopy(contents: TextFileContent): Profile {
   const profile = new CallTreeProfileBuilder()
+  profile.setChronological(false)
   const rows = parseTSV<PastedTimeProfileRow | PastedAllocationsProfileRow>(contents)
 
   const stack: FrameInfoWithWeight[] = []

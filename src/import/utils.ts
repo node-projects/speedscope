@@ -13,6 +13,27 @@ export interface TextFileContent {
   parseAsJSON(): any
 }
 
+// A decoded chunk can contain millions of lines. Keep iteration lazy rather
+// than retaining an array and a substring for every line in that chunk.
+function linesFromChunks(chunks: Iterable<string>): Iterable<string> {
+  return {
+    *[Symbol.iterator]() {
+      let carry = ''
+      for (const chunk of chunks) {
+        let start = 0
+        let end: number
+        while ((end = chunk.indexOf('\n', start)) !== -1) {
+          yield carry + chunk.slice(start, end)
+          carry = ''
+          start = end + 1
+        }
+        carry += chunk.slice(start)
+      }
+      yield carry
+    },
+  }
+}
+
 // V8 has a maximum string size. To support files whose contents exceeds that
 // size, we provide an alternate string interface for text backed by a
 // Uint8Array instead.
@@ -217,25 +238,7 @@ export class BufferBackedTextFileContent implements TextFileContent {
   }
 
   splitLines(): Iterable<string> {
-    const iterator = function* (this: BufferBackedTextFileContent) {
-      let lineBuffer: string = ''
-      for (let chunk of this.chunks) {
-        const fragments = chunk.split('\n')
-        for (let i = 0; i < fragments.length; i++) {
-          if (i === 0) lineBuffer += fragments[i]
-          else {
-            yield lineBuffer
-            lineBuffer = fragments[i]
-          }
-        }
-      }
-
-      yield lineBuffer
-    }
-
-    return {
-      [Symbol.iterator]: iterator.bind(this),
-    }
+    return linesFromChunks(this.chunks)
   }
 
   firstChunk(): string {
@@ -264,8 +267,8 @@ export class BufferBackedTextFileContent implements TextFileContent {
 export class StringBackedTextFileContent implements TextFileContent {
   constructor(private s: string) {}
 
-  splitLines(): string[] {
-    return this.s.split('\n')
+  splitLines(): Iterable<string> {
+    return linesFromChunks([this.s])
   }
 
   firstChunk(): string {

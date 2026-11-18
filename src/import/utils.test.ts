@@ -5,6 +5,7 @@ import {
   BufferBackedTextFileContent,
   MaybeCompressedDataReader,
   withMockedFileChunkSizeForTests,
+  StringBackedTextFileContent,
 } from './utils'
 
 function arrayBuffer(bytes: Uint8Array): ArrayBuffer {
@@ -12,6 +13,33 @@ function arrayBuffer(bytes: Uint8Array): ArrayBuffer {
 }
 
 const text = '[{"name":"work","ph":"B","ts":1}]'
+
+test('line iterables preserve empty/CRLF/Unicode lines across byte boundaries and can be reused', async () => {
+  for (const text of ['', '\n', '\n\n', 'a\r\nb\n', 'α😀\n日本語\nlong line']) {
+    for (const size of [1, 2, 3, 7]) {
+      await withMockedFileChunkSizeForTests(size, () => {
+        const content = new BufferBackedTextFileContent(arrayBuffer(new TextEncoder().encode(text)))
+        for (const source of [content, new StringBackedTextFileContent(text)]) {
+          const lines = source.splitLines()
+          expect([...lines]).toEqual(text.split('\n'))
+          expect([...lines]).toEqual(text.split('\n'))
+        }
+      })
+    }
+  }
+})
+
+test('line iteration does not split the full input into an array', () => {
+  const content = new StringBackedTextFileContent('line\n'.repeat(100000))
+  const split = jest.spyOn(String.prototype, 'split')
+  try {
+    const iterator = content.splitLines()[Symbol.iterator]()
+    expect(iterator.next().value).toBe('line')
+    expect(split).not.toHaveBeenCalled()
+  } finally {
+    jest.restoreAllMocks()
+  }
+})
 
 test('ASCII fallback decodes bounded pieces across chunk boundaries', async () => {
   const descriptor = Object.getOwnPropertyDescriptor(globalThis, 'TextDecoder')!

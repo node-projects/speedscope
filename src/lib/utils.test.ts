@@ -286,7 +286,7 @@ test('StringBackedTextFileContent.firstChunk', async () => {
 test('StringBackedTextFileContent.splitLines', async () => {
   const str = 'may\nyour\nrope\nbe\nlong'
   const content = new StringBackedTextFileContent(str)
-  expect(content.splitLines()).toEqual(['may', 'your', 'rope', 'be', 'long'])
+  expect([...content.splitLines()]).toEqual(['may', 'your', 'rope', 'be', 'long'])
 })
 
 test('StringBackedTextFileContent.parseAsJSON', async () => {

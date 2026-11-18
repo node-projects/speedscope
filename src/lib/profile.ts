@@ -78,7 +78,7 @@ export class Frame extends HasWeights {
   })
 
   static getOrInsert(set: KeyedSet<Frame>, info: FrameInfo) {
-    return set.getOrInsert(new Frame(info))
+    return set.get(info.key) || set.getOrInsert(new Frame(info))
   }
 }
 
@@ -112,8 +112,54 @@ export interface ProfileGroup {
   profiles: Profile[]
 }
 
+export interface CallTreeEvent {
+  node: CallTreeNode
+  value: number
+  open: boolean
+}
+
+// Most nodes have few children. Allocate lookup maps only for wide nodes and
+// release them when construction finishes; completed profiles keep just trees.
+class GroupedCallTreeIndex {
+  private indexes = new WeakMap<CallTreeNode, Map<Frame, CallTreeNode>>()
+
+  getOrCreate(parent: CallTreeNode, frame: Frame): CallTreeNode {
+    let index = this.indexes.get(parent)
+    if (!index && parent.children.length >= 16) {
+      index = new Map(parent.children.map(child => [child.frame, child]))
+      this.indexes.set(parent, index)
+    }
+    let node = index ? index.get(frame) : parent.children.find(child => child.frame === frame)
+    if (!node) {
+      node = new CallTreeNode(frame, parent)
+      parent.children.push(node)
+      if (index) index.set(frame, node)
+    }
+    return node
+  }
+
+  clear() {
+    this.indexes = new WeakMap()
+  }
+}
+
 export class Profile {
   protected name: string = ''
+  private chronological = true
+  private derived = false
+
+  isChronological() {
+    return this.chronological
+  }
+  setChronological(value: boolean) {
+    this.chronological = value
+  }
+  isDerived() {
+    return this.derived
+  }
+  setDerived(value: boolean) {
+    this.derived = value
+  }
 
   protected totalWeight: number
 
@@ -226,6 +272,14 @@ export class Profile {
     openFrame: (node: CallTreeNode, value: number) => void,
     closeFrame: (node: CallTreeNode, value: number) => void,
   ) {
+    for (const {node, value, open} of this.getCallEvents()) {
+      if (open) openFrame(node, value)
+      else closeFrame(node, value)
+    }
+  }
+
+  // Lazy iteration lets large consumers pause without materializing all events.
+  *getCallEvents(): IterableIterator<CallTreeEvent> {
     let prevStack: CallTreeNode[] = []
     const activeNodes = new Set<CallTreeNode>()
     let value = 0
@@ -235,8 +289,7 @@ export class Profile {
       // Find lowest common ancestor of the current stack and the previous one
       let lca: CallTreeNode | null = null
 
-      // This is O(n^2), but n should be relatively small here (stack height),
-      // so hopefully this isn't much of a problem
+      // Active membership makes this linear in the newly opened stack height.
       for (
         lca = stackTop;
         lca && lca.frame != Frame.root && !activeNodes.has(lca);
@@ -247,7 +300,7 @@ export class Profile {
       while (prevStack.length > 0 && lastOf(prevStack) != lca) {
         const node = prevStack.pop()!
         activeNodes.delete(node)
-        closeFrame(node, value)
+        yield {node, value, open: false}
       }
 
       // Open frames that are now becoming open
@@ -262,7 +315,7 @@ export class Profile {
       toOpen.reverse()
 
       for (let node of toOpen) {
-        openFrame(node, value)
+        yield {node, value, open: true}
         activeNodes.add(node)
         prevStack.push(node)
       }
@@ -271,7 +324,7 @@ export class Profile {
 
     // Close frames that are open at the end of the trace
     for (let i = prevStack.length - 1; i >= 0; i--) {
-      closeFrame(prevStack[i], value)
+      yield {node: prevStack[i], value, open: false}
     }
   }
 
@@ -435,22 +488,26 @@ export class Profile {
 }
 
 export class StackListProfileBuilder extends Profile {
+  private groupedIndex = new GroupedCallTreeIndex()
+
   _appendSample(stack: Frame[], weight: number, useAppendOrder: boolean) {
     if (isNaN(weight)) throw new Error('invalid weight')
     let node = useAppendOrder ? this.appendOrderCalltreeRoot : this.groupedCalltreeRoot
 
-    let framesInStack = new Set<Frame>()
+    const framesInStack = useAppendOrder ? new Set<Frame>() : null
 
     for (let frame of stack) {
-      const last = useAppendOrder
-        ? lastOf(node.children)
-        : node.children.find(c => c.frame === frame)
-      if (last && !last.isFrozen() && last.frame == frame) {
-        node = last
+      if (!useAppendOrder) {
+        node = this.groupedIndex.getOrCreate(node, frame)
       } else {
-        const parent = node
-        node = new CallTreeNode(frame, node)
-        parent.children.push(node)
+        const last = lastOf(node.children)
+        if (last && !last.isFrozen() && last.frame === frame) {
+          node = last
+        } else {
+          const parent = node
+          node = new CallTreeNode(frame, node)
+          parent.children.push(node)
+        }
       }
       node.addToTotalWeight(weight)
 
@@ -460,7 +517,7 @@ export class StackListProfileBuilder extends Profile {
       // frame multiple times for a single sample, we so just
       // track all of the unique frames that participated in
       // this call stack, then add to their weight at the end.
-      framesInStack.add(node.frame)
+      if (framesInStack) framesInStack.add(node.frame)
     }
     node.addToSelfWeight(weight)
 
@@ -473,7 +530,7 @@ export class StackListProfileBuilder extends Profile {
     if (useAppendOrder) {
       node.frame.addToSelfWeight(weight)
 
-      for (let frame of framesInStack) {
+      for (let frame of framesInStack!) {
         frame.addToTotalWeight(weight)
       }
 
@@ -540,6 +597,7 @@ export class StackListProfileBuilder extends Profile {
       this.weights.reduce((a, b) => a + b, 0),
     )
     this.sortGroupedCallTree()
+    this.groupedIndex.clear()
     return this
   }
 }
@@ -548,6 +606,7 @@ export class StackListProfileBuilder extends Profile {
 // way to open & close frames directly without needing to construct tons of
 // arrays as intermediaries.
 export class CallTreeProfileBuilder extends Profile {
+  private groupedIndex = new GroupedCallTreeIndex()
   private appendOrderStack: CallTreeNode[] = [this.appendOrderCalltreeRoot]
   private groupedOrderStack: CallTreeNode[] = [this.groupedCalltreeRoot]
   private framesInStack = new Map<Frame, number>()
@@ -556,6 +615,7 @@ export class CallTreeProfileBuilder extends Profile {
   private lastValue: number = 0
   private addWeightsToFrames(value: number) {
     const delta = value - this.lastValue
+    if (delta === 0) return
     for (let frame of this.framesInStack.keys()) {
       frame.addToTotalWeight(delta)
     }
@@ -566,6 +626,7 @@ export class CallTreeProfileBuilder extends Profile {
   }
   private addWeightsToNodes(value: number, stack: CallTreeNode[]) {
     const delta = value - this.lastValue
+    if (delta === 0) return
     for (let node of stack) {
       node.addToTotalWeight(delta)
     }
@@ -594,15 +655,17 @@ export class CallTreeProfileBuilder extends Profile {
         }
       }
 
-      const last = useAppendOrder
-        ? lastOf(prevTop.children)
-        : prevTop.children.find(c => c.frame === frame)
       let node: CallTreeNode
-      if (last && !last.isFrozen() && last.frame == frame) {
-        node = last
+      if (!useAppendOrder) {
+        node = this.groupedIndex.getOrCreate(prevTop, frame)
       } else {
-        node = new CallTreeNode(frame, prevTop)
-        prevTop.children.push(node)
+        const last = lastOf(prevTop.children)
+        if (last && !last.isFrozen() && last.frame === frame) {
+          node = last
+        } else {
+          node = new CallTreeNode(frame, prevTop)
+          prevTop.children.push(node)
+        }
       }
       stack.push(node)
     }
@@ -682,6 +745,7 @@ export class CallTreeProfileBuilder extends Profile {
       throw new Error('Tried to complete profile construction with a non-empty stack')
     }
     this.sortGroupedCallTree()
+    this.groupedIndex.clear()
     return this
   }
 }

@@ -3,6 +3,7 @@ import {TextFileContent} from './utils'
 
 export function importFromPMCStatCallGraph(contents: TextFileContent): Profile | null {
   const profile = new StackListProfileBuilder()
+  profile.setChronological(false)
   const stack: FrameInfo[] = []
   let file: string | undefined
   let prevDuration = '0'

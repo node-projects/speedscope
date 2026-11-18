@@ -6,15 +6,15 @@ import {
   StackListProfileBuilder,
 } from './profile'
 
-const derivedProfiles = new WeakSet<Profile>()
 export function isDerivedProfile(profile: Profile): boolean {
-  return derivedProfiles.has(profile)
+  return profile.isDerived()
 }
 
-function finish(builder: Profile, source: Profile, name: string): Profile {
+function finish(builder: Profile, source: Profile, name: string, chronological = false): Profile {
   builder.setName(name)
   builder.setValueFormatter({unit: source.getWeightUnit(), format: source.formatValue.bind(source)})
-  derivedProfiles.add(builder)
+  builder.setDerived(true)
+  builder.setChronological(chronological)
   return builder
 }
 
@@ -41,6 +41,7 @@ export function cropProfile(profile: Profile, start: number, end: number): Profi
     builder.build(),
     profile,
     `${profile.getName()} [${profile.formatValue(start)}–${profile.formatValue(end)}]`,
+    profile.isChronological(),
   )
 }
 

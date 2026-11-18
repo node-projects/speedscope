@@ -48,6 +48,12 @@ function ToolbarLeftContent(props: ToolbarProps) {
           props.viewMode === ViewMode.CHRONO_FLAME_CHART && style.toolbarTabActive,
         )}
         onClick={setChronoFlameChart}
+        disabled={!props.activeProfileState.profile.isChronological()}
+        title={
+          !props.activeProfileState.profile.isChronological()
+            ? 'This profile contains aggregate weights without chronological order'
+            : undefined
+        }
       >
         <span className={css(style.emoji)}>🕰</span>Time Order
       </button>
@@ -364,6 +370,7 @@ const getStyle = withTheme(theme =>
       paddingTop: 0,
       paddingBottom: 0,
       ':focus-visible': {outline: `2px solid ${theme.fgPrimaryColor}`, outlineOffset: -2},
+      ':disabled': {opacity: 0.5, cursor: 'default'},
       background: theme.altBgSecondaryColor,
       marginTop: Sizes.SEPARATOR_HEIGHT,
       height: Sizes.TOOLBAR_TAB_HEIGHT,
