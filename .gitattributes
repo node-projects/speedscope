@@ -1,0 +1,6 @@
+# Keep source and workflow checkouts consistent across Windows and Unix runners.
+* text=auto eol=lf
+
+# Profile fixtures include intentional encodings, CRLF input and binary captures.
+# Their original bytes must survive checkout unchanged.
+sample/** -text
