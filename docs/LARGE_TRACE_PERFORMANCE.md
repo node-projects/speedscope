@@ -123,12 +123,80 @@ per query and file-only checks avoid allocating name highlight ranges. Unicode
 word boundaries, punctuation, escaped metacharacters and full-name/path matching
 have regressions. User-provided regex is still not enabled.
 
-Imports remain in-memory operations: raw input, parsed objects and construction
-trees can still exhaust memory inside the worker. UI hydration and rendering have
+Profile trees and rendering remain in-memory operations. Unsupported formats
+still use the original full-document importer. UI hydration and rendering have
 costs, and transferring work can increase overall elapsed time even while making
-the interface responsive. This does not fix every OOM report or implement
-streaming. Derived transformations remain synchronous. Export retains the final
+the interface responsive. This does not fix every OOM report. Derived
+transformations remain synchronous. Export retains the final
 Blob bytes and source profile while bounding temporary serialization chunks
-(apart from an individually huge string). True streaming/memory budgets,
+(apart from an individually huge string). An out-of-core model, heap budgets,
 worker-backed transforms, signed comparisons and synchronized timelines remain
 separate follow-ups in [the maintained backlog](ISSUE_BACKLOG.md).
+
+## Streaming duration traces
+
+Large duration-event `.json`/`.trace` files, optionally gzip-compressed, now use
+incremental parsing inside the worker. A local File is streamed without reading
+its whole contents; transferred ArrayBuffers are consumed in 64 KiB slices.
+Native `DecompressionStream` inflates gzip incrementally. The streaming parser
+([@streamparser/json](https://github.com/juanjoDiaz/streamparser-json), pinned at
+0.0.26) releases completed event objects from its parent array. We retain the
+duration events, naming metadata and first event needed by the existing Hermes
+discriminator, dropping unused event fields and ignored events. Event arguments
+remain intact because they participate in frame identities.
+
+This avoids a full inflated byte buffer, a whole JSON string and a complete
+parsed input object. Out-of-order traces still need stable sorting, so retained
+events and constructed trees continue to scale with the capture. This is not an
+out-of-core profile store or a hard bound on total JavaScript/browser memory.
+
+The streaming path rejects excessive input complexity before returning a profile:
+
+| Limit | Default |
+| --- | ---: |
+| Decompressed input | 1 GiB |
+| Pending event/metadata bytes between completed events | 16 MiB |
+| Retained event source bytes | 256 MiB |
+| Input events, including ignored events | 2,000,000 |
+| JSON nesting depth | 128 |
+
+Checks run before bounded parser writes and while tokens/events are emitted.
+The pending-byte check is conservative at chunk boundaries. These are source
+complexity limits, not heap accounting: object overhead, expanded Unicode,
+sorting, call-tree nodes, numeric snapshots, hydration and GPU resources have
+additional costs. A limit failure stops with an actionable error; it never
+silently truncates the trace or retries the full importer. Cancellation releases
+the reader and terminates the worker; source cancellation failures cannot hide
+the original error.
+
+Native CPU/heap/speedscope files and known filename overrides retain their
+detector. CPU markers anywhere in the stream, sample tables, duplicate root
+`traceEvents` properties and unrecognized wrapper properties return to that
+detector, preserving their original semantics. Those fallback formats do not
+gain these streaming budgets. Gzip also falls back when native decompression is
+unavailable. URL/CLI loading still buffers the input response before transfer;
+local File streaming avoids that buffer. Tolerated trailing commas and missing
+final `]` after complete array events remain supported. Incomplete values and
+corrupt gzip fail rather than producing a partial result.
+
+Validation includes every duration-trace fixture against the ordinary importer,
+one-byte UTF-8/escape boundaries, late metadata, argument identity, unordered and
+anonymous events, sampled/CPU fallback, ignored payloads, gzip File imports with
+whole-file reads forbidden, resource-limit failures, and cancellation races.
+The PLC capture exported identically: four profiles, 17,510 frames, 1,039,656
+call events and matching totals. Fresh-process Windows/Node 24 import-only runs:
+
+| Path | Import time | Peak RSS | Heap after import |
+| --- | ---: | ---: | ---: |
+| Ordinary importer | 2,281 ms | 999 MiB | 572 MiB |
+| Streaming duration importer | 4,311 ms | 623 MiB | 437 MiB |
+
+This single capture/run measured about 38% lower peak RSS at a latency cost.
+Browser peak memory, rendering and worker hydration are not represented by this
+Node benchmark. Results vary by machine, input and garbage collection. Reproduce
+each path in its own process with `node scripts/benchmark-profile.mjs <capture>
+import` and `node scripts/benchmark-profile.mjs <capture> stream-import`.
+
+Issues #519, #347, #478, #386 and #404 remain **partial** in the backlog: the
+specific original reproductions and a general bounded-memory profile model still
+need work.

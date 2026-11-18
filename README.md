@@ -72,6 +72,8 @@ Large JSON and trace captures import in the background with progress and a
 **Cancel import** button. This improves responsiveness; very large captures can
 still exceed browser memory limits. Search offers Contains, Whole word and Exact
 matching for function names and source paths.
+Duration traces stream plain/gzip input and discard unused events. Oversized
+captures stop with a clear limit error; see [import limits and measurements](docs/LARGE_TRACE_PERFORMANCE.md#streaming-duration-traces).
 
 ## Command line usage
 

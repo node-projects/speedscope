@@ -34,6 +34,10 @@ await writeFile(
 )
 await writeFile(path.join(outdir, 'LICENSE'), await readFile('LICENSE'))
 await writeFile(
+  path.join(outdir, 'streamparser-json.LICENSE'),
+  await readFile('node_modules/@streamparser/json/LICENSE'),
+)
+await writeFile(
   path.join(outdir, 'release.txt'),
   `${pkg.name}@${pkg.version}\n${new Date().toISOString()}\n${execFileSync(
     'git',
