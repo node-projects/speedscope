@@ -159,17 +159,14 @@ function partitionByPidTid<T extends {tid: number | string; pid: number | string
 }
 
 function selectQueueToTakeFromNext(
-  bEventQueue: BTraceEvent[],
-  eEventQueue: ETraceEvent[],
+  bFront: BTraceEvent | undefined,
+  eFront: ETraceEvent | undefined,
 ): 'B' | 'E' {
-  if (bEventQueue.length === 0 && eEventQueue.length === 0) {
+  if (bFront == null && eFront == null) {
     throw new Error('This method should not be given both queues empty')
   }
-  if (eEventQueue.length === 0) return 'B'
-  if (bEventQueue.length === 0) return 'E'
-
-  const bFront = bEventQueue[0]
-  const eFront = eEventQueue[0]
+  if (eFront == null) return 'B'
+  if (bFront == null) return 'E'
 
   const bts = bFront.ts
   const ets = eFront.ts
@@ -445,9 +442,12 @@ function eventListToProfile(
   profileBuilder.setName(name)
 
   const frameStack: BTraceEvent[] = []
+  const frameInfoStack: FrameInfo[] = []
   const enterFrame = (b: BTraceEvent) => {
+    const frameInfo = frameInfoForEvent(b, exporterSource)
     frameStack.push(b)
-    profileBuilder.enterFrame(frameInfoForEvent(b, exporterSource), b.ts)
+    frameInfoStack.push(frameInfo)
+    profileBuilder.enterFrame(frameInfo, b.ts)
   }
 
   const tryToLeaveFrame = (e: ETraceEvent) => {
@@ -463,7 +463,7 @@ function eventListToProfile(
     }
 
     const eFrameInfo = frameInfoForEvent(e, exporterSource)
-    const bFrameInfo = frameInfoForEvent(b, exporterSource)
+    const bFrameInfo = lastOf(frameInfoStack)!
 
     if (e.name !== b.name) {
       console.warn(
@@ -479,14 +479,18 @@ function eventListToProfile(
     }
 
     frameStack.pop()
+    frameInfoStack.pop()
     profileBuilder.leaveFrame(bFrameInfo, e.ts)
   }
 
-  while (bEventQueue.length > 0 || eEventQueue.length > 0) {
-    const queueName = selectQueueToTakeFromNext(bEventQueue, eEventQueue)
+  // Advance cursors instead of shifting large arrays on every event.
+  let bIndex = 0
+  let eIndex = 0
+  while (bIndex < bEventQueue.length || eIndex < eEventQueue.length) {
+    const queueName = selectQueueToTakeFromNext(bEventQueue[bIndex], eEventQueue[eIndex])
     switch (queueName) {
       case 'B': {
-        enterFrame(bEventQueue.shift()!)
+        enterFrame(bEventQueue[bIndex++])
         break
       }
       case 'E': {
@@ -496,13 +500,13 @@ function eventListToProfile(
         // match.
         const stackTop = lastOf(frameStack)
         if (stackTop != null) {
-          const bFrameInfo = frameInfoForEvent(stackTop, exporterSource)
+          const bFrameInfo = lastOf(frameInfoStack)!
 
           let swapped: boolean = false
 
-          for (let i = 1; i < eEventQueue.length; i++) {
+          for (let i = eIndex + 1; i < eEventQueue.length; i++) {
             const eEvent = eEventQueue[i]
-            if (eEvent.ts > eEventQueue[0].ts) {
+            if (eEvent.ts > eEventQueue[eIndex].ts) {
               // Only consider 'E' events with the same ts as the front of the queue.
               break
             }
@@ -510,8 +514,8 @@ function eventListToProfile(
             const eFrameInfo = frameInfoForEvent(eEvent, exporterSource)
             if (bFrameInfo.key === eFrameInfo.key) {
               // We have a match! Process this one first.
-              const temp = eEventQueue[0]
-              eEventQueue[0] = eEventQueue[i]
+              const temp = eEventQueue[eIndex]
+              eEventQueue[eIndex] = eEventQueue[i]
               eEventQueue[i] = temp
               swapped = true
               break
@@ -520,17 +524,17 @@ function eventListToProfile(
 
           if (!swapped) {
             // There was no key match, let's see if we can find a name match
-            for (let i = 1; i < eEventQueue.length; i++) {
+            for (let i = eIndex + 1; i < eEventQueue.length; i++) {
               const eEvent = eEventQueue[i]
-              if (eEvent.ts > eEventQueue[0].ts) {
+              if (eEvent.ts > eEventQueue[eIndex].ts) {
                 // Only consider 'E' events with the same ts as the front of the queue.
                 break
               }
 
               if (eEvent.name === stackTop.name) {
                 // We have a match! Process this one first.
-                const temp = eEventQueue[0]
-                eEventQueue[0] = eEventQueue[i]
+                const temp = eEventQueue[eIndex]
+                eEventQueue[eIndex] = eEventQueue[i]
                 eEventQueue[i] = temp
                 swapped = true
                 break
@@ -542,7 +546,7 @@ function eventListToProfile(
           // pop a stack frame that doesn't even match by name. Bummer.
         }
 
-        const e = eEventQueue.shift()!
+        const e = eEventQueue[eIndex++]
 
         tryToLeaveFrame(e)
         break
@@ -555,7 +559,7 @@ function eventListToProfile(
   }
 
   for (let i = frameStack.length - 1; i >= 0; i--) {
-    const frame = frameInfoForEvent(frameStack[i], exporterSource)
+    const frame = frameInfoStack[i]
     console.warn(`Frame "${frame.key}" was still open at end of profile. Closing automatically.`)
     profileBuilder.leaveFrame(frame, profileBuilder.getTotalWeight())
   }

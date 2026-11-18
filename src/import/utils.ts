@@ -178,12 +178,21 @@ export class BufferBackedTextFileContent implements TextFileContent {
   }
 
   parseAsJSON(): any {
-    // We only use the Uint8Array version of JSON.parse when necessary, because
-    // it's around 4x slower than native.
+    // Chunk boundaries are for decoding, not the engine's actual string limit.
+    // Prefer native JSON parsing whenever the decoded text fits in a string.
     if (this.chunks.length === 1) {
       return permissivelyParseJSONString(this.chunks[0])
     }
-    return permissivelyParseJSONUint8Array(this.byteArray)
+    let text: string
+    try {
+      text = this.chunks.join('')
+    } catch (e) {
+      if (e instanceof RangeError) {
+        return permissivelyParseJSONUint8Array(this.byteArray)
+      }
+      throw e
+    }
+    return permissivelyParseJSONString(text)
   }
 }
 
@@ -229,8 +238,22 @@ export class MaybeCompressedDataReader implements ProfileDataSource {
     maybeCompressedDataPromise: Promise<ArrayBuffer>,
   ) {
     this.uncompressedData = maybeCompressedDataPromise.then(async (fileData: ArrayBuffer) => {
+      const bytes = new Uint8Array(fileData)
+      if (
+        bytes[0] === 0x1f &&
+        bytes[1] === 0x8b &&
+        typeof DecompressionStream !== 'undefined' &&
+        typeof Response !== 'undefined'
+      ) {
+        try {
+          const stream = new Response(fileData).body!.pipeThrough(new DecompressionStream('gzip'))
+          return await new Response(stream).arrayBuffer()
+        } catch (e) {
+          // Retain the existing inflater for browsers without working native gzip support.
+        }
+      }
       try {
-        const result = pako.inflate(new Uint8Array(fileData)).buffer as ArrayBuffer
+        const result = pako.inflate(bytes).buffer as ArrayBuffer
         return result
       } catch (e) {
         return fileData

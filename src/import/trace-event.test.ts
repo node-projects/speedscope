@@ -1,5 +1,36 @@
 import {checkProfileSnapshot} from '../lib/test-utils'
 import {withMockedFileChunkSizeForTests} from './utils'
+import {importTraceEvents} from './trace-event'
+
+test('importTraceEvents large event queues', () => {
+  const count = 250000
+  const events = []
+  for (let i = 0; i < count; i++) {
+    events.push({ph: 'B', name: 'work', pid: 1, tid: 0, ts: i * 2})
+    events.push({ph: 'E', name: 'work', pid: 1, tid: 0, ts: i * 2 + 1})
+  }
+
+  const group = importTraceEvents(events)
+  expect(group.profiles).toHaveLength(1)
+  const profile = group.profiles[0]
+  expect(profile.getTotalWeight()).toBe(count * 2 - 1)
+  let calls = 0
+  let closes = 0
+  let valid = true
+  profile.forEachCall(
+    (node, value) => {
+      valid = valid && node.frame.name === 'work' && value === calls * 2
+      calls++
+    },
+    (_node, value) => {
+      valid = valid && value === closes * 2 + 1
+      closes++
+    },
+  )
+  expect(calls).toBe(count)
+  expect(closes).toBe(count)
+  expect(valid).toBe(true)
+})
 
 test('importTraceEvents simple', async () => {
   await checkProfileSnapshot('./sample/profiles/trace-event/simple.json')
