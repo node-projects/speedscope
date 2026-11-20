@@ -9,7 +9,7 @@ Source: [upstream issues](https://github.com/jlfwong/speedscope/issues). [Machin
 | Kind | Implemented | Already supported | Partial | Planned | Needs reproduction | Declined | Obsolete | Total |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | bug | 18 | 9 | 14 | 8 | 6 | 0 | 1 | 56 |
-| feature | 22 | 8 | 6 | 30 | 0 | 4 | 0 | 70 |
+| feature | 24 | 8 | 6 | 28 | 0 | 4 | 0 | 70 |
 | maintenance | 3 | 1 | 0 | 3 | 0 | 1 | 0 | 8 |
 
 **Implemented** means the reviewed scope has an implementation. **Supported** means it already works or the established format is supported. **Partial** never means fully fixed. **Needs reproduction** means insufficient current evidence. A useful proposal can remain planned because it needs substantial design, fixtures or validation.
@@ -43,7 +43,7 @@ P1: correctness/large-profile failures. P2: valuable product work. P3: lower-pri
 | [#193](https://github.com/jlfwong/speedscope/issues/193) `perf script --hide-call-graph` output is not accepted | bug | yes | partial | P3 | The known failure now has an actionable error. Additional producer-specific cases need fixtures; this is not evidence that every unsupported file imports. |
 | [#138](https://github.com/jlfwong/speedscope/issues/138) AffineTransform multiplication test failed once | bug | yes | planned | P3 | Recorded affine counterexample involves ill-conditioned near-singular matrices and inverse cancellation. Needs condition-aware error bounds and deterministic counterexample coverage, not simply narrowing property domains. |
 
-## Remaining useful features (36)
+## Remaining useful features (34)
 
 | Issue | Kind | Useful? | Status | Priority | Work / evidence |
 | --- | --- | --- | --- | --- | --- |
@@ -71,8 +71,6 @@ P1: correctness/large-profile failures. P2: valuable product work. P3: lower-pri
 | [#308](https://github.com/jlfwong/speedscope/issues/308) Support import from MSBuild binlog | feature | yes | planned | P3 | MSBuild binlog requires its structured binary reader and task-span mapping. Prefer an external conversion until a maintained browser-compatible parser and fixture are selected. |
 | [#270](https://github.com/jlfwong/speedscope/issues/270) Support import from React devtools performance tab | feature | yes | planned | P3 | React DevTools export is a versioned renderer-specific format; require representative exports and a committed mapping of render/commit durations to profiles. |
 | [#245](https://github.com/jlfwong/speedscope/issues/245) FeatureRequest: memory chart | feature | yes | planned | P3 | Memory/counter time series are non-stack tracks requiring sampling/interpolation, independent axes and synchronized timeline support. |
-| [#241](https://github.com/jlfwong/speedscope/issues/241) UX: Timeline mouse cursor  | feature | yes | planned | P3 | Minimap cursor affordances and a clearer viewport overlay need interaction/contrast testing in both themes. No unverified pointer behavior change applied. |
-| [#240](https://github.com/jlfwong/speedscope/issues/240) UX: Timelime improvement | feature | yes | planned | P3 | Minimap cursor affordances and a clearer viewport overlay need interaction/contrast testing in both themes. No unverified pointer behavior change applied. |
 | [#236](https://github.com/jlfwong/speedscope/issues/236) custom counters / graphs | feature | yes | planned | P3 | Memory/counter time series are non-stack tracks requiring sampling/interpolation, independent axes and synchronized timeline support. |
 | [#173](https://github.com/jlfwong/speedscope/issues/173) Format Support: concatenated output from many calls to jstack | feature | yes | planned | P3 | jstack/Java thread dumps are snapshots, not elapsed durations. Need explicit sample ordering/weight policy and public format fixtures before adding another text parser. |
 | [#145](https://github.com/jlfwong/speedscope/issues/145) Import & display frame boundaries from Chrome | feature | yes | planned | P3 | Annotations and arbitrary per-block metadata require schema, serialization, selection and presentation design. Avoid putting metadata into frame identity because it can explode frame cardinality. |
@@ -103,7 +101,7 @@ P1: correctness/large-profile failures. P2: valuable product work. P3: lower-pri
 | [#269](https://github.com/jlfwong/speedscope/issues/269) Table view doesn't update at 60fps during scrolling | bug | conditional | needs-reproduction | P3 | Original slow scrolling report references a 2013 Mac. Iterative traversals and bounded Call Tree improve scale; no evidence that the exact older scrolling problem is fixed. |
 | [#42](https://github.com/jlfwong/speedscope/issues/42) Low framerate in Chrome 66 on MBP | bug | conditional | needs-reproduction | P3 | Report targets Chrome 66 compositor behavior. Current supported browsers differ; need a current profile and rendering trace before applying historical GPU workarounds. |
 
-## Implemented or already supported (61)
+## Implemented or already supported (63)
 
 | Issue | Kind | Useful? | Status | Priority | Work / evidence |
 | --- | --- | --- | --- | --- | --- |
@@ -166,6 +164,8 @@ P1: correctness/large-profile failures. P2: valuable product work. P3: lower-pri
 | [#363](https://github.com/jlfwong/speedscope/issues/363) Feature request: window title as loaded profile file name. | feature | yes | implemented | P3 | Window titles show the currently opened leaf filename alongside a distinct internal recording name; explicit hash titles keep precedence. Runtime-only sourceName survives worker hydration, derived views and symbol remapping, without adding local filename metadata to exports. See docs/SEARCH_AND_LAYOUT.md. |
 | [#350](https://github.com/jlfwong/speedscope/issues/350) Be able to click on the scopes at the bottom and jump back to that in the scopes above. | feature | yes | implemented | P3 | Selected-stack details provide keyboard-focusable scope buttons that select the exact ancestor call instance and bring ancestors above the viewport into view. Parent chains are paged at 100 scopes, with older-ancestor and reset controls; no full-chain index or history is retained. See docs/SEARCH_AND_LAYOUT.md. |
 | [#242](https://github.com/jlfwong/speedscope/issues/242) UX: Sandwitch: Detail for symbol name not visible | bug | yes | implemented | P3 | Sandwich shows a persistent selected-function details panel with the full name and file/line/column, including configured source-code links. Same-named functions can be distinguished without hovering; unavailable source metadata is explicit. See docs/SEARCH_AND_LAYOUT.md. |
+| [#241](https://github.com/jlfwong/speedscope/issues/241) UX: Timeline mouse cursor  | feature | yes | implemented | P3 | Overview hover uses a local grab cursor inside the viewport and a crosshair outside; dragging uses grabbing/crosshair and restores the prior body cursor afterward. Blur, Escape, profile/context replacement and unmount remove drag listeners and release gesture state. Non-primary buttons are ignored. See docs/SEARCH_AND_LAYOUT.md. |
+| [#240](https://github.com/jlfwong/speedscope/issues/240) UX: Timelime improvement | feature | yes | implemented | P3 | Overview and Visible range labels plus a two-tone clipped viewport outline explain how the minimap maps to the main graph. The focusable overview provides current-range instructions and keyboard pan/zoom/reset. No graph-node traversal or index is added. See docs/SEARCH_AND_LAYOUT.md. |
 | [#219](https://github.com/jlfwong/speedscope/issues/219) Document "this instance - total self" | maintenance | yes | implemented | P3 | Selected-stack details include an accessible expandable explanation of This Instance versus All Instances, Total versus Self, profile units and percentage denominators. Sandwich headers explain their non-idle denominator. Zero-weight percentages are finite and show 0%. See docs/SEARCH_AND_LAYOUT.md. |
 | [#209](https://github.com/jlfwong/speedscope/issues/209) Resize frames in Sandwich view | feature | yes | implemented | P3 | Sandwich table/graphs and callers/callees each have pointer-captured resize handles, accessible separator values and arrow/Home/End/reset controls. Minimum pane sizes, saved per-browser ratios, corrupt-storage fallback and graph resize notifications are implemented. Browser dragging, keyboard controls and reload persistence verified. |
 

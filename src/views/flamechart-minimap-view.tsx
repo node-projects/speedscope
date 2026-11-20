@@ -11,6 +11,11 @@ import {Color} from '../lib/color'
 import {Theme} from './themes/theme'
 import {minimapMousePositionAtom} from '../app-state'
 import {axisTicks, niceTickInterval} from '../lib/axis-ticks'
+import {overviewKeyViewport, overviewViewportBounds} from '../lib/overview-navigation'
+
+let nextOverviewId = 0
+const overviewHelp =
+  'The outlined area is visible in the main graph. Drag inside to pan; drag outside to select a range. Arrow keys pan, plus/minus zoom, Home resets. Shift makes larger steps. Escape ends a drag.'
 
 interface FlamechartMinimapViewProps {
   theme: Theme
@@ -31,9 +36,10 @@ enum DraggingMode {
 }
 
 export class FlamechartMinimapView extends Component<FlamechartMinimapViewProps, {}> {
-  container: Element | null = null
+  private descriptionId = `profile-overview-${nextOverviewId++}`
+  container: HTMLDivElement | null = null
   containerRef = (element: Element | null) => {
-    this.container = element || null
+    this.container = element as HTMLDivElement | null
   }
 
   overlayCanvas: HTMLCanvasElement | null = null
@@ -161,24 +167,70 @@ export class FlamechartMinimapView extends Component<FlamechartMinimapViewProps,
     }
   }
 
+  private renderViewportOutline(ctx: CanvasRenderingContext2D) {
+    const theme = this.props.theme,
+      size = this.physicalViewSize(),
+      ratio = window.devicePixelRatio
+    const axis = Sizes.FRAME_HEIGHT * ratio
+    const outline = overviewViewportBounds(
+      this.props.configSpaceViewportRect,
+      this.props.flamechart.getTotalWeight(),
+      this.props.flamechart.getLayers().length,
+      size,
+      axis,
+      2 * ratio,
+    )
+    if (!outline) return
+    ctx.save()
+    ctx.beginPath()
+    ctx.rect(0, axis, size.x, size.y - axis)
+    ctx.clip()
+    ctx.strokeStyle = theme.bgPrimaryColor
+    ctx.lineWidth = 3 * ratio
+    ctx.strokeRect(outline.left(), outline.top(), outline.width(), outline.height())
+    ctx.strokeStyle = theme.fgPrimaryColor
+    ctx.lineWidth = ratio
+    ctx.strokeRect(outline.left(), outline.top(), outline.width(), outline.height())
+    const label = 'Visible range',
+      padding = 4 * ratio,
+      fontSize = FontSize.LABEL * ratio
+    const width = cachedMeasureTextWidth(ctx, label)
+    if (outline.width() > width + 2 * padding && outline.height() > fontSize + 2 * padding) {
+      ctx.fillStyle = theme.bgPrimaryColor
+      ctx.fillRect(
+        outline.left() + padding,
+        outline.top() + padding,
+        width + padding,
+        fontSize + padding,
+      )
+      ctx.fillStyle = theme.fgPrimaryColor
+      ctx.fillText(label, outline.left() + padding * 1.5, outline.top() + padding * 1.5)
+    }
+    ctx.restore()
+  }
+
   onWindowResize = () => {
     this.onBeforeFrame()
   }
 
   componentWillReceiveProps(nextProps: FlamechartMinimapViewProps) {
-    if (this.props.flamechart !== nextProps.flamechart) {
-      this.renderCanvas()
-    } else if (this.props.configSpaceViewportRect != nextProps.configSpaceViewportRect) {
-      this.renderCanvas()
-    } else if (this.props.canvasContext !== nextProps.canvasContext) {
-      if (this.props.canvasContext) {
-        this.props.canvasContext.removeBeforeFrameHandler(this.onBeforeFrame)
-      }
-      if (nextProps.canvasContext) {
-        nextProps.canvasContext.addBeforeFrameHandler(this.onBeforeFrame)
-        nextProps.canvasContext.requestFrame()
-      }
+    if (this.props.canvasContext !== nextProps.canvasContext) {
+      this.props.canvasContext.removeBeforeFrameHandler(this.onBeforeFrame)
+      nextProps.canvasContext.addBeforeFrameHandler(this.onBeforeFrame)
     }
+    if (
+      this.props.flamechart !== nextProps.flamechart ||
+      this.props.canvasContext !== nextProps.canvasContext
+    ) {
+      this.endDrag()
+    }
+    if (
+      this.props.flamechart !== nextProps.flamechart ||
+      this.props.theme !== nextProps.theme ||
+      this.props.canvasContext !== nextProps.canvasContext ||
+      this.props.configSpaceViewportRect !== nextProps.configSpaceViewportRect
+    )
+      nextProps.canvasContext.requestFrame()
   }
 
   componentDidMount() {
@@ -187,6 +239,7 @@ export class FlamechartMinimapView extends Component<FlamechartMinimapViewProps,
   }
 
   componentWillUnmount() {
+    this.endDrag()
     window.removeEventListener('resize', this.onWindowResize)
     this.props.canvasContext.removeBeforeFrameHandler(this.onBeforeFrame)
   }
@@ -222,6 +275,7 @@ export class FlamechartMinimapView extends Component<FlamechartMinimapViewProps,
     this.resizeOverlayCanvasIfNeeded()
     this.renderRects()
     this.renderOverlays()
+    if (this.overlayCtx) this.renderViewportOutline(this.overlayCtx)
   }
 
   private renderCanvas = () => {
@@ -316,10 +370,34 @@ export class FlamechartMinimapView extends Component<FlamechartMinimapViewProps,
   private dragStartConfigSpaceMouse: Vec2 | null = null
   private dragConfigSpaceViewportOffset: Vec2 | null = null
   private draggingMode: DraggingMode | null = null
+  private previousBodyCursor: string | null = null
+  private bodyCursor: string | null = null
+  private endDrag = () => {
+    this.draggingMode = null
+    this.dragStartConfigSpaceMouse = null
+    this.dragConfigSpaceViewportOffset = null
+    this.interactionLock = null
+    this.frameHadWheelEvent = false
+    this.framesWithoutWheelEvents = 0
+    window.removeEventListener('mousemove', this.onWindowMouseMove)
+    window.removeEventListener('mouseup', this.onWindowMouseUp)
+    window.removeEventListener('blur', this.endDrag)
+    if (this.previousBodyCursor !== null && document.body.style.cursor === this.bodyCursor)
+      document.body.style.cursor = this.previousBodyCursor
+    this.previousBodyCursor = null
+    this.bodyCursor = null
+    if (this.container) this.container.style.cursor = ''
+    minimapMousePositionAtom.set(null)
+  }
   private onMouseDown = (ev: MouseEvent) => {
+    if (ev.button !== 0) return
+    ev.preventDefault()
+    this.endDrag()
     const configSpaceMouse = this.configSpaceMouse(ev)
 
     if (configSpaceMouse) {
+      this.container?.focus()
+      this.previousBodyCursor = document.body.style.cursor
       if (this.props.configSpaceViewportRect.contains(configSpaceMouse)) {
         // If dragging starting inside the viewport rectangle,
         // we'll move the existing viewport
@@ -336,6 +414,7 @@ export class FlamechartMinimapView extends Component<FlamechartMinimapViewProps,
       this.dragStartConfigSpaceMouse = configSpaceMouse
       window.addEventListener('mousemove', this.onWindowMouseMove)
       window.addEventListener('mouseup', this.onWindowMouseUp)
+      window.addEventListener('blur', this.endDrag)
       this.updateCursor(configSpaceMouse)
     }
   }
@@ -377,22 +456,26 @@ export class FlamechartMinimapView extends Component<FlamechartMinimapViewProps,
   }
 
   private updateCursor = (configSpaceMouse: Vec2) => {
+    let cursor: string
     if (this.draggingMode === DraggingMode.TRANSLATE_VIEWPORT) {
-      document.body.style.cursor = 'grabbing'
-      document.body.style.cursor = '-webkit-grabbing'
+      cursor = 'grabbing'
     } else if (this.draggingMode === DraggingMode.DRAW_NEW_VIEWPORT) {
-      document.body.style.cursor = 'col-resize'
+      cursor = 'crosshair'
     } else if (this.props.configSpaceViewportRect.contains(configSpaceMouse)) {
-      document.body.style.cursor = 'grab'
-      document.body.style.cursor = '-webkit-grab'
+      cursor = 'grab'
     } else {
-      document.body.style.cursor = 'col-resize'
+      cursor = 'crosshair'
+    }
+    if (this.container) this.container.style.cursor = cursor
+    if (this.draggingMode !== null) {
+      this.bodyCursor = cursor
+      document.body.style.cursor = cursor
     }
   }
 
   private onMouseLeave = () => {
     if (this.draggingMode == null) {
-      document.body.style.cursor = 'default'
+      if (this.container) this.container.style.cursor = ''
     }
     // Clear the minimap mouse position when leaving the minimap
     minimapMousePositionAtom.set(null)
@@ -407,13 +490,39 @@ export class FlamechartMinimapView extends Component<FlamechartMinimapViewProps,
   }
 
   private onWindowMouseUp = (ev: MouseEvent) => {
-    this.draggingMode = null
-    window.removeEventListener('mousemove', this.onWindowMouseMove)
-    window.removeEventListener('mouseup', this.onWindowMouseUp)
-
+    this.endDrag()
     const configSpaceMouse = this.configSpaceMouse(ev)
     if (!configSpaceMouse) return
-    this.updateCursor(configSpaceMouse)
+    const bounds = this.container?.getBoundingClientRect()
+    if (
+      bounds &&
+      ev.clientX >= bounds.left &&
+      ev.clientX <= bounds.right &&
+      ev.clientY >= bounds.top &&
+      ev.clientY <= bounds.bottom
+    )
+      this.updateCursor(configSpaceMouse)
+  }
+
+  private onKeyDown = (event: KeyboardEvent) => {
+    if (event.key === 'Escape') {
+      this.endDrag()
+      event.preventDefault()
+      event.stopPropagation()
+      return
+    }
+    if (event.ctrlKey || event.metaKey || event.altKey) return
+    const next = overviewKeyViewport(
+      event.key,
+      event.shiftKey,
+      this.props.configSpaceViewportRect,
+      this.props.flamechart,
+    )
+    if (!next) return
+    event.preventDefault()
+    event.stopPropagation()
+    this.endDrag()
+    this.props.setConfigSpaceViewportRect(next)
   }
 
   private overlayCanvasRef = (element: Element | null) => {
@@ -433,6 +542,12 @@ export class FlamechartMinimapView extends Component<FlamechartMinimapViewProps,
     return (
       <div
         ref={this.containerRef}
+        role="group"
+        aria-label="Profile overview"
+        aria-describedby={this.descriptionId}
+        title={overviewHelp}
+        tabIndex={0}
+        onKeyDown={this.onKeyDown}
         onWheel={this.onWheel}
         onMouseDown={this.onMouseDown}
         onMouseMove={this.onMouseMove}
@@ -440,6 +555,23 @@ export class FlamechartMinimapView extends Component<FlamechartMinimapViewProps,
         className={css(style.minimap, commonStyle.vbox)}
       >
         <canvas width={1} height={1} ref={this.overlayCanvasRef} className={css(style.fill)} />
+        <span aria-hidden="true" className={css(style.overviewHint)}>
+          Overview
+        </span>
+        <span id={this.descriptionId} className={css(style.overviewDescription)}>
+          Visible range:{' '}
+          {this.props.flamechart.formatValue(
+            Math.max(0, this.props.configSpaceViewportRect.left()),
+          )}{' '}
+          to{' '}
+          {this.props.flamechart.formatValue(
+            Math.min(
+              this.props.flamechart.getTotalWeight(),
+              this.props.configSpaceViewportRect.right(),
+            ),
+          )}
+          . {overviewHelp}
+        </span>
       </div>
     )
   }

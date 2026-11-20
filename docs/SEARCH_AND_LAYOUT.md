@@ -35,6 +35,48 @@ A local PLC smoke check searched 17,510 frames across four profiles, found 40
 matches without truncation, and left all profile totals unchanged. It took about
 148 ms with ten yields in that Node run; this is not a browser latency guarantee.
 
+## Navigate the overview
+
+The overview above Time Order and Left Heavy shows an outlined **Visible range**
+for the main graph. The outline uses the theme's foreground and background
+colors together, so it stays distinct from colored frames. Very narrow ranges
+get a minimum visible outline width, without changing the actual viewport or
+profile weights. The outline is clipped below the overview's time axis.
+
+Hover inside the visible range for a grab cursor; drag to pan. Outside it, a
+crosshair indicates that dragging selects a new horizontal range. Only the
+primary mouse button starts a drag. Releasing outside the overview, the window
+losing focus, pressing Escape, switching profiles/views or replacing the canvas ends
+the gesture and removes its window listeners. Escape keeps the last viewport.
+Hover cursor changes stay local to the overview, and an active drag restores
+the prior page cursor when it ends.
+
+Tab to **Profile overview** to use the keyboard. Left/Right pan by 10% of the
+current width; Up/Down pan by 10% of the viewport height, with a minimum of one
+row. Shift increases these steps to 50%. Plus/Equals halves the width around
+the current center; Minus doubles it. Shift uses quarter/fourfold zoom steps.
+Home restores the full horizontal range and returns to the top. Existing zoom
+and viewport bounds still apply. Modified browser shortcuts such as Ctrl+F
+are left available. A focus outline and accessible description expose the
+current range and controls. This improves overview access without claiming
+that all canvas charts are screen-reader accessible.
+
+All overlay and keyboard calculations use only current viewport dimensions;
+they do not scan call occurrences, retain another profile or build an index.
+This implements [#240](https://github.com/jlfwong/speedscope/issues/240) and
+[#241](https://github.com/jlfwong/speedscope/issues/241), and advances
+[#376](https://github.com/jlfwong/speedscope/issues/376).
+
+Validation on 2026-11-21 passed 362 Jest tests across 64 suites (307 snapshots),
+five Node tests, type checking, linting, schema/backlog checks and both builds.
+Browser checks verified keyboard zoom/pan/reset, Ctrl+F, pointer pan/range
+selection, restored page cursors and the outline in light/dark themes without
+console errors. A context-replacement regression ensures redraws use the new
+canvas rather than scheduling a stale frame on the old one. PLC streaming
+retained four profiles, 17,510 frames and 1,039,656 call events with its baseline
+export hash; the Node import smoke took about 2.5 seconds. This does not measure
+browser frame rate or establish a total heap cap.
+
 ## Bounded graph search
 
 Time Order and Left Heavy search navigate at most the first 10,000 matching call
