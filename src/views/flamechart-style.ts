@@ -17,6 +17,25 @@ export const getFlamechartStyle = withTheme(theme =>
     minimap: {
       height: Sizes.MINIMAP_HEIGHT,
       borderBottom: `${Sizes.SEPARATOR_HEIGHT}px solid ${theme.fgSecondaryColor}`,
+      ':focus-visible': {outline: `2px solid ${theme.fgPrimaryColor}`, outlineOffset: -2},
+    },
+    overviewHint: {
+      position: 'absolute',
+      top: 2,
+      left: 5,
+      padding: '1px 3px',
+      fontSize: FontSize.LABEL,
+      background: theme.bgPrimaryColor,
+      color: theme.fgPrimaryColor,
+      pointerEvents: 'none',
+    },
+    overviewDescription: {
+      position: 'absolute',
+      width: 1,
+      height: 1,
+      overflow: 'hidden',
+      clipPath: 'inset(50%)',
+      whiteSpace: 'nowrap',
     },
     panZoomView: {
       flex: 1,

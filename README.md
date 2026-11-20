@@ -156,6 +156,9 @@ The Sandwich view is a table view in which you can find a list of all functions 
 
 ## Navigation
 
+The overview outlines the visible range. Tab to **Profile overview** for keyboard
+pan, plus/minus zoom, and Home to reset. See [overview controls](docs/SEARCH_AND_LAYOUT.md#navigate-the-overview).
+
 Once a profile has loaded, the main view is split into two: the top area is the "minimap", and the bottom area is the "stack view".
 
 Colors follow the order of frames sorted by file path and symbol name. Frames

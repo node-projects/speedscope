@@ -756,7 +756,7 @@
       "status": "partial",
       "priority": "P2",
       "workstream": "Accessibility and presentation",
-      "evidence": "Native toolbar/search buttons and semantic expandable Call Tree provide keyboard and screen-reader access to profile data without WebGL. Canvas charts and remaining selectors are not claimed fully accessible.",
+      "evidence": "Native toolbar/search buttons and semantic expandable Call Tree provide keyboard and screen-reader access to profile data without WebGL. Canvas charts and remaining selectors are not claimed fully accessible. The overview is keyboard-focusable with range descriptions, arrow-key pan, plus/minus zoom and Home reset; canvas charts are still not claimed fully accessible.",
       "remaining": "Native toolbar/search buttons and semantic expandable Call Tree provide keyboard and screen-reader access to profile data without WebGL. Canvas charts and remaining selectors are not claimed fully accessible."
     },
     {
@@ -1113,11 +1113,11 @@
       "url": "https://github.com/jlfwong/speedscope/issues/241",
       "kind": "feature",
       "usefulness": "yes",
-      "status": "planned",
+      "status": "implemented",
       "priority": "P3",
       "workstream": "Search and navigation",
-      "evidence": "Minimap cursor affordances and a clearer viewport overlay need interaction/contrast testing in both themes. No unverified pointer behavior change applied.",
-      "remaining": "Minimap cursor affordances and a clearer viewport overlay need interaction/contrast testing in both themes. No unverified pointer behavior change applied."
+      "evidence": "Overview hover uses a local grab cursor inside the viewport and a crosshair outside; dragging uses grabbing/crosshair and restores the prior body cursor afterward. Blur, Escape, profile/context replacement and unmount remove drag listeners and release gesture state. Non-primary buttons are ignored. See docs/SEARCH_AND_LAYOUT.md.",
+      "remaining": "No additional work selected for the reviewed scope."
     },
     {
       "id": 240,
@@ -1125,11 +1125,11 @@
       "url": "https://github.com/jlfwong/speedscope/issues/240",
       "kind": "feature",
       "usefulness": "yes",
-      "status": "planned",
+      "status": "implemented",
       "priority": "P3",
       "workstream": "Search and navigation",
-      "evidence": "Minimap cursor affordances and a clearer viewport overlay need interaction/contrast testing in both themes. No unverified pointer behavior change applied.",
-      "remaining": "Minimap cursor affordances and a clearer viewport overlay need interaction/contrast testing in both themes. No unverified pointer behavior change applied."
+      "evidence": "Overview and Visible range labels plus a two-tone clipped viewport outline explain how the minimap maps to the main graph. The focusable overview provides current-range instructions and keyboard pan/zoom/reset. No graph-node traversal or index is added. See docs/SEARCH_AND_LAYOUT.md.",
+      "remaining": "No additional work selected for the reviewed scope."
     },
     {
       "id": 236,
