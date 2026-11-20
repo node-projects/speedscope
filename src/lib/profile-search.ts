@@ -14,7 +14,7 @@ export enum SearchMode {
   EXACT = 'exact',
 }
 
-function createTextMatcher(pattern: string, mode: SearchMode) {
+export function createTextMatcher(pattern: string, mode: SearchMode) {
   if (mode === SearchMode.EXACT) {
     const lowerPattern = pattern.toLocaleLowerCase()
     const hasMatch = (text: string) => !!pattern && text.toLocaleLowerCase() === lowerPattern

@@ -657,11 +657,11 @@
       "url": "https://github.com/jlfwong/speedscope/issues/396",
       "kind": "feature",
       "usefulness": "yes",
-      "status": "partial",
+      "status": "implemented",
       "priority": "P3",
       "workstream": "Search and navigation",
-      "evidence": "Combine original profiles allows aggregate function search across threads. A result list that navigates each original process without combining remains useful future work.",
-      "remaining": "Combine original profiles allows aggregate function search across threads. A result list that navigates each original process without combining remains useful future work."
+      "evidence": "Profile actions provides bounded, cancellable search across original profiles, with an optional derived-profile toggle and literal contains/whole-word/exact modes. Results retain source/profile identity and per-profile units; selecting a result navigates to its original Sandwich frame, including recursion flattening. Stale-group guards prevent navigation into a replacement recording.",
+      "remaining": "No additional work selected for cross-profile function/path search. Synchronized multitrack rendering remains separately tracked."
     },
     {
       "id": 393,
@@ -1209,11 +1209,11 @@
       "url": "https://github.com/jlfwong/speedscope/issues/209",
       "kind": "feature",
       "usefulness": "yes",
-      "status": "planned",
+      "status": "implemented",
       "priority": "P3",
       "workstream": "Search and navigation",
-      "evidence": "Resizable Sandwich panes require persisted split state, pointer capture and minimum sizes. Existing automatic split remains; separate from import correctness fixes.",
-      "remaining": "Resizable Sandwich panes require persisted split state, pointer capture and minimum sizes. Existing automatic split remains; separate from import correctness fixes."
+      "evidence": "Sandwich table/graphs and callers/callees each have pointer-captured resize handles, accessible separator values and arrow/Home/End/reset controls. Minimum pane sizes, saved per-browser ratios, corrupt-storage fallback and graph resize notifications are implemented. Browser dragging, keyboard controls and reload persistence verified.",
+      "remaining": "No additional work selected for the reviewed pane-resizing scope."
     },
     {
       "id": 199,

@@ -463,6 +463,14 @@ export class Profile {
     this.frames.forEach(fn)
   }
 
+  getFrames(): Iterable<Frame> {
+    return this.frames
+  }
+
+  getFrame(key: string | number): Frame | undefined {
+    return this.frames.get(key)
+  }
+
   getProfileWithRecursionFlattened(): Profile {
     const builder = new CallTreeProfileBuilder()
 
