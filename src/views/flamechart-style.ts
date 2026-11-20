@@ -57,6 +57,16 @@ export const getFlamechartStyle = withTheme(theme =>
     stackLine: {
       whiteSpace: 'nowrap',
     },
+    stackSelect: {
+      color: 'inherit',
+      font: 'inherit',
+      background: 'transparent',
+      border: 0,
+      padding: 0,
+      cursor: 'pointer',
+      ':hover': {textDecoration: 'underline'},
+      ':focus-visible': {outline: `1px solid ${theme.fgPrimaryColor}`},
+    },
     stackFileLine: {
       color: theme.fgSecondaryColor,
     },

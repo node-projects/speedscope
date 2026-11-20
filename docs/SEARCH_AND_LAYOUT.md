@@ -51,6 +51,29 @@ Preferences are saved in this browser's local storage on completed drags and
 keyboard actions. They survive reloads and profile changes, but are not part of
 the exported profile. Invalid or unavailable browser storage falls back safely.
 
+## Navigate selected-stack ancestors
+
+In Time Order or Left Heavy, select a graph frame to show its stack details.
+Each scope name is now a keyboard-focusable button. Click it or press Enter/Space
+to select that exact ancestor call instance and update its statistics/highlight.
+If the ancestor is above the graph viewport, the graph scrolls up to include it;
+the horizontal range stays unchanged. Source-location links remain separate.
+
+Details show at most 100 scopes at a time, starting with the selected frame.
+**Show older ancestors** advances toward the root. **Back to selected frame**
+returns to the start. Selecting a scope starts a fresh page at that scope. This
+keeps the number of DOM rows and source links bounded even for very deep stacks.
+Paging follows only the next 100 parent pointers and retains no complete
+ancestor list or page history. Selecting an ancestor walks its parent chain to
+determine its graph depth, using constant auxiliary space.
+
+The helper regression covers a 100,000-level chain and fails if a page walks
+beyond its boundary. UI tests cover paging, exact-instance selection and focus
+restoration. The PLC trace's deepest stack has seven scopes, so it fits on one
+page without changing the imported profile.
+
+This implements [ancestor navigation (#350)](https://github.com/jlfwong/speedscope/issues/350).
+
 ## Upstream review
 
 On 2026-11-20, the 30 most recently created open upstream issues were checked.

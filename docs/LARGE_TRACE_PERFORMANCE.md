@@ -248,3 +248,51 @@ and overlapping labels are skipped. V8 source-path extraction and exact-first
 sourcemap matching (with empty maps ignored) improve #446, which remains partial
 because automatic linked map discovery/loading is still separate work. The
 maintained backlog records these completion boundaries explicitly.
+
+## Smaller duration queues and bounded selected-stack details
+
+The 2026-11-20 follow-up reuses complete (`X`) events as begin records rather
+than spreading every event into another full object. Synthesized end records
+retain only their timestamp, name and shared arguments. Source positions and
+argument-based frame identity remain unchanged. Queues already ordered by time
+skip stable-sort workspace; unordered queues still use the existing stable sort,
+including equal-timestamp and epoch-rounding behavior. No additional event index
+is retained. The streaming limits are unchanged.
+
+Three alternating fresh-process runs on Windows/Node 24 compared `f6c5d43`
+against this change, using the same ES2020 CommonJS benchmark bundle options:
+
+| Capture / metric | Before | After |
+| --- | ---: | ---: |
+| PLC import times (ms) | 2,609 / 2,524 / 2,579 | 2,562 / 2,546 / 2,562 |
+| PLC median peak RSS (MiB) | 576 | 576 |
+| Complete-event fixture import times (ms) | 1,131 / 833 / 822 | 986 / 767 / 779 |
+| Complete-event fixture median peak RSS (MiB) | 362 | 295 |
+| Complete-event fixture median heap at import (MiB) | 224 | 155 |
+
+The synthetic fixture contains 250,000 sequential complete events with 5,000
+distinct argument-based frame keys. Its median peak RSS fell about 19%; PLC
+performance remained essentially unchanged. These are process import measurements,
+not browser hydration/rendering or hard heap bounds. Separate full-export checks
+matched the baseline hash for both captures. PLC still exports four profiles,
+17,510 frames and 1,039,656 call events. Captures and benchmark artifacts are not
+committed. Reproduce import measurements with `node scripts/benchmark-profile.mjs
+<capture> stream-import`; do not include export validation in import-only RSS.
+
+Selected-stack details now retain/render at most 100 ancestor rows and follow
+parent pointers only as pages are requested, without building the full ancestor
+list. All scopes remain reachable through older-page and reset controls. Clicking
+one selects the exact ancestor instance; see [stack navigation](SEARCH_AND_LAYOUT.md#navigate-selected-stack-ancestors).
+Tests include a 100,000-level chain with a guarded page boundary. The PLC's
+deepest seven-scope stack was paged without changing the export hash.
+
+Issues #519, #478, #386, #347 and #404 remain partial: the final profile model,
+worker snapshots, unordered sorts and graph rendering still grow with capture
+size. This work reduces specific temporary allocations and bounds the details
+panel, without claiming an out-of-core viewer or fixing every reported OOM.
+
+Validation passed 339 Jest tests across 58 suites (307 snapshots), five Node
+tests, type checking, linting, schema/backlog checks, both builds and a dry-run
+npm contents check. Browser smoke checks used a 220-level profile to verify
+100-row pages, access to the root, reset controls, Enter/Space selection and
+visible ancestor highlighting below the time axis, without console errors.

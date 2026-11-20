@@ -3,6 +3,24 @@ import {importProfilesFromArrayBuffer} from '../import'
 import {checkProfileSnapshot} from '../lib/test-utils'
 import {withMockedFileChunkSizeForTests} from './utils'
 import {importTraceEvents} from './trace-event'
+import {exportProfileGroup} from '../lib/file-format'
+
+test('complete-event queues preserve unordered timing and argument-based frame identity', () => {
+  const complete = []
+  const explicit = []
+  for (let i = 0; i < 2000; i++) {
+    const common = {name: 'work', pid: 1, tid: 2, args: {category: i % 7, text: 'unicode 雪'}}
+    complete.push({...common, ph: 'X', ts: i * 3 + 100, dur: 2})
+    explicit.push({...common, ph: 'B', ts: i * 3 + 100})
+    explicit.push({...common, ph: 'E', ts: i * 3 + 102})
+  }
+  complete.reverse()
+  explicit.reverse()
+  expect(exportProfileGroup(importTraceEvents(complete))).toEqual(
+    exportProfileGroup(importTraceEvents(explicit)),
+  )
+  expect(complete.every(event => event.ph === 'X')).toBe(true)
+})
 
 test('importTraceEvents large event queues', () => {
   const count = 250000
