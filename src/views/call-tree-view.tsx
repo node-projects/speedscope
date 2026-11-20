@@ -2,6 +2,7 @@ import {h} from 'preact'
 import {useMemo, useState, useEffect} from 'preact/hooks'
 import {CallTreeNode, Profile} from '../lib/profile'
 import {useTheme} from './themes/theme'
+import {SourceLocation} from './source-location'
 
 // Bound DOM size independently of total trace size. Expansion is explicit and
 // traversal uses O(depth) storage, including for very deep recursive profiles.
@@ -88,9 +89,7 @@ export function CallTreeView({profile}: {profile: Profile}) {
               <td>{profile.formatValue(node.getTotalWeight())}</td>
               <td>{profile.formatValue(node.getSelfWeight())}</td>
               <td>
-                {node.frame.file}
-                {node.frame.line != null ? `:${node.frame.line}` : ''}
-                {node.frame.col != null ? `:${node.frame.col}` : ''}
+                <SourceLocation frame={node.frame} />
               </td>
             </tr>
           ))}

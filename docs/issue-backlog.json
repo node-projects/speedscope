@@ -597,11 +597,11 @@
       "url": "https://github.com/jlfwong/speedscope/issues/410",
       "kind": "feature",
       "usefulness": "yes",
-      "status": "planned",
+      "status": "implemented",
       "priority": "P2",
       "workstream": "Search and navigation",
-      "evidence": "Editor links need a user-configured URI template and path mapping, plus escaping. Call Tree makes locations readable/copyable now, without guessing the editor or local root.",
-      "remaining": "Editor links need a user-configured URI template and path mapping, plus escaping. Call Tree makes locations readable/copyable now, without guessing the editor or local root."
+      "evidence": "Profile actions configures browser-local VS Code/Insiders or fixed-host HTTP(S) source links with path-prefix mapping and encoded file/line/column values. Call Tree and selected-stack source locations open only on explicit clicks; no source discovery or per-profile URL index. See docs/SOURCE_AND_LABELS.md.",
+      "remaining": "No additional work selected for the reviewed scope."
     },
     {
       "id": 406,
@@ -765,11 +765,11 @@
       "url": "https://github.com/jlfwong/speedscope/issues/373",
       "kind": "feature",
       "usefulness": "yes",
-      "status": "planned",
+      "status": "implemented",
       "priority": "P3",
       "workstream": "Search and navigation",
-      "evidence": "Display-name/path shortening should preserve complete searchable/exported symbols and expose the full name. Call Tree source column helps now; global truncation rules need language-aware examples.",
-      "remaining": "Display-name/path shortening should preserve complete searchable/exported symbols and expose the full name. Call Tree source column helps now; global truncation rules need language-aware examples."
+      "evidence": "Optional compact graph path labels display the final path component while retaining full names in hover details, tables, search and exports. Visible search highlights are remapped to the shortened suffix; no profile copy or symbol index. See docs/SOURCE_AND_LABELS.md.",
+      "remaining": "No additional work selected for the reviewed scope."
     },
     {
       "id": 370,
