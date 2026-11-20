@@ -22,6 +22,9 @@ import {useAtom} from '../lib/atom'
 import {ProfileFilterDialog} from './profile-filter-dialog'
 import {MultiProfileSearchDialog} from './multi-profile-search-dialog'
 import {openProfileSearchMatch} from '../app-state/search-navigation'
+import {SourceLinksDialog} from './source-links-dialog'
+import {compactFrameLabelsAtom} from '../app-state/display-preferences'
+import {FrameInfo} from '../lib/profile'
 
 interface ToolbarProps extends ApplicationProps {
   browseForFile(): void
@@ -193,6 +196,8 @@ function ToolbarCenterContent(props: ToolbarProps): JSX.Element {
 function ToolbarRightContent(props: ToolbarProps) {
   const latestProps = useRef(props)
   latestProps.current = props
+  const compactLabels = useAtom(compactFrameLabelsAtom)
+  const [sourceLinksShown, setSourceLinksShown] = useState(false)
   const [searchProfiles, setSearchProfiles] = useState<Profile[] | null>(null)
   useEffect(() => {
     if (
@@ -219,6 +224,14 @@ function ToolbarRightContent(props: ToolbarProps) {
     select.value = ''
     const {activeProfileState, profileGroup} = props
     if (!activeProfileState || !profileGroup || props.loading || !action) return
+    if (action === 'source-links') {
+      setSourceLinksShown(true)
+      return
+    }
+    if (action === 'compact-labels') {
+      compactFrameLabelsAtom.set(!compactLabels)
+      return
+    }
     if (action === 'search-all') {
       setFilterSource(null)
       setSearchProfiles(profileGroup.profiles.map(p => p.profile))
@@ -323,12 +336,29 @@ function ToolbarRightContent(props: ToolbarProps) {
           <option value="file">Group by file</option>
           <option value="filter">Filter frames…</option>
           <option value="search-all">Search all profiles…</option>
+          <option value="source-links">Source-code links…</option>
+          <option value="compact-labels">
+            {compactLabels ? 'Show full graph labels' : 'Compact graph path labels'}
+          </option>
         </select>
       )}
       {props.activeProfileState && exportFile}
       {importFile}
       {colorSchemeToggle}
       {help}
+      {sourceLinksShown && (
+        <SourceLinksDialog
+          sample={(() => {
+            let checked = 0
+            for (const frame of props.activeProfileState?.profile.getFrames() || []) {
+              if (frame.file) return frame as FrameInfo
+              if (++checked === 200) break
+            }
+            return null
+          })()}
+          onClose={() => setSourceLinksShown(false)}
+        />
+      )}
       {searchProfiles && (
         <MultiProfileSearchDialog
           profiles={searchProfiles}

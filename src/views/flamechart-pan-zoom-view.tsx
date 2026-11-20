@@ -20,6 +20,9 @@ import {Color} from '../lib/color'
 import {Theme} from './themes/theme'
 import {minimapMousePositionAtom} from '../app-state'
 import {axisTicks, niceTickInterval} from '../lib/axis-ticks'
+import {useAtom} from '../lib/atom'
+import {compactFrameLabelsAtom} from '../app-state/display-preferences'
+import {frameLabel, labelMatchRanges} from '../lib/frame-label'
 
 interface FlamechartFrameLabel {
   configSpaceBounds: Rect
@@ -63,9 +66,14 @@ export interface FlamechartPanZoomViewProps {
   setLogicalSpaceViewportSize: (size: Vec2) => void
 
   searchResults: ProfileSearchResults | null
+  compactLabels?: boolean
 }
 
-export class FlamechartPanZoomView extends Component<FlamechartPanZoomViewProps, {}> {
+export function FlamechartPanZoomView(props: FlamechartPanZoomViewProps) {
+  const compactLabels = useAtom(compactFrameLabelsAtom)
+  return <FlamechartPanZoomViewImpl {...props} compactLabels={compactLabels} />
+}
+class FlamechartPanZoomViewImpl extends Component<FlamechartPanZoomViewProps, {}> {
   private container: Element | null = null
   private containerRef = (element: Element | null) => {
     this.container = element || null
@@ -235,14 +243,18 @@ export class FlamechartPanZoomView extends Component<FlamechartPanZoomViewProps,
         if (physicalLabelBounds.width() > minWidthToRender) {
           const match = this.props.searchResults?.getMatchForFrame(frame.node.frame)
 
+          const label = frameLabel(frame.node.frame.name, !!this.props.compactLabels)
           const trimmedText = trimTextMid(
             ctx,
-            frame.node.frame.name,
+            label.text,
             physicalLabelBounds.width() - 2 * LABEL_PADDING_PX,
           )
 
           if (match) {
-            const rangesToHighlightInTrimmedText = remapRangesToTrimmedText(trimmedText, match)
+            const rangesToHighlightInTrimmedText = remapRangesToTrimmedText(
+              trimmedText,
+              labelMatchRanges(match, label),
+            )
 
             // Once we have the character ranges to highlight, we need to
             // actually do the highlighting.
@@ -815,6 +827,8 @@ export class FlamechartPanZoomView extends Component<FlamechartPanZoomViewProps,
   componentWillReceiveProps(nextProps: FlamechartPanZoomViewProps) {
     if (this.props.flamechart !== nextProps.flamechart) {
       this.hoveredLabel = null
+      this.renderCanvas()
+    } else if (this.props.compactLabels !== nextProps.compactLabels) {
       this.renderCanvas()
     } else if (this.props.searchResults !== nextProps.searchResults) {
       this.renderCanvas()

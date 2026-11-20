@@ -44,6 +44,7 @@
     "docs/LARGE_TRACE_PERFORMANCE.md",
     "docs/PROFILE_FILTERS.md",
     "docs/SEARCH_AND_LAYOUT.md",
+    "docs/SOURCE_AND_LABELS.md",
     "bin/cli.mjs",
     "bin/server.mjs",
     "dist/release/**",

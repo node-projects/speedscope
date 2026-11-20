@@ -6,6 +6,7 @@ import {Frame, CallTreeNode} from '../lib/profile'
 import {ColorChit} from './color-chit'
 import {Flamechart} from '../lib/flamechart'
 import {useTheme} from './themes/theme'
+import {SourceLocation} from './source-location'
 
 interface StatisticsTableProps {
   title: string
@@ -69,14 +70,12 @@ function StackTraceView(props: StackTraceViewProps) {
     row.push(frame.name)
 
     if (frame.file) {
-      let pos = frame.file
-      if (frame.line != null) {
-        pos += `:${frame.line}`
-        if (frame.col != null) {
-          pos += `:${frame.col}`
-        }
-      }
-      row.push(<span className={css(style.stackFileLine)}> ({pos})</span>)
+      row.push(
+        <span className={css(style.stackFileLine)}>
+          {' '}
+          (<SourceLocation frame={frame} />)
+        </span>,
+      )
     }
     rows.push(<div className={css(style.stackLine)}>{row}</div>)
   }

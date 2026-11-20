@@ -79,6 +79,9 @@ Choose **Profile actions → Search all profiles…** to find functions across t
 and open a result in its original profile. Sandwich's table and caller/callee
 panes can now be resized with draggable or keyboard-operated dividers. See
 [search and layout controls](docs/SEARCH_AND_LAYOUT.md).
+**Profile actions** also offers configurable source-code links for VS Code or web
+repositories, and compact path labels in graphs. Full names remain searchable
+and available in details. See [source links and graph labels](docs/SOURCE_AND_LABELS.md).
 Duration traces stream plain/gzip input and discard unused events. Oversized
 captures stop with a clear limit error; see [import limits and measurements](docs/LARGE_TRACE_PERFORMANCE.md#streaming-duration-traces).
 
