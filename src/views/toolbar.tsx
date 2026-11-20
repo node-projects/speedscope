@@ -263,6 +263,7 @@ function ToolbarRightContent(props: ToolbarProps) {
       } else return
       props.setProfileGroup({
         name: profileGroup.name,
+        sourceName: profileGroup.sourceName,
         indexToView: profileGroup.profiles.length,
         profiles: [...profileGroup.profiles.map(p => p.profile), derived],
       })
@@ -386,6 +387,7 @@ function ToolbarRightContent(props: ToolbarProps) {
               throw new Error('The source profiles changed. Close this filter and try again.')
             current.setProfileGroup({
               name: group.name,
+              sourceName: group.sourceName,
               indexToView: group.profiles.length,
               profiles: [...group.profiles.map(p => p.profile), derived],
             })

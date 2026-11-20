@@ -9,9 +9,11 @@ import {Flamechart} from '../lib/flamechart'
 import {useTheme} from './themes/theme'
 import {SourceLocation} from './source-location'
 import {stackPage} from '../lib/stack-page'
+import {weightPercentage} from '../lib/profile-context'
 
 interface StatisticsTableProps {
   title: string
+  description: string
   grandTotal: number
   selectedTotal: number
   selectedSelf: number
@@ -24,28 +26,51 @@ function StatisticsTable(props: StatisticsTableProps) {
 
   const total = props.formatter(props.selectedTotal)
   const self = props.formatter(props.selectedSelf)
-  const totalPerc = (100.0 * props.selectedTotal) / props.grandTotal
-  const selfPerc = (100.0 * props.selectedSelf) / props.grandTotal
+  const totalPerc = weightPercentage(props.selectedTotal, props.grandTotal)
+  const selfPerc = weightPercentage(props.selectedSelf, props.grandTotal)
 
   return (
-    <div className={css(style.statsTable)}>
-      <div className={css(props.cellStyle, style.statsTableCell, style.statsTableHeader)}>
+    <div
+      role="group"
+      aria-label={`${props.title}: ${props.description}`}
+      className={css(style.statsTable)}
+    >
+      <div
+        title={props.description}
+        className={css(props.cellStyle, style.statsTableCell, style.statsTableHeader)}
+      >
         {props.title}
       </div>
 
-      <div className={css(props.cellStyle, style.statsTableCell)}>Total</div>
-      <div className={css(props.cellStyle, style.statsTableCell)}>Self</div>
+      <div
+        title="Total includes work in callees."
+        className={css(props.cellStyle, style.statsTableCell)}
+      >
+        Total
+      </div>
+      <div
+        title="Self excludes work in callees."
+        className={css(props.cellStyle, style.statsTableCell)}
+      >
+        Self
+      </div>
 
       <div className={css(props.cellStyle, style.statsTableCell)}>{total}</div>
       <div className={css(props.cellStyle, style.statsTableCell)}>{self}</div>
 
       <div className={css(props.cellStyle, style.statsTableCell)}>
         {formatPercent(totalPerc)}
-        <div className={css(style.barDisplay)} style={{height: `${totalPerc}%`}} />
+        <div
+          className={css(style.barDisplay)}
+          style={{height: `${Math.min(100, Math.max(0, totalPerc))}%`}}
+        />
       </div>
       <div className={css(props.cellStyle, style.statsTableCell)}>
         {formatPercent(selfPerc)}
-        <div className={css(style.barDisplay)} style={{height: `${selfPerc}%`}} />
+        <div
+          className={css(style.barDisplay)}
+          style={{height: `${Math.min(100, Math.max(0, selfPerc))}%`}}
+        />
       </div>
     </div>
   )
@@ -110,6 +135,20 @@ export function StackTraceView(props: StackTraceViewProps) {
   return (
     <div ref={container} className={css(style.stackTraceView)}>
       <div className={css(style.stackTraceViewPadding)}>
+        <details>
+          <summary>About these statistics</summary>
+          <p>
+            This Instance measures the selected call-tree node. All Instances measures the selected
+            function across this profile. Left Heavy groups calls with the same stack context, so
+            one node can combine multiple calls.
+          </p>
+          <p>
+            Total includes callees; Self excludes callees. Percentages use the entire current
+            profile, including idle weight. Filtered profiles use their retained weight. A
+            zero-weight profile shows 0%. Values use the profile's units, which may represent time,
+            bytes or samples.
+          </p>
+        </details>
         <nav aria-label="Stack ancestors">
           {start !== props.node && (
             <button
@@ -149,6 +188,7 @@ export function FlamechartDetailView(props: FlamechartDetailViewProps) {
     <div className={css(style.detailView)}>
       <StatisticsTable
         title={'This Instance'}
+        description="The selected call-tree node, including calls grouped in this stack context."
         cellStyle={style.thisInstanceCell}
         grandTotal={flamechart.getTotalWeight()}
         selectedTotal={selectedNode.getTotalWeight()}
@@ -157,6 +197,7 @@ export function FlamechartDetailView(props: FlamechartDetailViewProps) {
       />
       <StatisticsTable
         title={'All Instances'}
+        description="The selected function across the current profile."
         cellStyle={style.allInstancesCell}
         grandTotal={flamechart.getTotalWeight()}
         selectedTotal={frame.getTotalWeight()}

@@ -59,7 +59,38 @@ test('large JSON imports transfer bytes, preserve exported profiles and terminat
   const expected = await importProfileGroupFromText('large.trace.json', json)
   expect(exportProfileGroup(group!)).toEqual(exportProfileGroup(expected!))
   expect(wereSymbolsLoaded(group!)).toBe(true)
+  expect(group!.sourceName).toBe('large.trace.json')
   expect(worker.terminate).toHaveBeenCalled()
+})
+
+test('normal imports retain the current leaf filename without exporting it', async () => {
+  const group = await importProfileBuffer(
+    'C:\\private\\session.json',
+    new TextEncoder().encode(
+      JSON.stringify({
+        $schema: 'https://www.speedscope.app/file-format-schema.json',
+        name: 'internal recording',
+        shared: {frames: [{name: 'thread function'}]},
+        profiles: [
+          {
+            name: 'Worker A',
+            type: 'sampled',
+            unit: 'none',
+            startValue: 0,
+            endValue: 1,
+            samples: [[0]],
+            weights: [1],
+          },
+        ],
+      }),
+    ).buffer as ArrayBuffer,
+    {},
+    false,
+  )
+  expect(group!.sourceName).toBe('session.json')
+  expect(group!.name).toBe('internal recording')
+  expect(group!.profiles[0].getName()).toBe('Worker A')
+  expect(JSON.stringify(exportProfileGroup(group!))).not.toContain('sourceName')
 })
 
 test('worker creation blocked by the host falls back without detaching input', async () => {

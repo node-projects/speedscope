@@ -32,6 +32,7 @@ export interface ProfileState {
 
 export type ProfileGroupState = {
   name: string
+  sourceName?: string
 
   // The index within the list of profiles currently being viewed
   indexToView: number
@@ -70,6 +71,7 @@ export class ProfileGroupAtom extends Atom<ProfileGroupState> {
   setProfileGroup = (group: ProfileGroup) => {
     this.set({
       name: group.name,
+      sourceName: group.sourceName,
       indexToView: group.indexToView,
       profiles: group.profiles.map(p => ({
         profile: p,

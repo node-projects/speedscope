@@ -22,6 +22,7 @@ import {
 } from '../app-state'
 import {useAtom} from '../lib/atom'
 import {ActiveProfileState} from '../app-state/active-profile-state'
+import {weightPercentage} from '../lib/profile-context'
 
 interface HBarProps {
   perc: number
@@ -32,7 +33,10 @@ function HBarDisplay(props: HBarProps) {
 
   return (
     <div className={css(style.hBarDisplay)}>
-      <div className={css(style.hBarDisplayFilled)} style={{width: `${props.perc}%`}} />
+      <div
+        className={css(style.hBarDisplayFilled)}
+        style={{width: `${Math.min(100, Math.max(0, props.perc))}%`}}
+      />
     </div>
   )
 }
@@ -106,8 +110,8 @@ const ProfileTableRowView = ({
 
   const totalWeight = frame.getTotalWeight()
   const selfWeight = frame.getSelfWeight()
-  const totalPerc = (100.0 * totalWeight) / profile.getTotalNonIdleWeight()
-  const selfPerc = (100.0 * selfWeight) / profile.getTotalNonIdleWeight()
+  const totalPerc = weightPercentage(totalWeight, profile.getTotalNonIdleWeight())
+  const selfPerc = weightPercentage(selfWeight, profile.getTotalNonIdleWeight())
 
   const selected = frame === selectedFrame
 
@@ -286,7 +290,11 @@ export const ProfileTableView = memo(
         <table className={css(style.tableView)}>
           <thead className={css(style.tableHeader)}>
             <tr>
-              <th className={css(style.numericCell)} onClick={onTotalClick}>
+              <th
+                title="Total includes callees. Percentages use this profile's non-idle weight."
+                className={css(style.numericCell)}
+                onClick={onTotalClick}
+              >
                 <SortIcon
                   activeDirection={
                     sortMethod.field === SortField.TOTAL ? sortMethod.direction : null
@@ -294,7 +302,11 @@ export const ProfileTableView = memo(
                 />
                 Total
               </th>
-              <th className={css(style.numericCell)} onClick={onSelfClick}>
+              <th
+                title="Self excludes callees. Percentages use this profile's non-idle weight."
+                className={css(style.numericCell)}
+                onClick={onSelfClick}
+              >
                 <SortIcon
                   activeDirection={
                     sortMethod.field === SortField.SELF ? sortMethod.direction : null

@@ -19,6 +19,7 @@ export interface ProfileSnapshot {
 
 export interface ProfileGroupSnapshot {
   name: string
+  sourceName?: string
   indexToView: number
   profiles: ProfileSnapshot[]
 }

@@ -109,6 +109,8 @@ export class CallTreeNode extends HasWeights {
 
 export interface ProfileGroup {
   name: string
+  // Runtime provenance for the currently opened file; not interchange metadata.
+  sourceName?: string
   indexToView: number
   profiles: Profile[]
 }

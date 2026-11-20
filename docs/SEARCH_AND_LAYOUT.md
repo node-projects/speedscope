@@ -74,6 +74,54 @@ page without changing the imported profile.
 
 This implements [ancestor navigation (#350)](https://github.com/jlfwong/speedscope/issues/350).
 
+## Identify recordings and selected functions
+
+The browser/window title shows the current file's leaf name, followed by the
+internal recording name when it differs. Thread names remain unchanged in the
+toolbar. A `title` hash parameter still overrides the window title. File names
+are kept as runtime context through worker loading, derived profiles and symbol
+remapping. They are not added to exports: opening an exported recording shows
+the name of that newly opened file. Absolute local directories are discarded
+from this metadata and displayed leaf names are limited to 1,024 characters.
+
+Sandwich now shows a **Selected function details** panel above its graphs.
+It displays the full symbol name and source file/line/column, so same-named
+functions from different modules can be distinguished without a hover tooltip.
+Configured source-code links work there too. Missing source metadata is stated
+explicitly. Long names wrap inside a scrollable panel capped at 120 pixels;
+only the selected function gets this panel, without adding a column or index
+across the entire recording.
+
+## Understand the statistics
+
+Open **About these statistics** in selected-stack details for contextual help.
+**This Instance** measures the selected call-tree node. In Time Order that node
+represents its call context; in Left Heavy, a node can group multiple calls in
+the same stack context. **All Instances** measures that function across the
+current profile. **Total** includes work in callees; **Self** excludes it.
+Values use the profile's units, including time, bytes or samples.
+
+The detail-panel percentages use the entire current profile's weight, including
+idle weight. Sandwich table percentages use its non-idle weight, as explained
+in the column headers. Filtered profiles use their retained weight. For example,
+six units of total work with four self units in a ten-unit recording display
+60% total and 40% self in details, even when the other four units are idle.
+Zero-weight denominators display 0% with finite bars. Percentage calculations
+also avoid overflow from multiplying very large finite weights by 100 first.
+
+These changes implement [#363](https://github.com/jlfwong/speedscope/issues/363),
+[#242](https://github.com/jlfwong/speedscope/issues/242) and
+[#219](https://github.com/jlfwong/speedscope/issues/219).
+
+Validation on 2026-11-21 passed all 346 Jest tests across 60 suites (307
+snapshots), five Node tests, type checking, linting, schema/backlog checks and
+both builds. Browser smoke checks covered same-named functions from different
+files, recording/custom titles and expanded statistics help without console
+errors. A PLC streaming smoke retained four profiles, 17,510 frames and
+1,039,656 call events with the baseline export hash; its import took about
+2.4 seconds in that Node run. These UI changes add no per-frame context index or
+profile copy. Source-name metadata is one bounded string per group.
+
 ## Upstream review
 
 On 2026-11-20, the 30 most recently created open upstream issues were checked.
