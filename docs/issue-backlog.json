@@ -168,8 +168,8 @@
       "status": "partial",
       "priority": "P1",
       "workstream": "Large profiles and responsiveness",
-      "evidence": "Cancellable streaming duration imports now frame one bounded event at a time for native JSON parsing, keeping byte/event/depth guards and format fallbacks. Three fresh-process PLC comparisons reduced median import time from 4336 to 2493 ms and median peak RSS from 613 to 579 MiB. Export equality verified; general out-of-core storage/rendering and original OOM cases remain open.",
-      "remaining": "Streaming now covers duration-event arrays and supported traceEvents wrappers. CPU/sample/native formats and unrecognized wrappers retain their ordinary detector. Sorting, profile trees, snapshots and rendering still consume memory proportional to the capture; limits bound input complexity, not total browser heap. A true out-of-core model, bounded rendering and validation of the original reported capture remain open."
+      "evidence": "Cancellable streaming duration imports now frame one bounded event at a time for native JSON parsing, keeping byte/event/depth guards and format fallbacks. Three fresh-process PLC comparisons reduced median import time from 4336 to 2493 ms and median peak RSS from 613 to 579 MiB. Export equality verified; general out-of-core storage/rendering and original OOM cases remain open. Complete-event queues now reuse original begin events and retain compact end records; already chronological queues avoid sort workspace. Selected-stack details render at most 100 ancestors per page.",
+      "remaining": "Complete-event queue allocations and selected-stack DOM are reduced. Streaming supports duration-event arrays and recognized traceEvents wrappers; other formats retain their ordinary detector. The final model, sorting unordered input, worker snapshots and graph rendering still scale with the capture. A true out-of-core model and original OOM reproductions remain open."
     },
     {
       "id": 518,
@@ -384,8 +384,8 @@
       "status": "partial",
       "priority": "P1",
       "workstream": "Large profiles and responsiveness",
-      "evidence": "Cancellable streaming duration imports now frame one bounded event at a time for native JSON parsing, keeping byte/event/depth guards and format fallbacks. Three fresh-process PLC comparisons reduced median import time from 4336 to 2493 ms and median peak RSS from 613 to 579 MiB. Export equality verified; general out-of-core storage/rendering and original OOM cases remain open.",
-      "remaining": "Streaming now covers duration-event arrays and supported traceEvents wrappers. CPU/sample/native formats and unrecognized wrappers retain their ordinary detector. Sorting, profile trees, snapshots and rendering still consume memory proportional to the capture; limits bound input complexity, not total browser heap. A true out-of-core model, bounded rendering and validation of the original reported capture remain open."
+      "evidence": "Cancellable streaming duration imports now frame one bounded event at a time for native JSON parsing, keeping byte/event/depth guards and format fallbacks. Three fresh-process PLC comparisons reduced median import time from 4336 to 2493 ms and median peak RSS from 613 to 579 MiB. Export equality verified; general out-of-core storage/rendering and original OOM cases remain open. Complete-event queues now reuse original begin events and retain compact end records; already chronological queues avoid sort workspace. Selected-stack details render at most 100 ancestors per page.",
+      "remaining": "Complete-event queue allocations and selected-stack DOM are reduced. Streaming supports duration-event arrays and recognized traceEvents wrappers; other formats retain their ordinary detector. The final model, sorting unordered input, worker snapshots and graph rendering still scale with the capture. A true out-of-core model and original OOM reproductions remain open."
     },
     {
       "id": 477,
@@ -624,8 +624,8 @@
       "status": "partial",
       "priority": "P3",
       "workstream": "Large profiles and responsiveness",
-      "evidence": "Cancellable streaming duration imports now frame one bounded event at a time for native JSON parsing, keeping byte/event/depth guards and format fallbacks. Three fresh-process PLC comparisons reduced median import time from 4336 to 2493 ms and median peak RSS from 613 to 579 MiB. Export equality verified; general out-of-core storage/rendering and original OOM cases remain open.",
-      "remaining": "Streaming now covers duration-event arrays and supported traceEvents wrappers. CPU/sample/native formats and unrecognized wrappers retain their ordinary detector. Sorting, profile trees, snapshots and rendering still consume memory proportional to the capture; limits bound input complexity, not total browser heap. A true out-of-core model, bounded rendering and validation of the original reported capture remain open."
+      "evidence": "Cancellable streaming duration imports now frame one bounded event at a time for native JSON parsing, keeping byte/event/depth guards and format fallbacks. Three fresh-process PLC comparisons reduced median import time from 4336 to 2493 ms and median peak RSS from 613 to 579 MiB. Export equality verified; general out-of-core storage/rendering and original OOM cases remain open. Complete-event queues now reuse original begin events and retain compact end records; already chronological queues avoid sort workspace. Selected-stack details render at most 100 ancestors per page.",
+      "remaining": "Complete-event queue allocations and selected-stack DOM are reduced. Streaming supports duration-event arrays and recognized traceEvents wrappers; other formats retain their ordinary detector. The final model, sorting unordered input, worker snapshots and graph rendering still scale with the capture. A true out-of-core model and original OOM reproductions remain open."
     },
     {
       "id": 402,
@@ -696,8 +696,8 @@
       "status": "partial",
       "priority": "P1",
       "workstream": "Large profiles and responsiveness",
-      "evidence": "Cancellable streaming duration imports now frame one bounded event at a time for native JSON parsing, keeping byte/event/depth guards and format fallbacks. Three fresh-process PLC comparisons reduced median import time from 4336 to 2493 ms and median peak RSS from 613 to 579 MiB. Export equality verified; general out-of-core storage/rendering and original OOM cases remain open.",
-      "remaining": "Streaming now covers duration-event arrays and supported traceEvents wrappers. CPU/sample/native formats and unrecognized wrappers retain their ordinary detector. Sorting, profile trees, snapshots and rendering still consume memory proportional to the capture; limits bound input complexity, not total browser heap. A true out-of-core model, bounded rendering and validation of the original reported capture remain open."
+      "evidence": "Cancellable streaming duration imports now frame one bounded event at a time for native JSON parsing, keeping byte/event/depth guards and format fallbacks. Three fresh-process PLC comparisons reduced median import time from 4336 to 2493 ms and median peak RSS from 613 to 579 MiB. Export equality verified; general out-of-core storage/rendering and original OOM cases remain open. Complete-event queues now reuse original begin events and retain compact end records; already chronological queues avoid sort workspace. Selected-stack details render at most 100 ancestors per page.",
+      "remaining": "Complete-event queue allocations and selected-stack DOM are reduced. Streaming supports duration-event arrays and recognized traceEvents wrappers; other formats retain their ordinary detector. The final model, sorting unordered input, worker snapshots and graph rendering still scale with the capture. A true out-of-core model and original OOM reproductions remain open."
     },
     {
       "id": 384,
@@ -885,11 +885,11 @@
       "url": "https://github.com/jlfwong/speedscope/issues/350",
       "kind": "feature",
       "usefulness": "yes",
-      "status": "partial",
+      "status": "implemented",
       "priority": "P3",
       "workstream": "Search and navigation",
-      "evidence": "Expandable Call Tree gives a navigable ancestor/callee hierarchy. A compact clickable stack summary attached to the selected canvas frame is still a separate UI enhancement.",
-      "remaining": "Expandable Call Tree gives a navigable ancestor/callee hierarchy. A compact clickable stack summary attached to the selected canvas frame is still a separate UI enhancement."
+      "evidence": "Selected-stack details provide keyboard-focusable scope buttons that select the exact ancestor call instance and bring ancestors above the viewport into view. Parent chains are paged at 100 scopes, with older-ancestor and reset controls; no full-chain index or history is retained. See docs/SEARCH_AND_LAYOUT.md.",
+      "remaining": "No additional work selected for the reviewed scope."
     },
     {
       "id": 348,
@@ -912,8 +912,8 @@
       "status": "partial",
       "priority": "P1",
       "workstream": "Large profiles and responsiveness",
-      "evidence": "Cancellable streaming duration imports now frame one bounded event at a time for native JSON parsing, keeping byte/event/depth guards and format fallbacks. Three fresh-process PLC comparisons reduced median import time from 4336 to 2493 ms and median peak RSS from 613 to 579 MiB. Export equality verified; general out-of-core storage/rendering and original OOM cases remain open.",
-      "remaining": "Streaming now covers duration-event arrays and supported traceEvents wrappers. CPU/sample/native formats and unrecognized wrappers retain their ordinary detector. Sorting, profile trees, snapshots and rendering still consume memory proportional to the capture; limits bound input complexity, not total browser heap. A true out-of-core model, bounded rendering and validation of the original reported capture remain open."
+      "evidence": "Cancellable streaming duration imports now frame one bounded event at a time for native JSON parsing, keeping byte/event/depth guards and format fallbacks. Three fresh-process PLC comparisons reduced median import time from 4336 to 2493 ms and median peak RSS from 613 to 579 MiB. Export equality verified; general out-of-core storage/rendering and original OOM cases remain open. Complete-event queues now reuse original begin events and retain compact end records; already chronological queues avoid sort workspace. Selected-stack details render at most 100 ancestors per page.",
+      "remaining": "Complete-event queue allocations and selected-stack DOM are reduced. Streaming supports duration-event arrays and recognized traceEvents wrappers; other formats retain their ordinary detector. The final model, sorting unordered input, worker snapshots and graph rendering still scale with the capture. A true out-of-core model and original OOM reproductions remain open."
     },
     {
       "id": 346,

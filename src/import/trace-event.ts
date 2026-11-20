@@ -104,6 +104,7 @@ interface XTraceEvent extends TraceEvent {
 
 // The trace format supports a number of event types that we ignore.
 type ImportableTraceEvent = BTraceEvent | ETraceEvent | XTraceEvent
+type BeginTraceEvent = BTraceEvent | XTraceEvent
 
 interface StackFrame {
   line: string
@@ -176,7 +177,7 @@ function partitionByPidTid<T extends {tid?: number | string | null; pid?: number
 }
 
 function selectQueueToTakeFromNext(
-  bFront: BTraceEvent | undefined,
+  bFront: BeginTraceEvent | undefined,
   eFront: ETraceEvent | undefined,
 ): 'B' | 'E' {
   if (bFront == null && eFront == null) {
@@ -202,8 +203,8 @@ function selectQueueToTakeFromNext(
   return getEventId(bFront) === getEventId(eFront) ? 'B' : 'E'
 }
 
-function convertToEventQueues(events: ImportableTraceEvent[]): [BTraceEvent[], ETraceEvent[]] {
-  const beginEvents: BTraceEvent[] = []
+function convertToEventQueues(events: ImportableTraceEvent[]): [BeginTraceEvent[], ETraceEvent[]] {
+  const beginEvents: BeginTraceEvent[] = []
   const endEvents: ETraceEvent[] = []
   let timestampPrecision = 0
 
@@ -267,6 +268,7 @@ function convertToEventQueues(events: ImportableTraceEvent[]): [BTraceEvent[], E
     return 0
   })
 
+  const hasExplicitBegins = beginEvents.length > 0
   const activeXEnds: ETraceEvent[] = []
   for (let x of xEvents) {
     const xDur = dur(x)
@@ -283,8 +285,11 @@ function convertToEventQueues(events: ImportableTraceEvent[]): [BTraceEvent[], E
       previousEnd.ts = x.ts
       activeXEnds.pop()
     }
-    beginEvents.push({...x, ph: 'B'} as BTraceEvent)
-    const end = {...x, ph: 'E', ts: x.ts + xDur} as ETraceEvent
+    // A complete event already has everything needed to open a frame. Share it
+    // instead of cloning its fields into another full-size event object. Closing
+    // needs only a timestamp and the same name/arguments for matching.
+    beginEvents.push(x)
+    const end: ETraceEvent = {ph: 'E', ts: x.ts + xDur, name: x.name, args: x.args}
     endEvents.push(end)
     activeXEnds.push(end)
   }
@@ -298,8 +303,19 @@ function convertToEventQueues(events: ImportableTraceEvent[]): [BTraceEvent[], E
     return 0
   }
 
-  beginEvents.sort(compareTimestamps)
-  endEvents.sort(compareTimestamps)
+  // With only complete events, the begin queue is already in xEvents order.
+  // Many producers already emit each thread chronologically. Avoid allocating
+  // sort workspace for those queues; retain stable sorting for unordered input.
+  const sortIfUnordered = (queue: TraceEvent[]) => {
+    for (let i = 1; i < queue.length; i++) {
+      if (queue[i - 1].ts > queue[i].ts) {
+        queue.sort(compareTimestamps)
+        break
+      }
+    }
+  }
+  if (hasExplicitBegins) sortIfUnordered(beginEvents)
+  sortIfUnordered(endEvents)
 
   return [beginEvents, endEvents]
 }
@@ -478,9 +494,9 @@ function eventListToProfile(
   profileBuilder.setValueFormatter(new TimeFormatter('microseconds'))
   profileBuilder.setName(name)
 
-  const frameStack: BTraceEvent[] = []
+  const frameStack: BeginTraceEvent[] = []
   const frameInfoStack: FrameInfo[] = []
-  const enterFrame = (b: BTraceEvent) => {
+  const enterFrame = (b: BeginTraceEvent) => {
     const frameInfo = frameInfoForEvent(b, exporterSource)
     frameStack.push(b)
     frameInfoStack.push(frameInfo)

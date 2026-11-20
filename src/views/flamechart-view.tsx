@@ -66,6 +66,24 @@ export class FlamechartView extends StatelessComponent<FlamechartViewProps> {
     this.props.setSelectedNode(node)
   }
 
+  private onAncestorSelect = (node: CallTreeNode) => {
+    this.props.setSelectedNode(node)
+    // Parent links identify the exact call instance without scanning every
+    // flamechart frame or retaining a node-to-occurrence index.
+    let depth = -1
+    for (
+      let current: CallTreeNode | null = node;
+      current && !current.isRoot();
+      current = current.parent
+    )
+      depth++
+    const rect = this.props.configSpaceViewportRect
+    if (depth < rect.origin.y + 1) {
+      // Leave one row above the scope so the time axis cannot cover its label.
+      this.setConfigSpaceViewportRect(new Rect(rect.origin.withY(depth - 1), rect.size))
+    }
+  }
+
   formatValue(weight: number) {
     const totalWeight = this.props.flamechart.getTotalWeight()
     const percent = (100 * weight) / totalWeight
@@ -147,6 +165,7 @@ export class FlamechartView extends StatelessComponent<FlamechartViewProps> {
             flamechart={this.props.flamechart}
             getCSSColorForFrame={this.props.getCSSColorForFrame}
             selectedNode={this.props.selectedNode}
+            onSelect={this.onAncestorSelect}
           />
         )}
       </div>

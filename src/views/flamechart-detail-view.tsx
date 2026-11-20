@@ -1,5 +1,6 @@
 import {StyleDeclarationValue, css} from 'aphrodite'
 import {h, JSX} from 'preact'
+import {useLayoutEffect, useRef, useState} from 'preact/hooks'
 import {getFlamechartStyle} from './flamechart-style'
 import {formatPercent} from '../lib/utils'
 import {Frame, CallTreeNode} from '../lib/profile'
@@ -7,6 +8,7 @@ import {ColorChit} from './color-chit'
 import {Flamechart} from '../lib/flamechart'
 import {useTheme} from './themes/theme'
 import {SourceLocation} from './source-location'
+import {stackPage} from '../lib/stack-page'
 
 interface StatisticsTableProps {
   title: string
@@ -52,13 +54,29 @@ function StatisticsTable(props: StatisticsTableProps) {
 interface StackTraceViewProps {
   getFrameColor: (frame: Frame) => string
   node: CallTreeNode
+  onSelect: (node: CallTreeNode) => void
 }
-function StackTraceView(props: StackTraceViewProps) {
+export function StackTraceView(props: StackTraceViewProps) {
   const style = getFlamechartStyle(useTheme())
+  const [page, setPage] = useState({selected: props.node, start: props.node})
+  if (page.selected !== props.node) {
+    setPage({selected: props.node, start: props.node})
+  }
+  const start = page.selected === props.node ? page.start : props.node
+  const {nodes, next} = stackPage(start)
+  const container = useRef<HTMLDivElement>(null)
+  const previousSelection = useRef(props.node)
+  useLayoutEffect(() => {
+    const element = container.current!
+    element.scrollTop = 0
+    if (previousSelection.current !== props.node && element.contains(document.activeElement)) {
+      element.querySelector<HTMLButtonElement>('[aria-current="true"]')?.focus()
+    }
+    previousSelection.current = props.node
+  }, [props.node, start])
 
   const rows: JSX.Element[] = []
-  let node: CallTreeNode | null = props.node
-  for (; node && !node.isRoot(); node = node.parent) {
+  for (const node of nodes) {
     const row: (JSX.Element | string)[] = []
     const {frame} = node
 
@@ -67,7 +85,17 @@ function StackTraceView(props: StackTraceViewProps) {
     if (rows.length) {
       row.push(<span className={css(style.stackFileLine)}>&gt; </span>)
     }
-    row.push(frame.name)
+    row.push(
+      <button
+        className={css(style.stackSelect)}
+        type="button"
+        aria-label={`Select scope ${frame.name}`}
+        aria-current={node === props.node ? 'true' : undefined}
+        onClick={() => props.onSelect(node)}
+      >
+        {frame.name}
+      </button>,
+    )
 
     if (frame.file) {
       row.push(
@@ -80,8 +108,26 @@ function StackTraceView(props: StackTraceViewProps) {
     rows.push(<div className={css(style.stackLine)}>{row}</div>)
   }
   return (
-    <div className={css(style.stackTraceView)}>
-      <div className={css(style.stackTraceViewPadding)}>{rows}</div>
+    <div ref={container} className={css(style.stackTraceView)}>
+      <div className={css(style.stackTraceViewPadding)}>
+        <nav aria-label="Stack ancestors">
+          {start !== props.node && (
+            <button
+              type="button"
+              onClick={() => setPage({selected: props.node, start: props.node})}
+            >
+              Back to selected frame
+            </button>
+          )}
+          {next && (
+            <button type="button" onClick={() => setPage({selected: props.node, start: next})}>
+              Show older ancestors
+            </button>
+          )}
+          {(next || start !== props.node) && <span> Up to 100 scopes per page.</span>}
+        </nav>
+        {rows}
+      </div>
     </div>
   )
 }
@@ -90,6 +136,7 @@ interface FlamechartDetailViewProps {
   flamechart: Flamechart
   getCSSColorForFrame: (frame: Frame) => string
   selectedNode: CallTreeNode
+  onSelect: (node: CallTreeNode) => void
 }
 
 export function FlamechartDetailView(props: FlamechartDetailViewProps) {
@@ -116,7 +163,11 @@ export function FlamechartDetailView(props: FlamechartDetailViewProps) {
         selectedSelf={frame.getSelfWeight()}
         formatter={flamechart.formatValue.bind(flamechart)}
       />
-      <StackTraceView node={selectedNode} getFrameColor={props.getCSSColorForFrame} />
+      <StackTraceView
+        node={selectedNode}
+        getFrameColor={props.getCSSColorForFrame}
+        onSelect={props.onSelect}
+      />
     </div>
   )
 }
