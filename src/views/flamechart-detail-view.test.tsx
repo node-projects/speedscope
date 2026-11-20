@@ -1,7 +1,8 @@
 import {h, render} from 'preact'
 import {act} from 'preact/test-utils'
-import {CallTreeNode, Frame} from '../lib/profile'
-import {StackTraceView} from './flamechart-detail-view'
+import {CallTreeNode, Frame, CallTreeProfileBuilder} from '../lib/profile'
+import {StackTraceView, FlamechartDetailView} from './flamechart-detail-view'
+import {Flamechart} from '../lib/flamechart'
 
 let host: HTMLDivElement
 beforeEach(() => {
@@ -19,6 +20,69 @@ function chain(depth: number) {
     node = new CallTreeNode({name: `scope-${i}`, file: `src/scope-${i}.ts`} as Frame, node)
   return node
 }
+
+test('statistics explain instance scope and use the entire profile including idle weight', () => {
+  const builder = new CallTreeProfileBuilder(10)
+  const frame = {key: 0, name: 'parent'},
+    child = {key: 1, name: 'child'}
+  builder.enterFrame(frame, 2)
+  builder.enterFrame(child, 3)
+  builder.leaveFrame(child, 5)
+  builder.leaveFrame(frame, 8)
+  const profile = builder.build()
+  const node = profile.getGroupedCalltreeRoot().children[0]
+  const flamechart = new Flamechart({
+    getTotalWeight: () => 10,
+    formatValue: v => String(v),
+    forEachCall: () => {},
+    getColorBucketForFrame: () => 0,
+  })
+  act(() =>
+    render(
+      <FlamechartDetailView
+        flamechart={flamechart}
+        selectedNode={node}
+        getCSSColorForFrame={() => 'red'}
+        onSelect={() => {}}
+      />,
+      host,
+    ),
+  )
+  const groups = host.querySelectorAll('[role="group"]')
+  expect(groups[0].getAttribute('aria-label')).toContain('selected call-tree node')
+  expect(groups[0].textContent).toContain('60%')
+  expect(groups[0].textContent).toContain('40%')
+  expect(host.querySelector('details')!.textContent).toContain('including idle weight')
+  expect(host.querySelector('details')!.textContent).toContain('Left Heavy groups calls')
+})
+
+test('zero-weight statistics display zero percentages and finite bar styles', () => {
+  const builder = new CallTreeProfileBuilder(0)
+  const frame = {key: 0, name: 'empty'}
+  builder.enterFrame(frame, 0)
+  builder.leaveFrame(frame, 0)
+  const profile = builder.build()
+  const node = profile.getGroupedCalltreeRoot().children[0]
+  const flamechart = new Flamechart({
+    getTotalWeight: () => 0,
+    formatValue: v => String(v),
+    forEachCall: () => {},
+    getColorBucketForFrame: () => 0,
+  })
+  act(() =>
+    render(
+      <FlamechartDetailView
+        flamechart={flamechart}
+        selectedNode={node}
+        getCSSColorForFrame={() => 'red'}
+        onSelect={() => {}}
+      />,
+      host,
+    ),
+  )
+  expect(host.querySelector('[role="group"]')!.textContent).toContain('0%')
+  expect(host.innerHTML).not.toMatch(/NaN|Infinity/)
+})
 
 test('deep stack details page at 100 rows and select exact ancestor instances', () => {
   const node = chain(205)

@@ -5,6 +5,7 @@ import {h} from 'preact'
 import {StyleSheet, css} from 'aphrodite'
 
 import {ProfileGroup, SymbolRemapper} from '../lib/profile'
+import {profileWindowTitle} from '../lib/profile-context'
 import {FontFamily, FontSize, Duration} from './style'
 import {importEmscriptenSymbolMap as importEmscriptenSymbolRemapper} from '../lib/emscripten'
 import {saveToFile} from '../lib/file-format'
@@ -236,7 +237,7 @@ export class Application extends StatelessComponent<ApplicationProps> {
       if (controller.signal.aborted || this.importController !== controller) return
       if (this.props.hashParams.title)
         profileGroup = {...profileGroup, name: this.props.hashParams.title}
-      document.title = `${profileGroup.name} - speedscope`
+      document.title = profileWindowTitle(profileGroup, this.props.hashParams.title)
       if (this.props.hashParams.viewMode !== undefined)
         this.props.setViewMode(this.props.hashParams.viewMode)
       const selected = profileGroup.profiles[profileGroup.indexToView]
@@ -316,6 +317,7 @@ export class Application extends StatelessComponent<ApplicationProps> {
         if (symbolRemapper != null) {
           return {
             name: this.props.profileGroup.name || 'profile',
+            sourceName: this.props.profileGroup.sourceName,
             indexToView: this.props.profileGroup.indexToView,
             profiles: this.props.profileGroup.profiles.map(profileState => {
               // We do a shallow clone here to invalidate certain caches keyed

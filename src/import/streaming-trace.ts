@@ -2,6 +2,7 @@ import {Tokenizer, TokenParser, TokenType} from '@streamparser/json'
 import {ProfileGroup} from '../lib/profile'
 import {importTraceEvents, TraceEvent} from './trace-event'
 import {StringBackedTextFileContent} from './utils'
+import {sourceFileName} from '../lib/profile-context'
 
 // These are input-complexity limits, not measurements of browser heap usage.
 // Profile construction and rendering still need memory proportional to the trace.
@@ -297,6 +298,7 @@ export async function importDurationTraceStream(
     checkAbort(options.signal)
     const group = importTraceEvents(events)
     group.name = name
+    group.sourceName = sourceFileName(name)
     return group
   } catch (error) {
     if (error instanceof NotDurationTrace) return null

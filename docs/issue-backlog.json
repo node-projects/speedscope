@@ -813,11 +813,11 @@
       "url": "https://github.com/jlfwong/speedscope/issues/363",
       "kind": "feature",
       "usefulness": "yes",
-      "status": "planned",
+      "status": "implemented",
       "priority": "P3",
       "workstream": "Import formats and correctness",
-      "evidence": "Showing original filename alongside internal group name needs distinct stored source-name metadata through import/export. Custom title handling is fixed separately; do not overwrite thread names to display it.",
-      "remaining": "Showing original filename alongside internal group name needs distinct stored source-name metadata through import/export. Custom title handling is fixed separately; do not overwrite thread names to display it."
+      "evidence": "Window titles show the currently opened leaf filename alongside a distinct internal recording name; explicit hash titles keep precedence. Runtime-only sourceName survives worker hydration, derived views and symbol remapping, without adding local filename metadata to exports. See docs/SEARCH_AND_LAYOUT.md.",
+      "remaining": "No additional work selected for the reviewed scope."
     },
     {
       "id": 361,
@@ -1101,11 +1101,11 @@
       "url": "https://github.com/jlfwong/speedscope/issues/242",
       "kind": "bug",
       "usefulness": "yes",
-      "status": "partial",
+      "status": "implemented",
       "priority": "P3",
       "workstream": "Accessibility and presentation",
-      "evidence": "Call Tree shows file, line and column next to ambiguous function names; Sandwich tooltips already expose source. Source-aware labels in every graph remain separate.",
-      "remaining": "Call Tree shows file, line and column next to ambiguous function names; Sandwich tooltips already expose source. Source-aware labels in every graph remain separate."
+      "evidence": "Sandwich shows a persistent selected-function details panel with the full name and file/line/column, including configured source-code links. Same-named functions can be distinguished without hovering; unavailable source metadata is explicit. See docs/SEARCH_AND_LAYOUT.md.",
+      "remaining": "No additional work selected for the reviewed scope."
     },
     {
       "id": 241,
@@ -1185,11 +1185,11 @@
       "url": "https://github.com/jlfwong/speedscope/issues/219",
       "kind": "maintenance",
       "usefulness": "yes",
-      "status": "partial",
+      "status": "implemented",
       "priority": "P3",
       "workstream": "Packaging, integration and maintenance",
-      "evidence": "Call Tree explains total versus self directly; this-instance versus aggregate tooltip wording still deserves contextual documentation.",
-      "remaining": "Call Tree explains total versus self directly; this-instance versus aggregate tooltip wording still deserves contextual documentation."
+      "evidence": "Selected-stack details include an accessible expandable explanation of This Instance versus All Instances, Total versus Self, profile units and percentage denominators. Sandwich headers explain their non-idle denominator. Zero-weight percentages are finite and show 0%. See docs/SEARCH_AND_LAYOUT.md.",
+      "remaining": "No additional work selected for the reviewed scope."
     },
     {
       "id": 211,

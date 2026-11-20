@@ -16,6 +16,7 @@ import {SortField, SortDirection, profileGroupAtom, tableSortMethodAtom} from '.
 import {useAtom} from '../lib/atom'
 import {StatelessComponent} from '../lib/preact-helpers'
 import {SplitPane} from './split-pane'
+import {SelectedFrameDetails} from './selected-frame-details'
 
 interface SandwichViewProps {
   selectedFrame: Frame | null
@@ -98,7 +99,12 @@ class SandwichView extends StatelessComponent<SandwichViewProps> {
         label="Resize profile table"
         minimumSize={160}
         first={table}
-        second={flamegraphViews}
+        second={
+          <div className={css(commonStyle.vbox, style.graphs)}>
+            <SelectedFrameDetails frame={selectedFrame!} />
+            {flamegraphViews}
+          </div>
+        }
       />
     ) : (
       <div className={css(commonStyle.hbox, commonStyle.fillY)}>{table}</div>
@@ -108,6 +114,7 @@ class SandwichView extends StatelessComponent<SandwichViewProps> {
 
 const getStyle = withTheme(theme =>
   StyleSheet.create({
+    graphs: {flex: 1, minWidth: 0, minHeight: 0},
     tableView: {
       position: 'relative',
       flex: 1,

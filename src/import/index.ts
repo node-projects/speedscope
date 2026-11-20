@@ -1,4 +1,5 @@
 import {Profile, ProfileGroup} from '../lib/profile'
+import {sourceFileName} from '../lib/profile-context'
 
 import {
   importFromChromeCPUProfile,
@@ -62,6 +63,7 @@ async function importProfileGroup(dataSource: ProfileDataSource): Promise<Profil
 
   const profileGroup = await _importProfileGroup(dataSource)
   if (profileGroup) {
+    profileGroup.sourceName = sourceFileName(fileName)
     if (!profileGroup.name) {
       profileGroup.name = fileName
     }
@@ -241,5 +243,7 @@ async function _importProfileGroup(dataSource: ProfileDataSource): Promise<Profi
 }
 
 export async function importFromFileSystemDirectoryEntry(entry: FileSystemDirectoryEntry) {
-  return importFromInstrumentsTrace(entry)
+  const group = await importFromInstrumentsTrace(entry)
+  group.sourceName = sourceFileName(entry.name)
+  return group
 }

@@ -112,6 +112,7 @@ export function zeroPad(s: string, width: number) {
 }
 
 export function formatPercent(percent: number) {
+  if (percent === 0) return '0%'
   let formattedPercent = `${percent.toFixed(0)}%`
   if (percent === 100) formattedPercent = '100%'
   else if (percent > 99) formattedPercent = '>99%'
