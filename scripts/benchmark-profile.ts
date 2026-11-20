@@ -10,14 +10,18 @@ import {
 } from '../src/lib/profile-transformations'
 import {exportProfileGroup} from '../src/lib/file-format'
 import {exportProfileGroupToBlob} from '../src/lib/profile-export'
+import {Flamechart} from '../src/lib/flamechart'
+import {ProfileSearchResults, FlamechartSearchResults} from '../src/lib/profile-search'
 
 async function main() {
-  const [filename, action = 'all'] = process.argv.slice(2)
-  if (!['all', 'import', 'stream-import', 'export', 'legacy-export'].includes(action))
+  const [filename, action = 'all', query = ' '] = process.argv.slice(2)
+  if (
+    !['all', 'import', 'stream-import', 'stream-search', 'export', 'legacy-export'].includes(action)
+  )
     throw new Error(`Unknown action: ${action}`)
   const start = Date.now()
   let group
-  if (action === 'stream-import') {
+  if (action === 'stream-import' || action === 'stream-search') {
     const header = new Uint8Array(2)
     const fd = fs.openSync(filename, 'r')
     try {
@@ -41,7 +45,7 @@ async function main() {
   if (!group) throw new Error('Unrecognized profile')
   console.log(
     JSON.stringify({
-      action: action === 'stream-import' ? action : 'import',
+      action: action === 'stream-import' || action === 'stream-search' ? 'stream-import' : 'import',
       ms: Date.now() - start,
       profiles: group.profiles.length,
       totals: group.profiles.map(p => p.getTotalWeight()),
@@ -51,6 +55,34 @@ async function main() {
   )
   if (action === 'import' || action === 'stream-import') return
   ;(globalThis as any).gc?.()
+  if (action === 'stream-search') {
+    const profile = group.profiles[0]
+    const chart = new Flamechart({
+      getTotalWeight: () => profile.getTotalWeight(),
+      formatValue: value => profile.formatValue(value),
+      forEachCall: profile.forEachCall.bind(profile),
+      getColorBucketForFrame: () => 0,
+    })
+    ;(globalThis as any).gc?.()
+    const before = process.memoryUsage().heapUsed
+    const timer = Date.now()
+    const results = new FlamechartSearchResults(chart, new ProfileSearchResults(profile, query))
+    const count = results.count()
+    for (let i = 0; i < Math.min(10, count); i++) results.at(i)
+    const ms = Date.now() - timer
+    ;(globalThis as any).gc?.()
+    const retainedSearchMB = (process.memoryUsage().heapUsed - before) / 1048576
+    console.log(
+      JSON.stringify({
+        action,
+        ms,
+        matches: results.count(),
+        limited: results.isTruncated(),
+        retainedSearchMB,
+      }),
+    )
+    return
+  }
   if (action === 'all') {
     let timer = Date.now()
     const combined = combineProfiles(group.profiles)

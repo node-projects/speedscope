@@ -35,6 +35,38 @@ A local PLC smoke check searched 17,510 frames across four profiles, found 40
 matches without truncation, and left all profile totals unchanged. It took about
 148 ms with ten yields in that Node run; this is not a browser latency guarantee.
 
+## Bounded graph search
+
+Time Order and Left Heavy search navigate at most the first 10,000 matching call
+occurrences in depth-first order. If there are more, the count shows `10000+`
+and a visible status asks you to refine your search. This is a lower bound,
+not the full count. Previous/Next and Enter/Shift+Enter wrap within the retained
+window. A selected frame outside that window shows `?` for its navigation index.
+Use a more specific name/path or Whole word/Exact mode to narrow the query.
+
+Matching and graph highlights still inspect full names and source paths, even
+outside the navigation window. Sparse queries can find late occurrences: the
+limit applies to retained matches, not the number of frames searched. Showing
+the limit requires finding one further match, so exactly 10,000 results are
+reported as complete. No widths, weights or exported symbols are changed.
+Search zoom also keeps root-level result labels below the time axis, including
+short charts whose general viewport clamp would otherwise cover the first row.
+
+Symbol matching is lazy. Each query caches at most 4,096 boolean frame results
+and 512 highlight lists, evicting old entries and recomputing them when needed.
+Only labels/rows being drawn request name-highlight ranges, capped at the first
+64 ranges per name. A long, repetitive name can therefore match beyond its
+drawn underlines. File-only matches have no name underlines. Search input is
+limited to 4,096 characters. These are literal modes, not arbitrary regexes.
+
+Search no longer builds a full per-symbol highlight map or a rectangle for
+every matching call. Traversal uses O(depth) auxiliary storage and creates a
+navigation rectangle only when a result is opened. Rare/no-match queries can
+still scan an entire graph synchronously; bounded caches can require repeated
+text matching. Existing profile models, graph geometry and Sandwich row lists
+still scale with recording size. Cross-profile search retains its separate
+200-result limit and cancellation behavior.
+
 ## Resize Sandwich panes
 
 Select a function in Sandwich to show the table, callers and callees. Drag the

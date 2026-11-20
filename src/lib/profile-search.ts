@@ -1,7 +1,13 @@
 import {Profile, Frame, CallTreeNode} from './profile'
 import {Flamechart, FlamechartFrame} from './flamechart'
 import {Rect, Vec2} from './math'
-import {visitTree} from './utils'
+
+export const SEARCH_LIMITS = {
+  cachedFrames: 4096,
+  cachedHighlights: 512,
+  rangesPerName: 64,
+  navigationMatches: 10_000,
+}
 
 export enum FlamechartType {
   CHRONO_FLAME_CHART,
@@ -20,20 +26,21 @@ export function createTextMatcher(pattern: string, mode: SearchMode) {
     const hasMatch = (text: string) => !!pattern && text.toLocaleLowerCase() === lowerPattern
     return {
       hasMatch,
-      ranges: (text: string): [number, number][] => (hasMatch(text) ? [[0, text.length]] : []),
+      ranges: (text: string, limit = Infinity): [number, number][] =>
+        limit > 0 && hasMatch(text) ? [[0, text.length]] : [],
     }
   }
   if (mode === SearchMode.SUBSTRING) {
     const lowerPattern = pattern.toLocaleLowerCase()
     return {
       hasMatch: (text: string) => !!pattern && text.toLocaleLowerCase().includes(lowerPattern),
-      ranges: (text: string): [number, number][] => {
+      ranges: (text: string, limit = Infinity): [number, number][] => {
         if (!pattern) return []
         const lowerText = text.toLocaleLowerCase()
         const ranges: [number, number][] = []
         let start = 0,
           index: number
-        while ((index = lowerText.indexOf(lowerPattern, start)) !== -1) {
+        while (ranges.length < limit && (index = lowerText.indexOf(lowerPattern, start)) !== -1) {
           ranges.push([index, index + pattern.length])
           start = index + pattern.length
         }
@@ -51,12 +58,12 @@ export function createTextMatcher(pattern: string, mode: SearchMode) {
       regex.lastIndex = 0
       return !!pattern && regex.test(text)
     },
-    ranges: (text: string): [number, number][] => {
+    ranges: (text: string, limit = Infinity): [number, number][] => {
       if (!pattern) return []
       regex.lastIndex = 0
       const ranges: [number, number][] = []
       let match: RegExpExecArray | null
-      while ((match = regex.exec(text)) !== null) {
+      while (ranges.length < limit && (match = regex.exec(text)) !== null) {
         const length = match[1].length
         const end = match.index + match[0].length
         ranges.push([end - length, end])
@@ -99,25 +106,33 @@ export class ProfileSearchResults {
     this.matcher = createTextMatcher(searchQuery, searchMode)
   }
 
-  private matches: Map<Frame, [number, number][] | null> | null = null
+  private matches = new Map<Frame, [number, number][] | null>()
+  private frameMatches = new Map<Frame, boolean>()
+
+  private cache<K, V>(map: Map<K, V>, key: K, value: V, limit: number) {
+    if (map.size === limit) map.delete(map.keys().next().value!)
+    map.set(key, value)
+  }
+
+  hasMatchForFrame(frame: Frame): boolean {
+    const cached = this.frameMatches.get(frame)
+    if (cached !== undefined) return cached
+    const match =
+      this.matcher.hasMatch(frame.name) || (frame.file != null && this.matcher.hasMatch(frame.file))
+    this.cache(this.frameMatches, frame, match, SEARCH_LIMITS.cachedFrames)
+    return match
+  }
+
   getMatchForFrame(frame: Frame): [number, number][] | null {
-    if (!this.matches) {
-      this.matches = new Map()
-      this.profile.forEachFrame(frame => {
-        const match = this.matcher.ranges(frame.name)
-        if (match.length > 0) {
-          this.matches!.set(frame, match)
-        } else if (frame.file != null && this.matcher.hasMatch(frame.file)) {
-          // The frame matched by file only. Highlight ranges always index into
-          // frame.name, so there's nothing to highlight, but an empty (truthy)
-          // array still marks the frame as matched.
-          this.matches!.set(frame, [])
-        } else {
-          this.matches!.set(frame, null)
-        }
-      })
-    }
-    return this.matches.get(frame) || null
+    if (this.matches.has(frame)) return this.matches.get(frame)!
+    // Compute ranges only for labels/rows being drawn, not every source symbol.
+    // A file-only match has an empty, truthy range list because offsets refer
+    // exclusively to frame.name. Eviction never changes matching semantics.
+    const ranges = this.hasMatchForFrame(frame)
+      ? this.matcher.ranges(frame.name, SEARCH_LIMITS.rangesPerName)
+      : null
+    this.cache(this.matches, frame, ranges, SEARCH_LIMITS.cachedHighlights)
+    return ranges
   }
 }
 
@@ -126,9 +141,29 @@ export interface FlamechartSearchMatch {
   node: CallTreeNode
 }
 
+export function searchMatchViewport(
+  flamechart: Flamechart,
+  match: FlamechartSearchMatch,
+  current: Rect,
+): Rect {
+  const bounds = match.configSpaceBounds
+  const viewport = flamechart.getClampedConfigSpaceViewportRect({
+    configSpaceViewportRect: new Rect(
+      bounds.origin.minus(new Vec2(0, 1)),
+      bounds.size.withY(current.height()),
+    ),
+  })
+  // The general clamp puts short charts at y=0. These search views have a time
+  // axis over that row, so leave space for it when selecting a root call.
+  return bounds.origin.y === 0 && viewport.origin.y === 0
+    ? viewport.withOrigin(viewport.origin.withY(-1))
+    : viewport
+}
+
 interface CachedFlamechartResult {
-  matches: FlamechartSearchMatch[]
+  matches: {frame: FlamechartFrame; depth: number}[]
   indexForNode: Map<CallTreeNode, number>
+  truncated: boolean
 }
 
 export class FlamechartSearchResults {
@@ -140,32 +175,43 @@ export class FlamechartSearchResults {
   private matches: CachedFlamechartResult | null = null
   private getResults(): CachedFlamechartResult {
     if (this.matches == null) {
-      const matches: FlamechartSearchMatch[] = []
+      const matches: CachedFlamechartResult['matches'] = []
       const indexForNode = new Map<CallTreeNode, number>()
-      const visit = (frame: FlamechartFrame, depth: number) => {
-        const {node} = frame
-        if (this.profileResults.getMatchForFrame(node.frame)) {
-          const configSpaceBounds = new Rect(
-            new Vec2(frame.start, depth),
-            new Vec2(frame.end - frame.start, 1),
-          )
-          indexForNode.set(node, matches.length)
-          matches.push({configSpaceBounds, node})
-        }
-      }
-
+      let truncated = false
       const layers = this.flamechart.getLayers()
-      if (layers.length > 0) {
-        visitTree(layers[0], visit)
+      // Preserve depth-first navigation order with O(depth) traversal storage.
+      // Stop after proving there is a further match; don't count the rest or
+      // construct geometry for every matching occurrence in a broad search.
+      const pending = layers.length ? [{nodes: layers[0], index: 0, depth: 0}] : []
+      while (pending.length) {
+        const current = pending[pending.length - 1]
+        if (current.index === current.nodes.length) {
+          pending.pop()
+          continue
+        }
+        const frame = current.nodes[current.index++]
+        if (this.profileResults.hasMatchForFrame(frame.node.frame)) {
+          if (matches.length === SEARCH_LIMITS.navigationMatches) {
+            truncated = true
+            break
+          }
+          indexForNode.set(frame.node, matches.length)
+          matches.push({frame, depth: current.depth})
+        }
+        if (frame.children.length)
+          pending.push({nodes: frame.children, index: 0, depth: current.depth + 1})
       }
-
-      this.matches = {matches, indexForNode}
+      this.matches = {matches, indexForNode, truncated}
     }
     return this.matches
   }
 
   count(): number {
     return this.getResults().matches.length
+  }
+
+  isTruncated(): boolean {
+    return this.getResults().truncated
   }
 
   indexOf(node: CallTreeNode): number | null {
@@ -175,9 +221,16 @@ export class FlamechartSearchResults {
 
   at(index: number): FlamechartSearchMatch {
     const matches = this.getResults().matches
-    if (index < 0 || index >= matches.length) {
+    if (!Number.isInteger(index) || index < 0 || index >= matches.length) {
       throw new Error(`Index ${index} out of bounds in list of ${matches.length} matches.`)
     }
-    return matches[index]
+    const {frame, depth} = matches[index]
+    return {
+      node: frame.node,
+      configSpaceBounds: new Rect(
+        new Vec2(frame.start, depth),
+        new Vec2(frame.end - frame.start, 1),
+      ),
+    }
   }
 }

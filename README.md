@@ -72,6 +72,8 @@ Large JSON and trace captures import in the background with progress and a
 **Cancel import** button. This improves responsiveness; very large captures can
 still exceed browser memory limits. Search offers Contains, Whole word and Exact
 matching for function names and source paths.
+Graph-search navigation retains at most 10,000 results and clearly marks larger
+result sets; refine the query to narrow them. Symbol/highlight caches are bounded.
 Use **Profile actions → Filter frames…** to include your code or exclude framework
 frames by file path or name. It creates a separate aggregate profile and keeps the
 original available. See [filter rules and weight semantics](docs/PROFILE_FILTERS.md).

@@ -316,7 +316,7 @@ class FlamechartPanZoomViewImpl extends Component<FlamechartPanZoomViewProps, {}
       if (configSpaceBounds.top() > this.props.configSpaceViewportRect.bottom()) return false
 
       if (configSpaceBounds.hasIntersectionWith(this.props.configSpaceViewportRect)) {
-        if (this.props.searchResults?.getMatchForFrame(frame.node.frame)) {
+        if (this.props.searchResults?.hasMatchForFrame(frame.node.frame)) {
           const physicalRectBounds = configToPhysical.transformRect(configSpaceBounds)
           matchedFrameBatch.rect({
             x: Math.round(physicalRectBounds.left() + frameOutlineWidth / 2),

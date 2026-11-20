@@ -72,7 +72,7 @@
       "status": "partial",
       "priority": "P2",
       "workstream": "Search and navigation",
-      "evidence": "Substring, Unicode whole-word and exact name/path search are implemented. Matchers are compiled once per query and file-only matches avoid highlight-range allocations.",
+      "evidence": "Substring, Unicode whole-word and exact name/path search are implemented. Matchers are compiled once per query and file-only matches avoid highlight-range allocations. Single-profile matching is lazy with fixed-size caches, capped label ranges and explicit graph-navigation truncation at 10,000 matches, preserving full-name/path matching.",
       "remaining": "Whole-word and exact literal modes are implemented. Arbitrary regular expressions still require bounded execution and cancellation to prevent pathological patterns freezing large searches."
     },
     {
@@ -168,8 +168,8 @@
       "status": "partial",
       "priority": "P1",
       "workstream": "Large profiles and responsiveness",
-      "evidence": "Cancellable streaming duration imports now frame one bounded event at a time for native JSON parsing, keeping byte/event/depth guards and format fallbacks. Three fresh-process PLC comparisons reduced median import time from 4336 to 2493 ms and median peak RSS from 613 to 579 MiB. Export equality verified; general out-of-core storage/rendering and original OOM cases remain open. Complete-event queues now reuse original begin events and retain compact end records; already chronological queues avoid sort workspace. Selected-stack details render at most 100 ancestors per page.",
-      "remaining": "Complete-event queue allocations and selected-stack DOM are reduced. Streaming supports duration-event arrays and recognized traceEvents wrappers; other formats retain their ordinary detector. The final model, sorting unordered input, worker snapshots and graph rendering still scale with the capture. A true out-of-core model and original OOM reproductions remain open."
+      "evidence": "Cancellable streaming duration imports now frame one bounded event at a time for native JSON parsing, keeping byte/event/depth guards and format fallbacks. Three fresh-process PLC comparisons reduced median import time from 4336 to 2493 ms and median peak RSS from 613 to 579 MiB. Export equality verified; general out-of-core storage/rendering and original OOM cases remain open. Complete-event queues now reuse original begin events and retain compact end records; already chronological queues avoid sort workspace. Selected-stack details render at most 100 ancestors per page. Graph search now retains at most 10,000 navigation matches, 4,096 boolean frame results and 512 labels with at most 64 ranges each; truncation is explicit and matching continues outside the navigation window.",
+      "remaining": "Temporary import queues, selected-stack DOM and graph-search caches/navigation are reduced or bounded. Final profile models, worker snapshots, unordered sorting, graph geometry and Sandwich row lists still scale with the capture. Streaming coverage and original OOM reproductions remain incomplete; this is not an out-of-core viewer."
     },
     {
       "id": 518,
@@ -384,8 +384,8 @@
       "status": "partial",
       "priority": "P1",
       "workstream": "Large profiles and responsiveness",
-      "evidence": "Cancellable streaming duration imports now frame one bounded event at a time for native JSON parsing, keeping byte/event/depth guards and format fallbacks. Three fresh-process PLC comparisons reduced median import time from 4336 to 2493 ms and median peak RSS from 613 to 579 MiB. Export equality verified; general out-of-core storage/rendering and original OOM cases remain open. Complete-event queues now reuse original begin events and retain compact end records; already chronological queues avoid sort workspace. Selected-stack details render at most 100 ancestors per page.",
-      "remaining": "Complete-event queue allocations and selected-stack DOM are reduced. Streaming supports duration-event arrays and recognized traceEvents wrappers; other formats retain their ordinary detector. The final model, sorting unordered input, worker snapshots and graph rendering still scale with the capture. A true out-of-core model and original OOM reproductions remain open."
+      "evidence": "Cancellable streaming duration imports now frame one bounded event at a time for native JSON parsing, keeping byte/event/depth guards and format fallbacks. Three fresh-process PLC comparisons reduced median import time from 4336 to 2493 ms and median peak RSS from 613 to 579 MiB. Export equality verified; general out-of-core storage/rendering and original OOM cases remain open. Complete-event queues now reuse original begin events and retain compact end records; already chronological queues avoid sort workspace. Selected-stack details render at most 100 ancestors per page. Graph search now retains at most 10,000 navigation matches, 4,096 boolean frame results and 512 labels with at most 64 ranges each; truncation is explicit and matching continues outside the navigation window.",
+      "remaining": "Temporary import queues, selected-stack DOM and graph-search caches/navigation are reduced or bounded. Final profile models, worker snapshots, unordered sorting, graph geometry and Sandwich row lists still scale with the capture. Streaming coverage and original OOM reproductions remain incomplete; this is not an out-of-core viewer."
     },
     {
       "id": 477,
@@ -624,8 +624,8 @@
       "status": "partial",
       "priority": "P3",
       "workstream": "Large profiles and responsiveness",
-      "evidence": "Cancellable streaming duration imports now frame one bounded event at a time for native JSON parsing, keeping byte/event/depth guards and format fallbacks. Three fresh-process PLC comparisons reduced median import time from 4336 to 2493 ms and median peak RSS from 613 to 579 MiB. Export equality verified; general out-of-core storage/rendering and original OOM cases remain open. Complete-event queues now reuse original begin events and retain compact end records; already chronological queues avoid sort workspace. Selected-stack details render at most 100 ancestors per page.",
-      "remaining": "Complete-event queue allocations and selected-stack DOM are reduced. Streaming supports duration-event arrays and recognized traceEvents wrappers; other formats retain their ordinary detector. The final model, sorting unordered input, worker snapshots and graph rendering still scale with the capture. A true out-of-core model and original OOM reproductions remain open."
+      "evidence": "Cancellable streaming duration imports now frame one bounded event at a time for native JSON parsing, keeping byte/event/depth guards and format fallbacks. Three fresh-process PLC comparisons reduced median import time from 4336 to 2493 ms and median peak RSS from 613 to 579 MiB. Export equality verified; general out-of-core storage/rendering and original OOM cases remain open. Complete-event queues now reuse original begin events and retain compact end records; already chronological queues avoid sort workspace. Selected-stack details render at most 100 ancestors per page. Graph search now retains at most 10,000 navigation matches, 4,096 boolean frame results and 512 labels with at most 64 ranges each; truncation is explicit and matching continues outside the navigation window.",
+      "remaining": "Temporary import queues, selected-stack DOM and graph-search caches/navigation are reduced or bounded. Final profile models, worker snapshots, unordered sorting, graph geometry and Sandwich row lists still scale with the capture. Streaming coverage and original OOM reproductions remain incomplete; this is not an out-of-core viewer."
     },
     {
       "id": 402,
@@ -696,8 +696,8 @@
       "status": "partial",
       "priority": "P1",
       "workstream": "Large profiles and responsiveness",
-      "evidence": "Cancellable streaming duration imports now frame one bounded event at a time for native JSON parsing, keeping byte/event/depth guards and format fallbacks. Three fresh-process PLC comparisons reduced median import time from 4336 to 2493 ms and median peak RSS from 613 to 579 MiB. Export equality verified; general out-of-core storage/rendering and original OOM cases remain open. Complete-event queues now reuse original begin events and retain compact end records; already chronological queues avoid sort workspace. Selected-stack details render at most 100 ancestors per page.",
-      "remaining": "Complete-event queue allocations and selected-stack DOM are reduced. Streaming supports duration-event arrays and recognized traceEvents wrappers; other formats retain their ordinary detector. The final model, sorting unordered input, worker snapshots and graph rendering still scale with the capture. A true out-of-core model and original OOM reproductions remain open."
+      "evidence": "Cancellable streaming duration imports now frame one bounded event at a time for native JSON parsing, keeping byte/event/depth guards and format fallbacks. Three fresh-process PLC comparisons reduced median import time from 4336 to 2493 ms and median peak RSS from 613 to 579 MiB. Export equality verified; general out-of-core storage/rendering and original OOM cases remain open. Complete-event queues now reuse original begin events and retain compact end records; already chronological queues avoid sort workspace. Selected-stack details render at most 100 ancestors per page. Graph search now retains at most 10,000 navigation matches, 4,096 boolean frame results and 512 labels with at most 64 ranges each; truncation is explicit and matching continues outside the navigation window.",
+      "remaining": "Temporary import queues, selected-stack DOM and graph-search caches/navigation are reduced or bounded. Final profile models, worker snapshots, unordered sorting, graph geometry and Sandwich row lists still scale with the capture. Streaming coverage and original OOM reproductions remain incomplete; this is not an out-of-core viewer."
     },
     {
       "id": 384,
@@ -900,7 +900,7 @@
       "status": "implemented",
       "priority": "none",
       "workstream": "Import formats and correctness",
-      "evidence": "Vertical clamping no longer permits negative top padding when the entire stack already fits in the viewport; deep scrollable charts retain their top margin.",
+      "evidence": "Vertical clamping no longer permits negative top padding when the entire stack already fits in the viewport; deep scrollable charts retain their top margin. Search zoom also reserves the time-axis row for root-level results in short charts, so the selected label remains visible.",
       "remaining": "No additional work selected for the reviewed scope."
     },
     {
@@ -912,8 +912,8 @@
       "status": "partial",
       "priority": "P1",
       "workstream": "Large profiles and responsiveness",
-      "evidence": "Cancellable streaming duration imports now frame one bounded event at a time for native JSON parsing, keeping byte/event/depth guards and format fallbacks. Three fresh-process PLC comparisons reduced median import time from 4336 to 2493 ms and median peak RSS from 613 to 579 MiB. Export equality verified; general out-of-core storage/rendering and original OOM cases remain open. Complete-event queues now reuse original begin events and retain compact end records; already chronological queues avoid sort workspace. Selected-stack details render at most 100 ancestors per page.",
-      "remaining": "Complete-event queue allocations and selected-stack DOM are reduced. Streaming supports duration-event arrays and recognized traceEvents wrappers; other formats retain their ordinary detector. The final model, sorting unordered input, worker snapshots and graph rendering still scale with the capture. A true out-of-core model and original OOM reproductions remain open."
+      "evidence": "Cancellable streaming duration imports now frame one bounded event at a time for native JSON parsing, keeping byte/event/depth guards and format fallbacks. Three fresh-process PLC comparisons reduced median import time from 4336 to 2493 ms and median peak RSS from 613 to 579 MiB. Export equality verified; general out-of-core storage/rendering and original OOM cases remain open. Complete-event queues now reuse original begin events and retain compact end records; already chronological queues avoid sort workspace. Selected-stack details render at most 100 ancestors per page. Graph search now retains at most 10,000 navigation matches, 4,096 boolean frame results and 512 labels with at most 64 ranges each; truncation is explicit and matching continues outside the navigation window.",
+      "remaining": "Temporary import queues, selected-stack DOM and graph-search caches/navigation are reduced or bounded. Final profile models, worker snapshots, unordered sorting, graph geometry and Sandwich row lists still scale with the capture. Streaming coverage and original OOM reproductions remain incomplete; this is not an out-of-core viewer."
     },
     {
       "id": 346,

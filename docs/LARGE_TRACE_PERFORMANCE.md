@@ -296,3 +296,51 @@ tests, type checking, linting, schema/backlog checks, both builds and a dry-run
 npm contents check. Browser smoke checks used a 220-level profile to verify
 100-row pages, access to the root, reset controls, Enter/Space selection and
 visible ancestor highlighting below the time axis, without console errors.
+
+## Bounded graph-search state
+
+On 2026-11-21, graph search stopped eagerly caching every source symbol and
+allocating navigation geometry/index entries for every matching call. Per query,
+boolean frame results are capped at 4,096 entries and drawn-label ranges at
+512 entries with at most 64 ranges each. Time Order/Left Heavy navigation keeps
+the first 10,000 matches and checks for one further match to establish
+truncation. The search UI displays a `+` lower bound and a visible refinement
+notice; it never claims the truncated count is complete. Matching/highlighting
+can continue beyond that navigation window.
+
+Three alternating fresh-process Windows/Node 24 runs compared `a72d309` with
+bounded search on the PLC's first profile (513,009 graph frames), using a broad
+single-space query:
+
+| Search-only metric | Before | After |
+| --- | ---: | ---: |
+| Initialization times (ms) | 96 / 89 / 94 | 3 / 3 / 4 |
+| Retained search heap after explicit GC (MiB) | 119.60 / 119.60 / 119.60 | 0.907 / 0.907 / 0.906 |
+| Retained navigation matches | 513,009 | 10,000 (explicitly limited) |
+
+This is a deliberate navigation-limit tradeoff, not equivalent full-result
+enumeration. Separate single-run checks found the same 40 `GroupCalls` matches
+(14 → 22 ms) and zero matches for a nonexistent symbol (14 → 25 ms). Those sparse
+queries retain about half as much search heap, but can be slower because cached
+entries are recomputed. These are Node search measurements after import and graph
+construction, not whole-app memory caps or browser latency guarantees.
+The measured initialization counts results and opens the first ten; it does not
+draw labels or measure browser rendering.
+
+The PLC import/export check still reports four profiles, 17,510 source frames
+and 1,039,656 call events, with the unchanged baseline export hash. Captures and
+benchmark artifacts remain private/uncommitted. The maintained benchmark adds
+`node scripts/benchmark-profile.mjs <capture> stream-search [query]` for streaming
+import followed by bounded search of the first profile; its default query is a
+single space. It reports the navigation limit and retained search heap separately
+from input/model memory. Graph creation, worker snapshots, sorting, Sandwich
+row lists and the final model remain proportional to recording size; the OOM
+backlog stays partial.
+
+Validation passed all 354 Jest tests across 62 suites (307 snapshots), five Node
+tests, type checking, linting, schema/backlog checks, both builds and package
+contents. Regressions cover cache eviction, dense-symbol range limits, exact
+limit detection, late sparse matches, depth-first order and 25,000-level graphs.
+Browser checks on 20,050 calls verified the visible limit notice, both keyboard
+wrap directions, narrowing to a late result, and the root-label axis fix,
+without console errors.
