@@ -4,7 +4,7 @@ import {ProfileTableViewContainer} from './profile-table-view'
 import {h, JSX, createContext} from 'preact'
 import {memo} from 'preact/compat'
 import {useCallback, useMemo, useContext} from 'preact/hooks'
-import {commonStyle, Sizes, FontSize} from './style'
+import {commonStyle, FontSize} from './style'
 import {InvertedCallerFlamegraphView} from './inverted-caller-flamegraph-view'
 import {CalleeFlamegraphView} from './callee-flamegraph-view'
 import {SandwichSearchView} from './sandwich-search-view'
@@ -15,6 +15,7 @@ import {Theme, useTheme, withTheme} from './themes/theme'
 import {SortField, SortDirection, profileGroupAtom, tableSortMethodAtom} from '../app-state'
 import {useAtom} from '../lib/atom'
 import {StatelessComponent} from '../lib/preact-helpers'
+import {SplitPane} from './split-pane'
 
 interface SandwichViewProps {
   selectedFrame: Frame | null
@@ -51,38 +52,56 @@ class SandwichView extends StatelessComponent<SandwichViewProps> {
 
     if (selectedFrame) {
       flamegraphViews = (
-        <div className={css(commonStyle.fillY, style.callersAndCallees, commonStyle.vbox)}>
-          <div className={css(commonStyle.hbox, style.panZoomViewWraper)}>
-            <div className={css(style.flamechartLabelParent)}>
-              <div className={css(style.flamechartLabel)}>Callers</div>
+        <SplitPane
+          direction="column"
+          storageKey="speedscope-sandwich-callers-split"
+          label="Resize callers and callees"
+          minimumSize={80}
+          first={
+            <div className={css(commonStyle.hbox, style.panZoomViewWraper)}>
+              <div className={css(style.flamechartLabelParent)}>
+                <div className={css(style.flamechartLabel)}>Callers</div>
+              </div>
+              <InvertedCallerFlamegraphView
+                glCanvas={this.props.glCanvas}
+                activeProfileState={this.props.activeProfileState}
+              />
             </div>
-            <InvertedCallerFlamegraphView
-              glCanvas={this.props.glCanvas}
-              activeProfileState={this.props.activeProfileState}
-            />
-          </div>
-          <div className={css(style.divider)} />
-          <div className={css(commonStyle.hbox, style.panZoomViewWraper)}>
-            <div className={css(style.flamechartLabelParent, style.flamechartLabelParentBottom)}>
-              <div className={css(style.flamechartLabel, style.flamechartLabelBottom)}>Callees</div>
+          }
+          second={
+            <div className={css(commonStyle.hbox, style.panZoomViewWraper)}>
+              <div className={css(style.flamechartLabelParent, style.flamechartLabelParentBottom)}>
+                <div className={css(style.flamechartLabel, style.flamechartLabelBottom)}>
+                  Callees
+                </div>
+              </div>
+              <CalleeFlamegraphView
+                glCanvas={this.props.glCanvas}
+                activeProfileState={this.props.activeProfileState}
+              />
             </div>
-            <CalleeFlamegraphView
-              glCanvas={this.props.glCanvas}
-              activeProfileState={this.props.activeProfileState}
-            />
-          </div>
-        </div>
+          }
+        />
       )
     }
 
-    return (
-      <div className={css(commonStyle.hbox, commonStyle.fillY)}>
-        <div className={css(style.tableView)}>
-          <ProfileTableViewContainer activeProfileState={this.props.activeProfileState} />
-          <SandwichSearchView />
-        </div>
-        {flamegraphViews}
+    const table = (
+      <div className={css(style.tableView)}>
+        <ProfileTableViewContainer activeProfileState={this.props.activeProfileState} />
+        <SandwichSearchView />
       </div>
+    )
+    return flamegraphViews ? (
+      <SplitPane
+        direction="row"
+        storageKey="speedscope-sandwich-table-split"
+        label="Resize profile table"
+        minimumSize={160}
+        first={table}
+        second={flamegraphViews}
+      />
+    ) : (
+      <div className={css(commonStyle.hbox, commonStyle.fillY)}>{table}</div>
     )
   }
 }
@@ -118,14 +137,6 @@ const getStyle = withTheme(theme =>
       transform: 'rotate(-90deg)',
       display: 'flex',
       justifyContent: 'flex-end',
-    },
-    callersAndCallees: {
-      flex: 1,
-      borderLeft: `${Sizes.SEPARATOR_HEIGHT}px solid ${theme.fgSecondaryColor}`,
-    },
-    divider: {
-      height: 2,
-      background: theme.fgSecondaryColor,
     },
   }),
 )

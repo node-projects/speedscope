@@ -20,6 +20,8 @@ import {ProfileGroupState} from '../app-state/profile-group'
 import {colorSchemeAtom} from '../app-state/color-scheme'
 import {useAtom} from '../lib/atom'
 import {ProfileFilterDialog} from './profile-filter-dialog'
+import {MultiProfileSearchDialog} from './multi-profile-search-dialog'
+import {openProfileSearchMatch} from '../app-state/search-navigation'
 
 interface ToolbarProps extends ApplicationProps {
   browseForFile(): void
@@ -191,6 +193,16 @@ function ToolbarCenterContent(props: ToolbarProps): JSX.Element {
 function ToolbarRightContent(props: ToolbarProps) {
   const latestProps = useRef(props)
   latestProps.current = props
+  const [searchProfiles, setSearchProfiles] = useState<Profile[] | null>(null)
+  useEffect(() => {
+    if (
+      searchProfiles &&
+      (!props.profileGroup ||
+        props.profileGroup.profiles.length !== searchProfiles.length ||
+        props.profileGroup.profiles.some((p, i) => p.profile !== searchProfiles[i]))
+    )
+      setSearchProfiles(null)
+  }, [props.profileGroup, searchProfiles])
   const [filterSource, setFilterSource] = useState<{profile: Profile; originals: Profile[]} | null>(
     null,
   )
@@ -207,7 +219,13 @@ function ToolbarRightContent(props: ToolbarProps) {
     select.value = ''
     const {activeProfileState, profileGroup} = props
     if (!activeProfileState || !profileGroup || props.loading || !action) return
+    if (action === 'search-all') {
+      setFilterSource(null)
+      setSearchProfiles(profileGroup.profiles.map(p => p.profile))
+      return
+    }
     if (action === 'filter') {
+      setSearchProfiles(null)
       setFilterSource({
         profile: activeProfileState.profile,
         originals: profileGroup.profiles.map(p => p.profile),
@@ -304,12 +322,24 @@ function ToolbarRightContent(props: ToolbarProps) {
           <option value="invert">Invert stacks</option>
           <option value="file">Group by file</option>
           <option value="filter">Filter frames…</option>
+          <option value="search-all">Search all profiles…</option>
         </select>
       )}
       {props.activeProfileState && exportFile}
       {importFile}
       {colorSchemeToggle}
       {help}
+      {searchProfiles && (
+        <MultiProfileSearchDialog
+          profiles={searchProfiles}
+          onClose={() => setSearchProfiles(null)}
+          onSelect={(match, query, mode) => {
+            if (latestProps.current.loading)
+              throw new Error('A profile is loading. Search again when it finishes.')
+            openProfileSearchMatch(match, searchProfiles, query, mode)
+          }}
+        />
+      )}
       {filterSource && (
         <ProfileFilterDialog
           profile={filterSource.profile}

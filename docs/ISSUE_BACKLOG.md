@@ -9,7 +9,7 @@ Source: [upstream issues](https://github.com/jlfwong/speedscope/issues). [Machin
 | Kind | Implemented | Already supported | Partial | Planned | Needs reproduction | Declined | Obsolete | Total |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | bug | 17 | 9 | 15 | 8 | 6 | 0 | 1 | 56 |
-| feature | 16 | 8 | 8 | 34 | 0 | 4 | 0 | 70 |
+| feature | 18 | 8 | 7 | 33 | 0 | 4 | 0 | 70 |
 | maintenance | 2 | 1 | 1 | 3 | 0 | 1 | 0 | 8 |
 
 **Implemented** means the reviewed scope has an implementation. **Supported** means it already works or the established format is supported. **Partial** never means fully fixed. **Needs reproduction** means insufficient current evidence. A useful proposal can remain planned because it needs substantial design, fixtures or validation.
@@ -44,7 +44,7 @@ P1: correctness/large-profile failures. P2: valuable product work. P3: lower-pri
 | [#193](https://github.com/jlfwong/speedscope/issues/193) `perf script --hide-call-graph` output is not accepted | bug | yes | partial | P3 | The known failure now has an actionable error. Additional producer-specific cases need fixtures; this is not evidence that every unsupported file imports. |
 | [#138](https://github.com/jlfwong/speedscope/issues/138) AffineTransform multiplication test failed once | bug | yes | planned | P3 | Recorded affine counterexample involves ill-conditioned near-singular matrices and inverse cancellation. Needs condition-aware error bounds and deterministic counterexample coverage, not simply narrowing property domains. |
 
-## Remaining useful features (42)
+## Remaining useful features (40)
 
 | Issue | Kind | Useful? | Status | Priority | Work / evidence |
 | --- | --- | --- | --- | --- | --- |
@@ -68,7 +68,6 @@ P1: correctness/large-profile failures. P2: valuable product work. P3: lower-pri
 | [#477](https://github.com/jlfwong/speedscope/issues/477) Native support for cProfile dump | feature | yes | partial | P3 | Decide whether a safe, version-aware native binary decoder is worth maintaining; conversion already works. |
 | [#475](https://github.com/jlfwong/speedscope/issues/475) Use speedscope programmatically | feature | yes | planned | P3 | A supported embeddable instance API requires isolating global atoms, lifecycle/disposal and multiple viewers. CLI --serve and profileURL cover launch integrations; publishing internal classes now would freeze an unsuitable API. |
 | [#398](https://github.com/jlfwong/speedscope/issues/398) Need to support Java thread dump | feature | yes | planned | P3 | jstack/Java thread dumps are snapshots, not elapsed durations. Need explicit sample ordering/weight policy and public format fixtures before adding another text parser. |
-| [#396](https://github.com/jlfwong/speedscope/issues/396) can not search cross processes | feature | yes | partial | P3 | Combine original profiles allows aggregate function search across threads. A result list that navigates each original process without combining remains useful future work. |
 | [#373](https://github.com/jlfwong/speedscope/issues/373) Make the name display concise on the stack | feature | yes | planned | P3 | Display-name/path shortening should preserve complete searchable/exported symbols and expose the full name. Call Tree source column helps now; global truncation rules need language-aware examples. |
 | [#363](https://github.com/jlfwong/speedscope/issues/363) Feature request: window title as loaded profile file name. | feature | yes | planned | P3 | Showing original filename alongside internal group name needs distinct stored source-name metadata through import/export. Custom title handling is fixed separately; do not overwrite thread names to display it. |
 | [#351](https://github.com/jlfwong/speedscope/issues/351) Is it possible to choose the color for a given frame/function? | feature | yes | planned | P3 | Custom frame palettes need a stable schema and dark/light contrast rules. Existing symbol/file color buckets remain; arbitrary producer colors should not undermine selection/search legibility. |
@@ -80,7 +79,6 @@ P1: correctness/large-profile failures. P2: valuable product work. P3: lower-pri
 | [#241](https://github.com/jlfwong/speedscope/issues/241) UX: Timeline mouse cursor  | feature | yes | planned | P3 | Minimap cursor affordances and a clearer viewport overlay need interaction/contrast testing in both themes. No unverified pointer behavior change applied. |
 | [#240](https://github.com/jlfwong/speedscope/issues/240) UX: Timelime improvement | feature | yes | planned | P3 | Minimap cursor affordances and a clearer viewport overlay need interaction/contrast testing in both themes. No unverified pointer behavior change applied. |
 | [#236](https://github.com/jlfwong/speedscope/issues/236) custom counters / graphs | feature | yes | planned | P3 | Memory/counter time series are non-stack tracks requiring sampling/interpolation, independent axes and synchronized timeline support. |
-| [#209](https://github.com/jlfwong/speedscope/issues/209) Resize frames in Sandwich view | feature | yes | planned | P3 | Resizable Sandwich panes require persisted split state, pointer capture and minimum sizes. Existing automatic split remains; separate from import correctness fixes. |
 | [#173](https://github.com/jlfwong/speedscope/issues/173) Format Support: concatenated output from many calls to jstack | feature | yes | planned | P3 | jstack/Java thread dumps are snapshots, not elapsed durations. Need explicit sample ordering/weight policy and public format fixtures before adding another text parser. |
 | [#145](https://github.com/jlfwong/speedscope/issues/145) Import & display frame boundaries from Chrome | feature | yes | planned | P3 | Annotations and arbitrary per-block metadata require schema, serialization, selection and presentation design. Avoid putting metadata into frame identity because it can explode frame cardinality. |
 | [#118](https://github.com/jlfwong/speedscope/issues/118) Support non-call-stack event visualization | feature | yes | planned | P3 | Arbitrary asynchronous events need separate tracks/links because overlapping spans are not a synchronous stack. Coordinate this with OTEL and multitrack support. |
@@ -111,7 +109,7 @@ P1: correctness/large-profile failures. P2: valuable product work. P3: lower-pri
 | [#269](https://github.com/jlfwong/speedscope/issues/269) Table view doesn't update at 60fps during scrolling | bug | conditional | needs-reproduction | P3 | Original slow scrolling report references a 2013 Mac. Iterative traversals and bounded Call Tree improve scale; no evidence that the exact older scrolling problem is fixed. |
 | [#42](https://github.com/jlfwong/speedscope/issues/42) Low framerate in Chrome 66 on MBP | bug | conditional | needs-reproduction | P3 | Report targets Chrome 66 compositor behavior. Current supported browsers differ; need a current profile and rendering trace before applying historical GPU workarounds. |
 
-## Implemented or already supported (53)
+## Implemented or already supported (55)
 
 | Issue | Kind | Useful? | Status | Priority | Work / evidence |
 | --- | --- | --- | --- | --- | --- |
@@ -168,6 +166,8 @@ P1: correctness/large-profile failures. P2: valuable product work. P3: lower-pri
 | [#199](https://github.com/jlfwong/speedscope/issues/199) Increase unit precision when zoomed in far enough for markers to be identical | bug | yes | implemented | P2 | Axis labels use precision derived from the visible tick step across time, bytes and raw units. Bounded indexed ticks avoid duplicate/non-advancing values at large origins; canvas labels skip overlap. Tests cover zoom precision, minute rollover, negative times, invalid views and sub-ULP intervals. |
 | [#192](https://github.com/jlfwong/speedscope/issues/192) Allow to filter graph | feature | yes | implemented | P2 | Profile actions now creates non-destructive aggregate frame filters with include/exclude literal rules for file paths, names or either. Exclusions win; empty stacks/idle are omitted and retained-stack weights/self reattribution are documented. Originals, rule history and derived flags survive export. Iterative grouped traversal yields and cancels; tests cover deep trees and UI cancellation/paste isolation. |
 | [#35](https://github.com/jlfwong/speedscope/issues/35) Place tickmarks at nicer locations when displaying memory profiles | feature | yes | implemented | P2 | Byte-aware tick spacing uses powers of two in the main graph and minimap, with zoom-dependent precision, overlap suppression and bounded indexed ticks. Time/raw units retain decimal spacing. Tests cover bytes through TiB scales, fractional zoom and the formatter labels; browser memory-profile smoke check verified binary-aligned axes. |
+| [#396](https://github.com/jlfwong/speedscope/issues/396) can not search cross processes | feature | yes | implemented | P3 | Profile actions provides bounded, cancellable search across original profiles, with an optional derived-profile toggle and literal contains/whole-word/exact modes. Results retain source/profile identity and per-profile units; selecting a result navigates to its original Sandwich frame, including recursion flattening. Stale-group guards prevent navigation into a replacement recording. |
+| [#209](https://github.com/jlfwong/speedscope/issues/209) Resize frames in Sandwich view | feature | yes | implemented | P3 | Sandwich table/graphs and callers/callees each have pointer-captured resize handles, accessible separator values and arrow/Home/End/reset controls. Minimum pane sizes, saved per-browser ratios, corrupt-storage fallback and graph resize notifications are implemented. Browser dragging, keyboard controls and reload persistence verified. |
 
 ## Not selected or obsolete (6)
 

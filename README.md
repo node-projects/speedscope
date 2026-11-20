@@ -75,6 +75,10 @@ matching for function names and source paths.
 Use **Profile actions → Filter frames…** to include your code or exclude framework
 frames by file path or name. It creates a separate aggregate profile and keeps the
 original available. See [filter rules and weight semantics](docs/PROFILE_FILTERS.md).
+Choose **Profile actions → Search all profiles…** to find functions across threads
+and open a result in its original profile. Sandwich's table and caller/callee
+panes can now be resized with draggable or keyboard-operated dividers. See
+[search and layout controls](docs/SEARCH_AND_LAYOUT.md).
 Duration traces stream plain/gzip input and discard unused events. Oversized
 captures stop with a clear limit error; see [import limits and measurements](docs/LARGE_TRACE_PERFORMANCE.md#streaming-duration-traces).
 
