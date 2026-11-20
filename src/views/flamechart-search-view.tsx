@@ -5,8 +5,9 @@ import {
   FlamechartSearchMatch,
   FlamechartSearchResults,
   ProfileSearchResults,
+  searchMatchViewport,
 } from '../lib/profile-search'
-import {Rect, Vec2} from '../lib/math'
+import {Rect} from '../lib/math'
 import {h, createContext, ComponentChildren} from 'preact'
 import {Flamechart} from '../lib/flamechart'
 import {CallTreeNode} from '../lib/profile'
@@ -97,17 +98,8 @@ export const FlamechartSearchView = memo(() => {
       // TODO(jlfwong): The lack of animation here can be kind of jarring. It
       // would be nice to have some easier way for people to orient themselves
       // after the viewport shifted.
-      const configSpaceResultBounds = match.configSpaceBounds
-
-      const viewportRect = new Rect(
-        configSpaceResultBounds.origin.minus(new Vec2(0, 1)),
-        configSpaceResultBounds.size.withY(configSpaceViewportRect.height()),
-      )
-
       setSelectedNode(match.node)
-      setConfigSpaceViewportRect(
-        flamechart.getClampedConfigSpaceViewportRect({configSpaceViewportRect: viewportRect}),
-      )
+      setConfigSpaceViewportRect(searchMatchViewport(flamechart, match, configSpaceViewportRect))
     },
     [configSpaceViewportRect, setConfigSpaceViewportRect, setSelectedNode, flamechart],
   )
@@ -144,6 +136,7 @@ export const FlamechartSearchView = memo(() => {
     <SearchView
       resultIndex={resultIndex}
       numResults={numResults}
+      resultsLimited={searchResults?.isTruncated() || false}
       selectPrev={selectPrev}
       selectNext={selectNext}
     />

@@ -183,7 +183,7 @@ export const SandwichViewContainer = memo((ownProps: SandwichViewContainerProps)
     const rowList: Frame[] = []
 
     profile.forEachFrame(frame => {
-      if (profileSearchResults && !profileSearchResults.getMatchForFrame(frame)) {
+      if (profileSearchResults && !profileSearchResults.hasMatchForFrame(frame)) {
         return
       }
       rowList.push(frame)

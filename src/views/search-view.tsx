@@ -38,12 +38,13 @@ export const ProfileSearchContextProvider = ({children}: {children: ComponentChi
 interface SearchViewProps {
   resultIndex: number | null
   numResults: number | null
+  resultsLimited?: boolean
   selectNext: () => void
   selectPrev: () => void
 }
 
 export const SearchView = memo(
-  ({numResults, resultIndex, selectNext, selectPrev}: SearchViewProps) => {
+  ({numResults, resultIndex, selectNext, selectPrev, resultsLimited = false}: SearchViewProps) => {
     const theme = useTheme()
     const style = getStyle(theme)
     const searchIsActive = useAtom(searchIsActiveAtom)
@@ -55,7 +56,7 @@ export const SearchView = memo(
     const onInput = useCallback(
       (ev: Event) => {
         const value = (ev.target as HTMLInputElement).value
-        setSearchQuery(value)
+        setSearchQuery(value.slice(0, 4096))
       },
       [setSearchQuery],
     )
@@ -152,6 +153,7 @@ export const SearchView = memo(
         </select>
         <span className={css(style.inputContainer)}>
           <input
+            maxLength={4096}
             aria-label="Search functions or files"
             className={css(style.input)}
             value={searchQuery}
@@ -166,6 +168,7 @@ export const SearchView = memo(
           <Fragment>
             <span className={css(style.resultCount)}>
               {resultIndex == null ? '?' : resultIndex + 1}/{numResults}
+              {resultsLimited ? '+' : ''}
             </span>
             <button
               aria-label="Previous match"
@@ -203,6 +206,11 @@ export const SearchView = memo(
             />
           </svg>
         </button>
+        {resultsLimited && (
+          <div role="status" className={css(style.limitNotice)}>
+            Navigation limited to the first {numResults} matches. Refine your search.
+          </div>
+        )}
       </div>
     )
   },
@@ -253,6 +261,16 @@ const getStyle = withTheme(theme =>
     },
     resultCount: {
       verticalAlign: 'middle',
+    },
+    limitNotice: {
+      position: 'absolute',
+      top: '100%',
+      right: 0,
+      padding: 6,
+      maxWidth: 320,
+      background: theme.altBgSecondaryColor,
+      color: theme.altFgPrimaryColor,
+      border: `1px solid ${theme.altFgSecondaryColor}`,
     },
     icon: {
       flexShrink: 0,
