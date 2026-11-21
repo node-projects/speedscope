@@ -70,11 +70,11 @@
       "url": "https://github.com/jlfwong/speedscope/issues/547",
       "kind": "feature",
       "usefulness": "yes",
-      "status": "partial",
-      "priority": "P2",
+      "status": "implemented",
+      "priority": "none",
       "workstream": "Search and navigation",
-      "evidence": "Substring, Unicode whole-word and exact name/path search are implemented. Matchers are compiled once per query and file-only matches avoid highlight-range allocations. Single-profile matching is lazy with fixed-size caches, capped label ranges and explicit graph-navigation truncation at 10,000 matches, preserving full-name/path matching.",
-      "remaining": "Whole-word and exact literal modes are implemented. Arbitrary regular expressions still require bounded execution and cancellation to prevent pathological patterns freezing large searches."
+      "evidence": "Search adds case-insensitive RE2JS regular expressions alongside literal/whole-word/exact modes. Patterns have a 256-character cap, conservative repetition/expansion preflight and a 4,096-state compiled-program cap. Invalid or unsupported syntax is reported explicitly; matching avoids JavaScript backtracking. Cross-profile matching retains bounded/cancellable scanning and result limits; targeted regressions cover pathological repetition and invalid syntax.",
+      "remaining": "No additional work selected for the reviewed safe-regex scope. RE2 syntax excludes backreferences/lookaround; existing result/navigation truncation and bounded visible highlight ranges remain explicit."
     },
     {
       "id": 546,
@@ -394,11 +394,11 @@
       "url": "https://github.com/jlfwong/speedscope/issues/477",
       "kind": "feature",
       "usefulness": "yes",
-      "status": "partial",
-      "priority": "P3",
+      "status": "implemented",
+      "priority": "none",
       "workstream": "Import formats and correctness",
-      "evidence": "Native cProfile binary import is unsupported; the discussion confirms flameprof --format=log converts it to supported folded stacks. CPython dump_stats uses marshal (https://github.com/python/cpython/blob/3.14/Lib/cProfile.py).",
-      "remaining": "Decide whether a safe, version-aware native binary decoder is worth maintaining; conversion already works."
+      "evidence": "Native named .prof/.pstats/.cprofile input now uses a restricted nonexecuting marshal decoder with byte/object/reference/string/depth/function/edge limits, cancellation, source identity validation and raw File preflight. Real CPython 3.14.3 cProfile fixtures plus marshal wire versions 0-5 verify exact flat self time and a separately labeled immediate-caller self-time projection. Recursive/shared callees are never expanded into invented full stacks. See docs/PYTHON_CPROFILE.md.",
+      "remaining": "No additional work selected for the reviewed native cProfile scope. Original chronology/full stack paths cannot be reconstructed from aggregate pstats data; call-count/cumulative metrics, Python 2 labels, pure-Python profile caller schemas and unsupported future encodings are not displayed. Generic compressed-wrapper expansion remains outside the native decoder memory bound."
     },
     {
       "id": 476,
@@ -778,11 +778,11 @@
       "url": "https://github.com/jlfwong/speedscope/issues/370",
       "kind": "bug",
       "usefulness": "yes",
-      "status": "planned",
-      "priority": "P1",
+      "status": "implemented",
+      "priority": "none",
       "workstream": "Weight correctness and comparison",
-      "evidence": "The new A/B comparison model computes signed deltas between two ordinary nonnegative profiles. Negative Go heap delta pprof samples remain unsupported by the input/model path; a comparison dialog does not repair their import or justify dropping negative samples.",
-      "remaining": "Implement and validate signed Go heap delta import with an explicit differential representation and fixtures preserving allocation/deallocation totals. Keep this planned independently of the completed A/B comparison UI."
+      "evidence": "Signed selected pprof sample values now import as a labeled pair: negative contribution magnitudes first, positive contributions second. Ordinary profiles remain nonnegative; A/B comparison of the pair produces positive-minus-negative deltas without dropping deallocations or pretending either side is a complete before/after recording. Selected int64 weights and each side total must fit the exact JavaScript safe-integer range; overflow fails explicitly. Existing preferred metric, uint64 source identity and location handling are retained.",
+      "remaining": "No additional work selected for the reviewed signed-contribution import scope. The pair preserves contributions rather than reconstructing original heap baselines; values or side totals outside the exact safe-integer range are explicitly unsupported."
     },
     {
       "id": 369,
@@ -874,11 +874,11 @@
       "url": "https://github.com/jlfwong/speedscope/issues/351",
       "kind": "feature",
       "usefulness": "yes",
-      "status": "planned",
-      "priority": "P3",
+      "status": "implemented",
+      "priority": "none",
       "workstream": "Accessibility and presentation",
-      "evidence": "Custom frame palettes need a stable schema and dark/light contrast rules. Existing symbol/file color buckets remain; arbitrary producer colors should not undermine selection/search legibility.",
-      "remaining": "Custom frame palettes need a stable schema and dark/light contrast rules. Existing symbol/file color buckets remain; arbitrary producer colors should not undermine selection/search legibility."
+      "evidence": "Native frame metadata now accepts producer RGB colors, preserves them through export/remapping/derived profiles, and renders custom backgrounds in the main graph and minimap using a bounded GPU palette. Displayed colors adapt to dark/light label contrast while original RGB metadata remains intact. Browser checks verified both themes, minimap, search dimming/highlights and selected-frame outlines; renderer/data regression tests cover palette and metadata behavior.",
+      "remaining": "No additional work selected for the reviewed producer-color scope. This adds producer-specified RGB metadata, not an interactive palette editor. The bounded custom palette falls back to generated theme colors after its documented capacity; search and selection treatments retain precedence."
     },
     {
       "id": 350,
@@ -1162,11 +1162,11 @@
       "url": "https://github.com/jlfwong/speedscope/issues/228",
       "kind": "feature",
       "usefulness": "yes",
-      "status": "planned",
-      "priority": "P2",
+      "status": "implemented",
+      "priority": "none",
       "workstream": "Weight correctness and comparison",
-      "evidence": "A/B comparison of ordinary nonnegative recordings now has a separate signed-delta model and graph (#511/#445). That does not implement Brendan Gregg differential-folded input or change the ordinary profile model to accept signed samples.",
-      "remaining": "Define and fixture-test differential-folded column/negative-weight semantics, route them into an explicit signed representation, and retain both sides or a sound width envelope. Do not silently discard negative samples or reinterpret a differential input as ordinary folded counts."
+      "evidence": "Explicit .diff.folded/.differential.folded and corresponding .collapsed/.stacks names import Brendan Gregg two-column differential weights as separate nonnegative baseline/candidate profiles. Generic and streaming plain/gzip paths preserve both sides, fractional weights, removed/added paths and nonchronological exports. Existing A/B comparison computes signed differences using an honest union envelope; explicit selection avoids misreading ordinary folded symbols ending in numbers. Fixtures cover generic/streaming/worker parity, Unicode, overflow and limits.",
+      "remaining": "No additional work selected for the reviewed two-column differential-folded scope. Columns are baseline then candidate; signed single-column data is rejected, and profile units remain unspecified counts/weights unless supplied by another format."
     },
     {
       "id": 226,
