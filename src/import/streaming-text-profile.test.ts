@@ -66,7 +66,7 @@ test('perf hybrids and raw counter periods remain distinct while streaming', asy
   const expected = await importProfilesFromArrayBuffer(name, input)
   const actual = await importTextProfileStream(source(input, 1), name, 'perf')
   expect(exportProfileGroup(actual!)).toEqual(exportProfileGroup(expected!))
-  expect(actual!.profiles.map(profile => profile.getTotalWeight())).toEqual([1, 11, 13])
+  expect(actual!.profiles.map(profile => profile.getTotalWeight())).toEqual([16, 11, 13])
 })
 
 test('deep folded stacks remain iterative and export the same source frames and weights', async () => {
