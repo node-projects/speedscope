@@ -203,14 +203,16 @@ function selectQueueToTakeFromNext(
   return getEventId(bFront) === getEventId(eFront) ? 'B' : 'E'
 }
 
-function convertToEventQueues(events: ImportableTraceEvent[]): [BeginTraceEvent[], ETraceEvent[]] {
+function convertToEventQueues(
+  events: ImportableTraceEvent[],
+): [BeginTraceEvent[], ETraceEvent[], number] {
   const beginEvents: BeginTraceEvent[] = []
   const endEvents: ETraceEvent[] = []
   let timestampPrecision = 0
+  let firstTs = Infinity
 
   // Rebase all of the timestamps on the lowest timestamp
   if (events.length > 0) {
-    let firstTs = Number.MAX_SAFE_INTEGER
     for (let ev of events) {
       firstTs = Math.min(firstTs, ev.ts)
     }
@@ -317,7 +319,7 @@ function convertToEventQueues(events: ImportableTraceEvent[]): [BeginTraceEvent[
   if (hasExplicitBegins) sortIfUnordered(beginEvents)
   sortIfUnordered(endEvents)
 
-  return [beginEvents, endEvents]
+  return [beginEvents, endEvents, firstTs]
 }
 
 function filterIgnoredEventTypes(events: TraceEvent[]): ImportableTraceEvent[] {
@@ -488,11 +490,16 @@ function eventListToProfile(
   // ties by the order the events occurred in the file, and deal with 'E'
   // events in 'ts' order, breaking ties in whatever order causes the 'E'
   // events to match whatever is on the top of the stack.
-  const [bEventQueue, eEventQueue] = convertToEventQueues(importableEvents)
+  const [bEventQueue, eEventQueue, timelineStart] = convertToEventQueues(importableEvents)
 
   const profileBuilder = new CallTreeProfileBuilder()
   profileBuilder.setValueFormatter(new TimeFormatter('microseconds'))
   profileBuilder.setName(name)
+  // Each thread is locally rebased to zero; retain that raw wall-clock zero
+  // separately so profiles from this capture can share a timeline viewport.
+  if (Number.isFinite(timelineStart)) {
+    profileBuilder.setTimelineOrigin({clock: 'trace-event:wall', start: timelineStart})
+  }
 
   const frameStack: BeginTraceEvent[] = []
   const frameInfoStack: FrameInfo[] = []

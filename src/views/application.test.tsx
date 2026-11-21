@@ -12,6 +12,7 @@ import {getHashParams} from '../lib/hash-params'
 import {profileGroupAtom, viewModeAtom} from '../app-state'
 import * as fileFormat from '../lib/file-format'
 import {ViewMode} from '../lib/view-mode'
+import {MultiTrackView} from './multi-track-view'
 
 test('function links restore the destination profile after loading and do not reapply to later imports', async () => {
   const builder = new StackListProfileBuilder()
@@ -108,6 +109,82 @@ test('aggregate profiles cannot enter Time Order through shortcuts or profile sw
   expect((app as any).effectiveViewMode()).toBe(ViewMode.LEFT_HEAVY_FLAME_GRAPH)
   await app.onWindowKeyPress({key: '1'} as KeyboardEvent)
   expect(setViewMode).toHaveBeenCalledWith(ViewMode.LEFT_HEAVY_FLAME_GRAPH)
+})
+
+test('Tracks uses original profiles without WebGL and keeps its source list stable during selection updates', async () => {
+  const profiles = [new CallTreeProfileBuilder().build(), new CallTreeProfileBuilder().build()]
+  const setProfileIndexToView = jest.fn(),
+    setViewMode = jest.fn()
+  const app = new Application({
+    activeProfileState: {profile: profiles[0], index: 0},
+    profileGroup: {name: 'source', indexToView: 0, profiles: profiles.map(profile => ({profile}))},
+    viewMode: ViewMode.MULTI_TRACK,
+    glCanvas: null,
+    setProfileIndexToView,
+    setViewMode,
+  } as any)
+  const rendered = app.renderContent() as any
+  expect(rendered.type).toBe(MultiTrackView)
+  expect(rendered.props.profiles).toEqual(profiles)
+  ;(app as any).props = {...app.props, profileGroup: {...app.props.profileGroup, indexToView: 1}}
+  expect((app.renderContent() as any).props.profiles).toBe(rendered.props.profiles)
+  rendered.props.onSelectProfile(1)
+  expect(setProfileIndexToView).toHaveBeenCalledWith(1)
+  expect(setViewMode).toHaveBeenCalledWith(ViewMode.CALL_TREE)
+  ;(app as any).props = {...app.props, canvasContext: {}}
+  rendered.props.onSelectProfile(1)
+  expect(setViewMode).toHaveBeenLastCalledWith(ViewMode.CHRONO_FLAME_CHART)
+  rendered.props.onSelectProfile(500)
+  expect(setProfileIndexToView).toHaveBeenCalledTimes(2)
+  await app.onWindowKeyPress({key: '5'} as KeyboardEvent)
+  expect(setViewMode).toHaveBeenLastCalledWith(ViewMode.MULTI_TRACK)
+})
+
+test('Tracks replaces its source list when imported models change', () => {
+  const original = new CallTreeProfileBuilder().build()
+  const replacement = new CallTreeProfileBuilder().build()
+  const app = new Application({
+    activeProfileState: {profile: original, index: 0},
+    profileGroup: {profiles: [{profile: original}]},
+    viewMode: ViewMode.MULTI_TRACK,
+  } as any)
+  const before = (app.renderContent() as any).props.profiles
+  ;(app as any).props = {...app.props, profileGroup: {profiles: [{profile: replacement}]}}
+  const after = (app.renderContent() as any).props.profiles
+  expect(after).not.toBe(before)
+  expect(after).toEqual([replacement])
+  ;(app as any).props = {...app.props, loading: true}
+  app.renderLoadingBar = jest.fn(() => null)
+  app.renderContent()
+  expect((app as any).trackProfiles).toEqual([])
+})
+
+test('global view shortcuts leave native controls, editing and modified shortcuts alone', async () => {
+  const setViewMode = jest.fn(),
+    setFlattenRecursion = jest.fn()
+  const app = new Application({setViewMode, setFlattenRecursion} as any)
+  for (const tag of ['input', 'textarea', 'select']) {
+    const target = document.createElement(tag)
+    await app.onWindowKeyPress({key: '5', target} as unknown as KeyboardEvent)
+    await app.onWindowKeyPress({key: 'r', target} as unknown as KeyboardEvent)
+  }
+  const editable = document.createElement('div')
+  editable.setAttribute('contenteditable', 'true')
+  const child = document.createElement('span')
+  editable.appendChild(child)
+  await app.onWindowKeyPress({key: '5', target: child} as unknown as KeyboardEvent)
+  for (const flags of [
+    {ctrlKey: true},
+    {metaKey: true},
+    {altKey: true},
+    {isComposing: true},
+    {defaultPrevented: true},
+  ])
+    await app.onWindowKeyPress({key: '5', ...flags} as unknown as KeyboardEvent)
+  expect(setViewMode).not.toHaveBeenCalled()
+  expect(setFlattenRecursion).not.toHaveBeenCalled()
+  await app.onWindowKeyPress({key: '5'} as KeyboardEvent)
+  expect(setViewMode).toHaveBeenCalledWith(ViewMode.MULTI_TRACK)
 })
 
 test('exports expose progress, reject duplicate starts and cancel without discarding the profile', async () => {

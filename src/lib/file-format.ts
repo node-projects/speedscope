@@ -57,6 +57,7 @@ function exportProfile(profile: Profile, getIndexForFrame: (frame: Frame) => num
     endValue: profile.getTotalWeight(),
     ...(!profile.isChronological() ? {isChronological: false} : {}),
     ...(profile.isDerived() ? {isDerived: true} : {}),
+    ...(profile.getTimelineOrigin() ? {timeline: profile.getTimelineOrigin()} : {}),
     events: [],
   }
   const openFrame = (node: CallTreeNode, value: number) => {
@@ -103,6 +104,7 @@ function importSpeedscopeProfile(
     p.setName(name)
     p.setChronological(serialized.isChronological !== false)
     p.setDerived(serialized.isDerived === true)
+    if (serialized.timeline !== undefined) p.setTimelineOrigin(serialized.timeline)
   }
 
   function importEventedProfile(evented: FileFormat.EventedProfile) {

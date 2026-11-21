@@ -76,6 +76,8 @@ export function importFromChromeTimeline(events: TimelineEvent[], fileName: stri
   // For now, choose the first one in the list.
 
   const cpuProfileByID = new Map<string, CPUProfile>()
+  // A synthesized zero startTime is not evidence that recordings share a clock.
+  const explicitStarts = new Set<string>()
 
   // Maps profile IDs (like "0x3") to pid/tid pairs formatted as `${pid}:${tid}`
   const pidTidById = new Map<string, string>()
@@ -98,6 +100,8 @@ export function importFromChromeTimeline(events: TimelineEvent[], fileName: stri
       }
 
       cpuProfileByID.set(id, event.args.data.cpuProfile as CPUProfile)
+      if (Number.isFinite(event.args.data.cpuProfile?.startTime)) explicitStarts.add(id)
+      else explicitStarts.delete(id)
       pidTidById.set(id, pidTid)
     }
 
@@ -111,6 +115,8 @@ export function importFromChromeTimeline(events: TimelineEvent[], fileName: stri
         timeDeltas: [],
         ...event.args.data,
       })
+      if (Number.isFinite(event.args.data?.startTime)) explicitStarts.add(event.id || pidTid)
+      else explicitStarts.delete(event.id || pidTid)
 
       if (event.id) {
         pidTidById.set(event.id, `${event.pid}:${event.tid}`)
@@ -144,6 +150,7 @@ export function importFromChromeTimeline(events: TimelineEvent[], fileName: stri
         }
         if (chunk.startTime != null) {
           cpuProfile.startTime = chunk.startTime
+          if (Number.isFinite(chunk.startTime)) explicitStarts.add(event.id || pidTid)
         }
         if (chunk.endTime != null) {
           cpuProfile.endTime = chunk.endTime
@@ -166,7 +173,15 @@ export function importFromChromeTimeline(events: TimelineEvent[], fileName: stri
         if (threadName) {
         }
       }
-      const profile = importFromChromeCPUProfile(cpuProfileByID.get(profileId)!)
+      const rawProfile = cpuProfileByID.get(profileId)!
+      const profile = importFromChromeCPUProfile(rawProfile)
+      // These CPU profiles came from one Chrome Timeline capture. CDP defines
+      // startTime and the first sample delta in microseconds; local zero in
+      // importFromChromeCPUProfile is precisely that profiling start time.
+      // Standalone .cpuprofile imports intentionally remain unanchored.
+      if (explicitStarts.has(profileId) && Number.isFinite(rawProfile.startTime)) {
+        profile.setTimelineOrigin({clock: 'chrome-timeline:wall', start: rawProfile.startTime})
+      }
       if (threadName && cpuProfileByID.size > 1) {
         profile.setName(`${fileName} - ${threadName}`)
         if (threadName === 'CrRendererMain') {

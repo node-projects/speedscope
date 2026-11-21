@@ -205,3 +205,56 @@ profiles, 17,510 exported frames and 1,039,656 events. Export SHA-256 stayed
 This is a regression observation rather than a controlled speed comparison.
 Private captures, generated Go recordings and local measurement artifacts are
 excluded from Git.
+
+## Shared-clock Tracks overview
+
+The next batch adds explicit timeline origins and a synchronized Tracks view.
+A clean-cache Node 22.23.5 ARM64 run passed **668 tests across 99 suites, with
+310 snapshots**. The subsequent Canvas allocation/WebGL fallback fix passed
+29 focused tests across the Tracks, layout and application suites. All five
+Node tests, type checking, lint, schema/backlog checks, all three builds and
+npm dry-pack passed. The package includes the Tracks guide. The existing local
+Node 24 ARM64 full-Jest limitation remains; CI validates supported x64 runners.
+
+Native origins describe raw source time at profile-local zero, with an explicit
+clock and time unit. They survive native object/chunked export, worker transfer
+and source-map cloning; changed-unit, aggregate and derived profiles do not keep
+stale origins. Older native files gain no inferred alignment. Trace Event B/E/X
+imports preserve their pre-rebasing origins, and Chrome Timeline CPU profiles
+are marked only when explicit source starts establish common provenance.
+
+The PLC recheck retained four profiles, 17,510 exported frames and 1,039,656
+events. The four origin timestamps in microseconds are
+`3753262088.152`, `3753300106.176`, `3753262088.152`, and `3753262004.664`.
+The shared-data-plus-profile export hash intentionally changes to
+`53b28f954a000a144a4b88d6806a8e20a79ee58b3ef748067d132232977bd75b`.
+Removing only the new timeline fields exactly restores the prior hash
+`522de77afbfc4dd94f1f30c3a9551979d12db506305ffef999db9c910ae8eddb`;
+all original frame, call and weight data remains unchanged. A single streaming
+plus export check took 3,299 ms, not a controlled speed comparison.
+
+The initial geometry cap exposed a review bug: keeping the first closed calls
+left later parts of dense rows blank. Bounded longest-interval retention now
+keeps real intervals spanning the whole recording, including all top-level
+calls (40/20/40/39 across the PLC rows). It still omits detail explicitly rather
+than inventing occupancy bins or claiming complete coverage. Four-row results
+retain 6,099 rectangles with a 3,000-per-row allocation from the 12,000 total
+budget. Main-row extraction took 261–264 ms and retained results used about
+0.94 MiB after collection in local runs. These exclude import/full profile
+storage and do not establish browser latency or an out-of-core memory bound.
+
+Browser checks verified aligned offsets, shared pan/zoom and keyboard markers,
+per-row call readouts, individual-profile navigation, unanchored exclusions,
+readable ticks, light/dark themes and the real PLC overview including late
+activity. The authored fixture shows Main, Worker and Storage at distinct
+source starts; at 510 ms the marker reports application, compute and read.
+No console errors were observed. Viewport/recording changes cancel stale
+extraction; same-clock replacements reset the range and marker. Moving a
+crosshair does not reextract or repaint its geometry in focused regressions.
+
+Tracks currently inspects 10,000 profiles, offers 64 clock groups, mounts up to
+24 rows and displays eight call depths with bounded geometry/canvas dimensions.
+Those limits, broader format clock coverage, mixed-unit conversion and nested
+process grouping remain explicit. Issues #556/#473/#117 are therefore recorded
+as partial rather than claiming universal multitrack support. Private PLC data
+and ignored before/after diagnostic bundles remain excluded from Git.

@@ -1,0 +1,82 @@
+{
+  "$schema": "https://www.speedscope.app/file-format-schema.json",
+  "name": "Synchronized threads (authored)",
+  "shared": {
+    "frames": [
+      {"name": "application", "file": "app.ts", "line": 1},
+      {"name": "load", "file": "app.ts", "line": 10},
+      {"name": "send", "file": "app.ts", "line": 20},
+      {"name": "background", "file": "worker.ts", "line": 1},
+      {"name": "parse", "file": "worker.ts", "line": 10},
+      {"name": "compute", "file": "worker.ts", "line": 20},
+      {"name": "read", "file": "storage.ts", "line": 1}
+    ]
+  },
+  "profiles": [
+    {
+      "type": "evented",
+      "name": "Main (pid 10, tid 1)",
+      "unit": "microseconds",
+      "startValue": 0,
+      "endValue": 1000000,
+      "timeline": {"clock": "authored-wall", "start": 1000000},
+      "events": [
+        {"type": "O", "frame": 0, "at": 0},
+        {"type": "O", "frame": 1, "at": 100000},
+        {"type": "C", "frame": 1, "at": 500000},
+        {"type": "O", "frame": 2, "at": 600000},
+        {"type": "C", "frame": 2, "at": 900000},
+        {"type": "C", "frame": 0, "at": 1000000}
+      ]
+    },
+    {
+      "type": "evented",
+      "name": "Worker (pid 10, tid 2)",
+      "unit": "microseconds",
+      "startValue": 0,
+      "endValue": 500000,
+      "timeline": {"clock": "authored-wall", "start": 1250000},
+      "events": [
+        {"type": "O", "frame": 3, "at": 0},
+        {"type": "O", "frame": 4, "at": 50000},
+        {"type": "C", "frame": 4, "at": 200000},
+        {"type": "O", "frame": 5, "at": 250000},
+        {"type": "C", "frame": 5, "at": 450000},
+        {"type": "C", "frame": 3, "at": 500000}
+      ]
+    },
+    {
+      "type": "evented",
+      "name": "Storage (pid 20, tid 1)",
+      "unit": "microseconds",
+      "startValue": 0,
+      "endValue": 200000,
+      "timeline": {"clock": "authored-wall", "start": 1400000},
+      "events": [
+        {"type": "O", "frame": 6, "at": 0},
+        {"type": "C", "frame": 6, "at": 200000}
+      ]
+    },
+    {
+      "type": "evented",
+      "name": "No shared clock",
+      "unit": "microseconds",
+      "startValue": 0,
+      "endValue": 100000,
+      "events": [
+        {"type": "O", "frame": 6, "at": 0},
+        {"type": "C", "frame": 6, "at": 100000}
+      ]
+    },
+    {
+      "type": "sampled",
+      "name": "Aggregate counts",
+      "unit": "none",
+      "startValue": 0,
+      "endValue": 3,
+      "isChronological": false,
+      "samples": [[0, 1]],
+      "weights": [3]
+    }
+  ]
+}

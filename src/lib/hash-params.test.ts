@@ -1,4 +1,5 @@
 import {getHashParams} from './hash-params'
+import {ViewMode} from './view-mode'
 
 test('getHashParams', () => {
   expect(getHashParams('#profileURL=data:application/json;base64,e30=')).toEqual({
@@ -30,4 +31,5 @@ test('getHashParams', () => {
   })
   expect(getHashParams('#abc=bcd')).toEqual({})
   expect(getHashParams('garbage')).toEqual({})
+  expect(getHashParams('#view=tracks')).toEqual({viewMode: ViewMode.MULTI_TRACK})
 })

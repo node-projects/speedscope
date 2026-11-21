@@ -66,6 +66,11 @@ function HelpDialog(props: {onClose(): void}) {
             <li>
               <strong>Call Tree:</strong> expand stacks in a keyboard-accessible table.
             </li>
+            <li>
+              <strong>Tracks:</strong> align chronological threads sharing an explicit clock. Pan
+              and zoom all rows together, or move the time marker to correlate activity. Open a
+              profile for deeper stacks. Profiles without a shared origin are excluded with reasons.
+            </li>
           </ul>
           <p>
             Click a graph frame to see its details. Function selection follows you between Time
@@ -95,7 +100,7 @@ function HelpDialog(props: {onClose(): void}) {
           <h3 className={css(style.sectionTitle)}>Keyboard shortcuts</h3>
           <dl className={css(style.shortcuts)}>
             {[
-              ['1 / 2 / 3 / 4', 'Switch between views'],
+              ['1 / 2 / 3 / 4 / 5', 'Switch between views'],
               ['r', 'Toggle recursion flattening'],
               ['n / p', 'Next / previous profile'],
               ['Ctrl/⌘ O', 'Import a recording'],

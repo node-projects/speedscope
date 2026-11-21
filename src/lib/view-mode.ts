@@ -3,4 +3,5 @@ export const enum ViewMode {
   LEFT_HEAVY_FLAME_GRAPH,
   SANDWICH_VIEW,
   CALL_TREE,
+  MULTI_TRACK,
 }

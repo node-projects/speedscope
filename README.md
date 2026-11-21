@@ -113,6 +113,13 @@ including a second local recording. The differential flamegraph and paged table
 show signed total/self changes, with absolute or normalized weights. Both inputs
 remain in memory while comparing; graph rendering and comparison preparation have
 explicit limits. See [comparison semantics and limits](docs/PROFILE_COMPARISON.md).
+Choose **Tracks** (shortcut **5**) to view chronological threads on a shared time
+axis, with common pan/zoom and a time marker. Trace Event duration imports and
+eligible Chrome Timeline CPU profiles preserve their origins automatically;
+native recordings can declare them explicitly. Unanchored or aggregate profiles
+are excluded with reasons. The view extracts bounded visible geometry rather
+than retaining another full flamechart per thread. See [clock semantics and
+track controls](docs/MULTI_TRACK.md).
 Use **Profile actions → Link to selected function…** to share a function selection.
 For local recordings, the recipient opens the link and imports the same file.
 Same-tab links and browser Back/Forward update the function selection without

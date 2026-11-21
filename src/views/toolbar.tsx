@@ -47,6 +47,7 @@ function ToolbarLeftContent(props: ToolbarProps) {
   const setSandwichView = useSetViewMode(viewModeAtom.set, ViewMode.SANDWICH_VIEW)
 
   const setCallTree = useSetViewMode(viewModeAtom.set, ViewMode.CALL_TREE)
+  const setTracks = useSetViewMode(viewModeAtom.set, ViewMode.MULTI_TRACK)
 
   if (!props.activeProfileState) return null
 
@@ -97,6 +98,17 @@ function ToolbarLeftContent(props: ToolbarProps) {
         onClick={setCallTree}
       >
         Call Tree
+      </button>
+      <button
+        type="button"
+        className={css(
+          style.toolbarTab,
+          props.viewMode === ViewMode.MULTI_TRACK && style.toolbarTabActive,
+        )}
+        onClick={setTracks}
+        title="View threads on a shared clock (5)"
+      >
+        Tracks
       </button>
     </div>
   )

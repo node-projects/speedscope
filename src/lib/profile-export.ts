@@ -90,6 +90,7 @@ export async function exportProfileGroupToBlob(
           endValue: profile.getTotalWeight(),
           isChronological: profile.isChronological() ? undefined : false,
           isDerived: profile.isDerived() ? true : undefined,
+          timeline: profile.getTimelineOrigin(),
         }).slice(0, -1) + ',"events":[',
       )
       let first = true

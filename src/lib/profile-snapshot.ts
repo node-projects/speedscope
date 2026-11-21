@@ -1,4 +1,4 @@
-import type {FrameInfo} from './profile'
+import type {FrameInfo, TimelineOrigin} from './profile'
 import type {FileFormat} from './file-format-spec'
 
 // Internal worker transport, not an interchange format or a public package API.
@@ -9,6 +9,7 @@ export interface ProfileSnapshot {
   totalWeight: number
   chronological: boolean
   derived: boolean
+  timeline?: TimelineOrigin
   frames: FrameInfo[]
   frameWeights: Float64Array
   appendNodes: Float64Array

@@ -20,6 +20,8 @@ function getViewMode(value: string): ViewMode | null {
       return ViewMode.SANDWICH_VIEW
     case 'call-tree':
       return ViewMode.CALL_TREE
+    case 'tracks':
+      return ViewMode.MULTI_TRACK
     default:
       return null
   }
