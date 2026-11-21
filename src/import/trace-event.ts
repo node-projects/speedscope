@@ -9,6 +9,7 @@ import {
 import {TimeFormatter} from '../lib/value-formatters'
 import {importTraceCounterTracks} from './trace-event-counters'
 import {attachTraceInstantTracks, TraceInstantCollector} from './trace-event-instants'
+import {diagnosticFrameKey, TraceEventDiagnostics} from './trace-event-diagnostics'
 
 // This file concerns import from the "Trace Event Format", authored by Google
 // and used for Google's own chrome://trace.
@@ -476,6 +477,7 @@ function getProfileNamesFromTraceEvents(
 function eventListToProfile(
   importableEvents: ImportableTraceEvent[],
   name: string,
+  diagnostics: TraceEventDiagnostics,
   exporterSource: ExporterSource = ExporterSource.UNKNOWN,
 ): Profile {
   // The trace event format is hard to deal with because it specifically
@@ -518,10 +520,12 @@ function eventListToProfile(
     const b = lastOf(frameStack)
 
     if (b == null) {
-      console.warn(
-        `Tried to end frame "${
-          frameInfoForEvent(e, exporterSource).key
-        }", but the stack was empty. Doing nothing instead.`,
+      diagnostics.warn(
+        'empty-stack',
+        () =>
+          `Tried to end frame "${diagnosticFrameKey(
+            frameInfoForEvent(e, exporterSource).key,
+          )}", but the stack was empty. Doing nothing instead.`,
       )
       return
     }
@@ -531,15 +535,27 @@ function eventListToProfile(
 
     // Duration-end events may omit name and args: they close the current frame.
     if (e.name != null && e.name !== b.name) {
-      console.warn(
-        `ts=${e.ts}: Tried to end "${eFrameInfo.key}" when "${bFrameInfo.key}" was on the top of the stack. Doing nothing instead.`,
+      diagnostics.warn(
+        'name-mismatch',
+        () =>
+          `ts=${e.ts}: Tried to end "${diagnosticFrameKey(
+            eFrameInfo.key,
+          )}" when "${diagnosticFrameKey(
+            bFrameInfo.key,
+          )}" was on the top of the stack. Doing nothing instead.`,
       )
       return
     }
 
     if (e.name != null && eFrameInfo.key !== bFrameInfo.key) {
-      console.warn(
-        `ts=${e.ts}: Tried to end "${eFrameInfo.key}" when "${bFrameInfo.key}" was on the top of the stack. Ending ${bFrameInfo.key} instead.`,
+      diagnostics.warn(
+        'argument-mismatch',
+        () =>
+          `ts=${e.ts}: Tried to end "${diagnosticFrameKey(
+            eFrameInfo.key,
+          )}" when "${diagnosticFrameKey(
+            bFrameInfo.key,
+          )}" was on the top of the stack. Ending ${diagnosticFrameKey(bFrameInfo.key)} instead.`,
       )
     }
 
@@ -625,7 +641,13 @@ function eventListToProfile(
 
   for (let i = frameStack.length - 1; i >= 0; i--) {
     const frame = frameInfoStack[i]
-    console.warn(`Frame "${frame.key}" was still open at end of profile. Closing automatically.`)
+    diagnostics.warn(
+      'open-at-eof',
+      () =>
+        `Frame "${diagnosticFrameKey(
+          frame.key,
+        )}" was still open at end of profile. Closing automatically.`,
+    )
     profileBuilder.leaveFrame(frame, profileBuilder.getTotalWeight())
   }
 
@@ -714,6 +736,7 @@ function eventListToProfileGroup(
   const profileNamesByPidTid = getProfileNamesFromTraceEvents(events, partitionedTraceEvents)
 
   const profilePairs: [string, Profile][] = []
+  const diagnostics = new TraceEventDiagnostics()
 
   profileNamesByPidTid.forEach((name, profileKey) => {
     const importableEventsForPidTid = partitionedTraceEvents.get(profileKey)
@@ -724,9 +747,10 @@ function eventListToProfileGroup(
 
     profilePairs.push([
       profileKey,
-      eventListToProfile(importableEventsForPidTid, name, exporterSource),
+      eventListToProfile(importableEventsForPidTid, name, diagnostics, exporterSource),
     ])
   })
+  diagnostics.flush()
 
   // For now, we just sort processes by pid & tid.
   // TODO: The standard specifies that metadata events with the name
