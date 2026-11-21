@@ -6,6 +6,7 @@ import {
   FlamechartSearchResults,
   ProfileSearchResults,
   searchMatchViewport,
+  zoomToSearchMatchViewport,
 } from '../lib/profile-search'
 import {Rect} from '../lib/math'
 import {h, createContext, ComponentChildren} from 'preact'
@@ -132,6 +133,20 @@ export const FlamechartSearchView = memo(() => {
     }
   }, [numResults, resultIndex, searchResults, selectAndZoomToMatch])
 
+  const zoomToMatch = useCallback(() => {
+    if (
+      resultIndex == null ||
+      !searchResults ||
+      !flamechart ||
+      !configSpaceViewportRect ||
+      !setConfigSpaceViewportRect
+    )
+      return
+    setConfigSpaceViewportRect(
+      zoomToSearchMatchViewport(flamechart, searchResults.at(resultIndex), configSpaceViewportRect),
+    )
+  }, [resultIndex, searchResults, flamechart, configSpaceViewportRect, setConfigSpaceViewportRect])
+
   return (
     <SearchView
       resultIndex={resultIndex}
@@ -139,6 +154,7 @@ export const FlamechartSearchView = memo(() => {
       resultsLimited={searchResults?.isTruncated() || false}
       selectPrev={selectPrev}
       selectNext={selectNext}
+      zoomToMatch={zoomToMatch}
     />
   )
 })
