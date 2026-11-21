@@ -2,6 +2,7 @@ import {Profile, ProfileGroup} from '../lib/profile'
 import {decodeBase64} from '../lib/utils'
 import workerSource from './trace-worker-source'
 import {ImportProgress, TraceWorkerResponse} from './trace-worker-protocol'
+import {tryImportTextProfile} from './streaming-text-profile'
 
 const importer = () => import('./index')
 const preparedGroups = new WeakSet<ProfileGroup>()
@@ -114,6 +115,12 @@ export async function importProfileFile(
     if (result instanceof ArrayBuffer) return importProfileBuffer(file.name, result, options, false)
   }
   checkAbort(options.signal)
+  const streamed = await tryImportTextProfile(file, file.name, {
+    signal: options.signal,
+    onProgress: () => options.onProgress?.({phase: 'Streaming profile', canCancel: true}),
+  })
+  if (streamed) return streamed
+  checkAbort(options.signal)
   options.onProgress?.({phase: 'Reading profile', canCancel: false})
   const module = await importer()
   checkAbort(options.signal)
@@ -134,6 +141,12 @@ export async function importProfileBuffer(
     if (result && !(result instanceof ArrayBuffer)) return result
     if (result instanceof ArrayBuffer) buffer = result
   }
+  checkAbort(options.signal)
+  const streamed = await tryImportTextProfile(buffer, name, {
+    signal: options.signal,
+    onProgress: () => options.onProgress?.({phase: 'Streaming profile', canCancel: true}),
+  })
+  if (streamed) return streamed
   checkAbort(options.signal)
   options.onProgress?.({phase: 'Reading profile', canCancel: false})
   const module = await importer()
