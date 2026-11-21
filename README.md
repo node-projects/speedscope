@@ -53,6 +53,9 @@ speedscope is designed to ingest profiles from a variety of different profilers 
 ](https://github.com/jlfwong/speedscope/wiki/Importing-from-async%E2%80%90profiler-(Java))
   - [Importing from Java Flight Recorder](https://github.com/jlfwong/speedscope/wiki/Importing-from-Java-Flight-Recorder)
   - [Importing Java thread dumps (`jstack` / `Thread.print`)](docs/JAVA_THREAD_DUMPS.md)
+  - [Importing ZIP archives of Java thread-dump snapshots](docs/JAVA_THREAD_DUMP_ZIP.md)
+- Android
+  - [Classic Android method traces (versions 1–3)](docs/IMPORT_FORMATS.md#classic-android-method-traces)
 - Erlang/Elixir
   - [eflambe](https://github.com/Stratus3D/eflambe)
 - Native code
@@ -63,8 +66,9 @@ speedscope is designed to ingest profiles from a variety of different profilers 
 - [Importing from custom sources](https://github.com/jlfwong/speedscope/wiki/Importing-from-custom-sources)
 
 Contributions to add support for additional formats are welcome! Open an issue in
-[this fork](https://github.com/node-projects/speedscope/issues). The importer guides
-above are maintained upstream and remain useful for the supported file formats.
+[this fork](https://github.com/node-projects/speedscope/issues). Upstream importer
+guides remain useful for their formats; [fork-specific import behavior](docs/IMPORT_FORMATS.md)
+documents the Android, archive, pprof and background-import policies.
 # Usage
 
 Visit [the hosted app](https://node-projects.github.io/speedscope/), then browse for a
@@ -74,8 +78,10 @@ local recording. See [offline use and update behavior](docs/OFFLINE.md).
 Repository builds can also produce a self-contained HTML document with
 `npm run build:single-file`; see [single-file builds and CSP](docs/SINGLE_FILE.md).
 
-Large JSON and trace captures import in the background with progress and a
-**Cancel import** button. This improves responsiveness; very large captures can
+Recordings of at least 1 MiB use a background importer when workers are available,
+including perf, folded stacks, pprof, JFR, Android traces and renamed captures.
+Progress and **Cancel import** keep the app responsive; generic formats still
+materialize their input and profile model. Very large captures can
 still exceed browser memory limits. Search offers Contains, Whole word and Exact
 matching for function names and source paths.
 Graph-search navigation retains at most 10,000 results and clearly marks larger
