@@ -57,6 +57,37 @@ original source position without changing its 5 ms weight. Same-tab links and
 Back restored two different function selections without reimport. The PLC also
 loaded and its thread chooser stayed usable; no console errors were observed.
 
+## Perf periods, OTLP and source-line indexing
+
+The next batch corrects perf period attribution, adds current-schema OTLP
+Profiles JSON and bounds embedded-source line indexes. The final clean-cache
+Node 22.23.5 ARM64 run passed **563 tests across 81 suites, with 310 snapshots**.
+All five Node tests, type checking, lint, schema/backlog checks, Pages/standalone/
+single-HTML builds and npm dry-pack passed. Two new public format guides are
+included in the package. The earlier Node 24 ARM64 Jest limitation remains;
+this is not a claim that a full local Node 24 Jest run passed.
+
+The public perf #393 reproduction now reports `265306119` ns for its 13-sample
+DiscoveryClient thread; its timestamp span is not treated as CPU execution.
+The complete public capture imports 44 profiles with `3469387710` ns total.
+Generic and streaming exports match hash
+`65120439b745f5a6d16f45fc1974d0c8301423c3e9356d404de8900774208857`.
+Sixteen existing perf snapshots intentionally changed for corrected units,
+weights, chronology and explicit missing-period labels. The new checked-in
+regression has synthetic stacks and cites the original timestamp/period facts.
+
+Browser checks imported the authored OTLP fixture as an aggregate 14 ns profile,
+with an exact large thread ID, source positions and full inline chain. The perf
+regression displayed 265.31 ms with Time Order disabled. Both worked without
+console errors in the self-contained HTTP preview. These do not establish binary
+OTLP, historical development layouts, scheduler idle intervals or file:// support.
+
+The private PLC run took 2,534 ms and retained four profiles, 17,510 exported
+frames, 1,039,656 events and the unchanged baseline export hash. This remains a
+single-run regression observation, not a controlled before/after timing claim.
+See [source-line indexing measurements](SOURCE_AND_LABELS.md#embedded-source-line-lookup)
+for the separate deterministic local-source benchmark and its limits.
+
 Type checking, linting, schema/backlog checks and Pages/standalone/single-HTML builds
 passed. npm dry-pack includes the new format and ZIP resource-policy guides.
 Targeted regressions cover ZIP expansion ceilings, cancellation, corrupt archives,

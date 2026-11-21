@@ -3,6 +3,23 @@
 The [README](../README.md#supported-file-formats) lists supported sources.
 This guide describes additional fork-specific behavior and its limits.
 
+## Perf clock weights
+
+Explicit `perf script` periods now determine aggregate weights. CPU/task-clock
+periods are nanoseconds of sampled CPU time; off-CPU periods remain separate
+sleep-time profiles, and cycles remain raw counts. Missing periods retain
+explicitly labeled inference or sample counts. Timestamp gaps are not claimed
+as measured execution. See [perf semantics and the public regression](PERF_IMPORT.md).
+
+## OpenTelemetry Profiles
+
+Current OTLP Profiles JSON imports sampled stacks through a shared dictionary,
+preserving metric weights, inline chains and thread/resource separation.
+Timestamps do not become durations, and sample periods do not multiply values.
+The importer currently parses the JSON in memory and creates aggregate profiles;
+binary protobuf and older development layouts remain unsupported. See the
+[pinned schema, limits and exact supported scope](OTEL_PROFILES.md).
+
 ## Classic Android method traces
 
 Open the classic concatenated key/data format emitted by Android method tracing:

@@ -39,9 +39,9 @@ function HelpDialog(props: {onClose(): void}) {
           <p>
             Supported formats include speedscope JSON, Chrome and Firefox profiles, duration traces
             (plain or gzip), perf, pprof, collapsed stacks, Java Flight Recorder, classic Android
-            method traces and traditional Java thread dumps. Java dumps can be plain text or a
-            bounded ZIP of snapshots from one JVM. Extract unsupported archive variants first. Java
-            dumps count observed stacks, rather than elapsed time.
+            method traces, current OTLP Profiles JSON and traditional Java thread dumps. Java dumps
+            can be plain text or a bounded ZIP of snapshots from one JVM. Extract unsupported
+            archive variants first. Java dumps count observed stacks, rather than elapsed time.
           </p>
         </section>
         <section className={css(style.card)}>

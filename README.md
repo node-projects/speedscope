@@ -56,11 +56,14 @@ speedscope is designed to ingest profiles from a variety of different profilers 
   - [Importing ZIP archives of Java thread-dump snapshots](docs/JAVA_THREAD_DUMP_ZIP.md)
 - Android
   - [Classic Android method traces (versions 1–3)](docs/IMPORT_FORMATS.md#classic-android-method-traces)
+- OpenTelemetry
+  - [Current OTLP Profiles JSON (sampled stacks)](docs/OTEL_PROFILES.md)
 - Erlang/Elixir
   - [eflambe](https://github.com/Stratus3D/eflambe)
 - Native code
   - [Importing from Instruments.app](https://github.com/jlfwong/speedscope/wiki/Importing-from-Instruments.app) (macOS)
   - [Importing from `perf`](https://github.com/jlfwong/speedscope/wiki/Importing-from-perf-(linux)) (linux)
+    — see [period weights, CPU time and inferred timelines](docs/PERF_IMPORT.md).
 - [Importing from .NET Core](https://github.com/jlfwong/speedscope/wiki/Importing-from-.NET-Core)
 - [Importing from GHC (Haskell)](https://github.com/jlfwong/speedscope/wiki/Importing-from-Haskell)
 - [Importing from custom sources](https://github.com/jlfwong/speedscope/wiki/Importing-from-custom-sources)
