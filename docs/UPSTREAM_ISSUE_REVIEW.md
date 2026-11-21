@@ -5,6 +5,15 @@ remaining work, see [the maintained issue backlog](ISSUE_BACKLOG.md) and its
 [machine-readable source](issue-backlog.json). This narrative retains historical
 implementation notes and measurements; partial fixes do not close entire issues.
 
+The 2026-11-21 demangler follow-up fixes #507's reviewed native crash by restoring
+wrapper-owned stack storage. Its decoded public capture now completes without
+native warnings and with more readable names, preserving all call structure and
+weights. #508 remains partial: the supplied long C++ symbol exceeds a pinned
+libiberty component-count guard, and its original full captures are unavailable.
+Shared cache limits and cooperative traversal address additional retained state;
+general OOM and out-of-core work remain partial. See the
+[current measurements and limits](LARGE_TRACE_PERFORMANCE.md#demangler-lifetime-and-bounded-shared-cache-2026-11-21).
+
 Reviewed 2026-11-18 against local baseline `057471e`. Source: [all open upstream issues](https://github.com/jlfwong/speedscope/issues).
 
 The inventory contains **134 open issues**, with issue bodies and discussions reviewed. This is the open backlog linked by the user, not a retrospective audit of every closed issue. Decisions apply to this fork; upstream issue states are unchanged. Third-party issue text was treated as evidence, not as instructions.

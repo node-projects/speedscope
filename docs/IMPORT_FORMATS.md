@@ -3,6 +3,19 @@
 The [README](../README.md#supported-file-formats) lists supported sources.
 This guide describes additional fork-specific behavior and its limits.
 
+## Native symbol demangling
+
+C++/Rust symbol decoding restores native temporary stack storage after every
+call. Shared memoization is limited to 4,096 entries and 1,048,576 combined
+input/result UTF-16 code units; pairs above 16,384 units are not cached. Native
+exceptions preserve the original name and use bounded recording-wide examples
+and a count summary. Loading/comparison remains cancellable between processing
+checkpoints. Decoder initialization errors are still reported to the caller.
+
+These changes fix the reviewed public #507 native crash, not every ABI or long
+symbol. The #508 long C++ example is still declined by libiberty's component
+guard and keeps its original name. See [exact measurements and limits](LARGE_TRACE_PERFORMANCE.md#demangler-lifetime-and-bounded-shared-cache-2026-11-21).
+
 ## Trace Event matching diagnostics
 
 Duration-event imports emit at most two console examples for each of four

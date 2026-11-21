@@ -1,5 +1,40 @@
 # Import-format validation, 2026-11-21
 
+## Demangler follow-up
+
+The native wrapper now restores temporary stack storage and frees nonzero
+results in nested `finally` blocks. The pinned Emscripten/GCC rebuild was
+reproduced independently; the embedded WASM SHA-256 is recorded in
+[the build guide](../src/lib/demangle/README.md). Regressions exercise 20,000
+uncached calls with an unchanged stack pointer, cleanup after failures, and
+12,000 distinct real symbols through an evicting cache.
+
+The shared cache is bounded by 4,096 entries, 1,048,576 combined UTF-16 code
+units and a 16,384-unit individual-pair limit. Tests cover exact boundaries,
+LRU recency, cached failures with caller-owned observers, oversized bypass,
+and no retained errors. Recording-wide failure summaries, native initialization
+errors and cancellation within large/between small profiles are also tested.
+
+Against `39791bd`, the decoded public #507 input keeps 3,333 frames, 62,672 call
+events and identical structural/weight hashes. Decoded names rise from 320 to
+2,397 and native warnings fall from 2,114 to zero. Browser worker import rendered
+readable Rust names in Call Tree with no error/warning logs. The full private
+PLC export remains 52,623,405 bytes with unchanged SHA-256
+`2a5b580376bfffb8dcccbf3081d30620a9c85047f047a2604e0dc1e0f712d0b3`.
+
+The #508 long gRPC symbol is valid according to LLVM c++filt, but libiberty's
+component-count guard declines it. A regression checks subsequent module
+usability, without claiming this symbol is decoded. That limitation and the
+missing full #508 captures keep the issue partial. Native guards remain enabled;
+cache text limits are not a total JS/WASM heap guarantee.
+
+The final clean-cache local Node 22.23.5 ARM64 run passed **805 tests across
+116 suites with 310 snapshots**. All five Node tests, type checking, lint,
+schema/backlog checks, all three builds and npm contents checks passed. Test
+fixture path and decoder-capability assumptions caught during development were
+corrected; the long-symbol decoding limitation remains explicit rather than
+being claimed fixed by wrapper-lifetime tests.
+
 ## Trace Event diagnostic follow-up
 
 Recording-wide diagnostic quotas now replace per-event warning floods, keeping
