@@ -2,7 +2,11 @@
 import fs from 'fs'
 import {InstantEventResourceLimitError} from '../lib/instant-track'
 import zlib from 'zlib'
-import {importTraceInstantTracks, isChromeCPUProfileRecord} from './trace-event-instants'
+import {
+  importTraceInstantTracks,
+  isChromeCPUProfileRecord,
+  TraceInstantCollector,
+} from './trace-event-instants'
 import {importProfileGroupFromText} from './index'
 import {importFromChromeTimeline} from './chrome'
 import {tryImportDurationTrace, importDurationTraceStream} from './streaming-trace'
@@ -367,5 +371,63 @@ test('oversized valid labels and IDs are resource omissions only for mixed captu
     await expect(
       importProfileGroupFromText('mixed.json', JSON.stringify([stack, event])),
     ).rejects.toThrow('label')
+  }
+})
+
+test('incremental collector defers first failure, releases raw details and preserves mixed count-first precedence', async () => {
+  const stack = {ph: 'X', name: 'work', ts: 0, dur: 20}
+  const mixed = () => importProfileGroupFromText('mixed.json', JSON.stringify([stack]))
+  for (const first of [point({s: 'bad'}), point({args: {text: 'x'.repeat(16385)}})]) {
+    const collector = new TraceInstantCollector()
+    collector.add(first)
+    for (let index = 0; index < 250000; index++) collector.add(point())
+    expect(() => collector.tracks()).toThrow(first.s === 'bad' ? 'scope' : '16,384')
+    const group = collector.finish((await mixed())!)
+    expect(group.instantTracks).toBeUndefined()
+    expect(group.instantEventOmission).toEqual({count: 250001, reason: 'point-limit'})
+  }
+  for (const malformedFirst of [true, false]) {
+    const events = [point({s: 'bad'}), point({args: {text: 'x'.repeat(16385)}})]
+    if (!malformedFirst) events.reverse()
+    const collector = new TraceInstantCollector()
+    events.forEach(event => collector.add(event))
+    if (malformedFirst)
+      expect(() => collector.finish({name: '', indexToView: 0, profiles: []})).toThrow('scope')
+    else
+      expect(collector.finish((await mixed())!).instantEventOmission).toEqual({
+        count: 2,
+        reason: 'details-limit',
+      })
+  }
+  // Mutating producer args after add cannot affect the normalized retained details.
+  const args = {value: 'before'}
+  const collector = new TraceInstantCollector()
+  collector.add(point({args}))
+  args.value = 'after'
+  expect(JSON.parse(collector.tracks()[0].events[0].details!).args.value).toBe('before')
+})
+
+test('collector preserves a directly thrown undefined value as the first strict failure', () => {
+  const event = point()
+  Object.defineProperty(event, 'ts', {
+    get() {
+      throw undefined
+    },
+  })
+  const collector = new TraceInstantCollector()
+  collector.add(event)
+  collector.add(point())
+  for (const finish of [
+    () => collector.tracks(),
+    () => collector.finish({name: '', indexToView: 0, profiles: []}),
+  ]) {
+    let threw = false
+    try {
+      finish()
+    } catch (error) {
+      threw = true
+      expect(error).toBeUndefined()
+    }
+    expect(threw).toBe(true)
   }
 })

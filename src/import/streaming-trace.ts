@@ -3,7 +3,11 @@ import {ProfileGroup} from '../lib/profile'
 import {importTraceEvents, TraceEvent} from './trace-event'
 import {StringBackedTextFileContent} from './utils'
 import {sourceFileName} from '../lib/profile-context'
-import {isChromeCPUProfileRecord, isTraceInstant} from './trace-event-instants'
+import {
+  isChromeCPUProfileRecord,
+  isTraceInstant,
+  TraceInstantCollector,
+} from './trace-event-instants'
 
 // These are input-complexity limits, not measurements of browser heap usage.
 // Profile construction and rendering still need memory proportional to the trace.
@@ -36,7 +40,8 @@ function checkAbort(signal?: AbortSignal) {
 
 // No whole-document string or parsed event array is created. Only one event is
 // assembled at a time; unmatched root properties and ignored events are dropped.
-// Events must still be retained for stable sorting of out-of-order timestamps.
+// Stack/counter events remain available for sorting; instant events enter a
+// bounded normalized collector and release each parsed raw payload immediately.
 export async function importDurationTraceStream(
   stream: ReadableStream<Uint8Array>,
   name: string,
@@ -73,6 +78,7 @@ export async function importDurationTraceStream(
   let lastProgress = 0
   let framedEvent: unknown
   const events: TraceEvent[] = []
+  const instantCollector = new TraceInstantCollector()
 
   const acceptEvent = (value: unknown) => {
     completedOffset = offset + 1
@@ -86,10 +92,11 @@ export async function importDurationTraceStream(
     const duration = event.ph === 'B' || event.ph === 'E' || event.ph === 'X'
     const counter = event.ph === 'C'
     const instant = isTraceInstant(event)
+    if (instant) instantCollector.add(event)
     if ((duration || counter) && !('ts' in event)) throw new NotDurationTrace()
     const metadata =
       event.ph === 'M' && (event.name === 'process_name' || event.name === 'thread_name')
-    if (duration || counter || instant || metadata || count === 1) {
+    if (duration || counter || metadata || count === 1) {
       retainedBytes += offset - eventStart + 1
       if (retainedBytes > limits.maxRetainedBytes)
         throw new TraceImportLimitError('retained event bytes')
@@ -102,17 +109,6 @@ export async function importDurationTraceStream(
         tid: event.tid,
         name: event.name,
         args: event.args,
-        ...(instant
-          ? {
-              cat: event.cat,
-              s: (event as any).s,
-              stack: (event as any).stack,
-              sf: (event as any).sf,
-              id: (event as any).id,
-              id2: (event as any).id2,
-              tts: event.tts,
-            }
-          : {}),
         ...(counter ? {cat: event.cat, id: (event as any).id, id2: (event as any).id2} : {}),
         ...(event.ph === 'X' ? {dur: (event as any).dur, tdur: (event as any).tdur} : {}),
       })
@@ -310,7 +306,7 @@ export async function importDurationTraceStream(
     checkAbort(options.signal)
     options.onProgress?.(bytes)
     checkAbort(options.signal)
-    const group = importTraceEvents(events)
+    const group = importTraceEvents(events, instantCollector)
     group.name = name
     group.sourceName = sourceFileName(name)
     return group

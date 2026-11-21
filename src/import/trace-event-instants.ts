@@ -196,100 +196,163 @@ function detailsForEvent(details: {[key: string]: unknown}): string | undefined 
   return JSON.stringify(details)
 }
 
+export class TraceInstantCollector {
+  private count = 0
+  private error: unknown
+  private failed = false
+  private readonly importEvent: (event: InstantTraceEvent) => void
+  private readonly buildTracks: () => readonly InstantTrack[]
+  private readonly clear: () => void
+
+  constructor(clock = 'trace-event:wall') {
+    type Point = InstantEventInfo & {timestamp: number}
+    type Lane = {track: Omit<InstantTrack, 'events'>; points: Point[]; monotone: boolean}
+    const lanes = new Map<string, Lane>()
+    let points = 0,
+      metadata = 0
+    const countMetadata = (count: number) => {
+      metadata += count
+      if (metadata > INSTANT_LIMITS.totalMetadataCharacters)
+        resource('metadata-limit', 'event metadata exceeds 4,194,304 characters')
+    }
+    this.clear = () => lanes.clear()
+    this.importEvent = event => {
+      label(clock, 'clock')
+      if (typeof event.ts !== 'number' || !Number.isFinite(event.ts))
+        fail('timestamp must be a finite number of microseconds')
+      const scope =
+        event.s === undefined || event.s === 't'
+          ? 'thread'
+          : event.s === 'p'
+            ? 'process'
+            : event.s === 'g'
+              ? 'global'
+              : fail('scope must be t, p, or g')
+      const fields = readDetailsFields(event)
+      const pid = identity(fields.pid, 'pid'),
+        tid = identity(fields.tid, 'tid')
+      const key = JSON.stringify([
+        scope,
+        ...(scope === 'global' ? [] : scope === 'process' ? [pid] : [pid, tid]),
+      ])
+      const name = label(event.name, 'name')
+      const category =
+        event.cat == null || event.cat === '' ? undefined : label(event.cat, 'category')
+      if (++points > INSTANT_LIMITS.points)
+        resource('point-limit', 'more than 250,000 instant points')
+      let lane = lanes.get(key)
+      if (!lane) {
+        if (lanes.size >= INSTANT_LIMITS.tracks)
+          resource('track-limit', 'more than 256 instant lanes')
+        const processId =
+          scope !== 'global' && fields.pid != null && fields.pid !== ''
+            ? label(String(fields.pid), 'pid')
+            : undefined
+        const threadId =
+          scope === 'thread' && fields.tid != null && fields.tid !== ''
+            ? label(String(fields.tid), 'tid')
+            : undefined
+        const track: Lane['track'] = {
+          id: `trace-instant:${lanes.size}`,
+          name: `${scope[0].toUpperCase()}${scope.slice(1)} instant events`,
+          clock,
+          timeUnit: 'microseconds',
+          start: event.ts,
+          scope,
+          ...(processId ? {processId} : {}),
+          ...(threadId ? {threadId} : {}),
+          times: new Float64Array(0),
+        }
+        countMetadata(
+          track.id.length +
+            track.name.length +
+            clock.length +
+            (processId?.length || 0) +
+            (threadId?.length || 0),
+        )
+        lane = {track, points: [], monotone: true}
+        lanes.set(key, lane)
+      }
+      const details = detailsForEvent(fields)
+      countMetadata(name.length + (category?.length || 0) + (details?.length || 0))
+      if (lane.points.length && event.ts < lane.points[lane.points.length - 1].timestamp)
+        lane.monotone = false
+      lane.points.push({
+        timestamp: event.ts,
+        name,
+        ...(category ? {category} : {}),
+        ...(details === undefined ? {} : {details}),
+      })
+    }
+    this.buildTracks = () => {
+      const tracks: InstantTrack[] = []
+      for (const lane of lanes.values()) {
+        if (!lane.monotone) lane.points.sort((a, b) => a.timestamp - b.timestamp)
+        const start = lane.points[0].timestamp
+        const times = new Float64Array(lane.points.length)
+        for (let i = 0; i < times.length; i++) {
+          const time = lane.points[i].timestamp - start
+          if (!Number.isFinite(time)) fail('timestamp range overflows')
+          times[i] = time
+        }
+        tracks.push({...lane.track, start, times, events: lane.points})
+      }
+      return validateInstantTracks(tracks) || []
+    }
+  }
+
+  add(event: InstantTraceEvent): void {
+    if (!isTraceInstant(event)) return
+    this.count++
+    if (this.failed) return
+    try {
+      this.importEvent(event)
+    } catch (error) {
+      this.error = error
+      this.failed = true
+      this.clear()
+    }
+  }
+
+  tracks(): readonly InstantTrack[] {
+    if (this.failed) throw this.error
+    return this.buildTracks()
+  }
+
+  finish(group: ProfileGroup): ProfileGroup {
+    const mixed = group.profiles.length > 0 || !!group.counterTracks?.length
+    if (!this.count) return group
+    let error = this.error
+    let failed = this.failed
+    if (mixed && this.count > INSTANT_LIMITS.points) {
+      failed = true
+      error = new InstantEventResourceLimitError('point-limit', 'more than 250,000 instant points')
+    }
+    if (!failed) {
+      try {
+        const tracks = this.buildTracks()
+        if (tracks.length) group.instantTracks = tracks
+        this.clear()
+        return group
+      } catch (caught) {
+        error = caught
+      }
+    }
+    this.clear()
+    if (!mixed || !(error instanceof InstantEventResourceLimitError)) throw error
+    delete group.instantTracks
+    group.instantEventOmission = Object.freeze({count: this.count, reason: error.reason})
+    return group
+  }
+}
+
 export function importTraceInstantTracks(
   events: readonly InstantTraceEvent[],
   clock = 'trace-event:wall',
 ): readonly InstantTrack[] {
-  type Point = InstantEventInfo & {timestamp: number}
-  type Lane = {track: Omit<InstantTrack, 'events'>; points: Point[]}
-  const lanes = new Map<string, Lane>()
-  let points = 0,
-    metadata = 0
-  const countMetadata = (count: number) => {
-    metadata += count
-    if (metadata > INSTANT_LIMITS.totalMetadataCharacters)
-      resource('metadata-limit', 'event metadata exceeds 4,194,304 characters')
-  }
-  label(clock, 'clock')
-  for (const event of events) {
-    if (!isTraceInstant(event)) continue
-    if (typeof event.ts !== 'number' || !Number.isFinite(event.ts))
-      fail('timestamp must be a finite number of microseconds')
-    const scope =
-      event.s === undefined || event.s === 't'
-        ? 'thread'
-        : event.s === 'p'
-          ? 'process'
-          : event.s === 'g'
-            ? 'global'
-            : fail('scope must be t, p, or g')
-    const fields = readDetailsFields(event)
-    const pid = identity(fields.pid, 'pid'),
-      tid = identity(fields.tid, 'tid')
-    const key = JSON.stringify([
-      scope,
-      ...(scope === 'global' ? [] : scope === 'process' ? [pid] : [pid, tid]),
-    ])
-    const name = label(event.name, 'name')
-    const category =
-      event.cat == null || event.cat === '' ? undefined : label(event.cat, 'category')
-    if (++points > INSTANT_LIMITS.points)
-      resource('point-limit', 'more than 250,000 instant points')
-    let lane = lanes.get(key)
-    if (!lane) {
-      if (lanes.size >= INSTANT_LIMITS.tracks)
-        resource('track-limit', 'more than 256 instant lanes')
-      const processId =
-        scope !== 'global' && fields.pid != null && fields.pid !== ''
-          ? label(String(fields.pid), 'pid')
-          : undefined
-      const threadId =
-        scope === 'thread' && fields.tid != null && fields.tid !== ''
-          ? label(String(fields.tid), 'tid')
-          : undefined
-      const track: Lane['track'] = {
-        id: `trace-instant:${lanes.size}`,
-        name: `${scope[0].toUpperCase()}${scope.slice(1)} instant events`,
-        clock,
-        timeUnit: 'microseconds',
-        start: event.ts,
-        scope,
-        ...(processId ? {processId} : {}),
-        ...(threadId ? {threadId} : {}),
-        times: new Float64Array(0),
-      }
-      countMetadata(
-        track.id.length +
-          track.name.length +
-          clock.length +
-          (processId?.length || 0) +
-          (threadId?.length || 0),
-      )
-      lane = {track, points: []}
-      lanes.set(key, lane)
-    }
-    const details = detailsForEvent(fields)
-    countMetadata(name.length + (category?.length || 0) + (details?.length || 0))
-    lane.points.push({
-      timestamp: event.ts,
-      name,
-      ...(category ? {category} : {}),
-      ...(details === undefined ? {} : {details}),
-    })
-  }
-  const tracks: InstantTrack[] = []
-  for (const lane of lanes.values()) {
-    lane.points.sort((a, b) => a.timestamp - b.timestamp)
-    const start = lane.points[0].timestamp
-    const times = new Float64Array(lane.points.length)
-    for (let i = 0; i < times.length; i++) {
-      const time = lane.points[i].timestamp - start
-      if (!Number.isFinite(time)) fail('timestamp range overflows')
-      times[i] = time
-    }
-    tracks.push({...lane.track, start, times, events: lane.points})
-  }
-  return validateInstantTracks(tracks) || []
+  const collector = new TraceInstantCollector(clock)
+  for (const event of events) collector.add(event)
+  return collector.tracks()
 }
 
 // Mixed captures keep their existing stacks/counters when optional marker data
@@ -300,9 +363,10 @@ export function attachTraceInstantTracks(
   events: readonly InstantTraceEvent[],
   clock = 'trace-event:wall',
 ): ProfileGroup {
-  const mixed = group.profiles.length > 0 || !!group.counterTracks?.length
-  let count = 0
-  if (mixed) {
+  // A full parsed array can establish mixed overflow without constructing any
+  // optional marker metadata. The streaming caller already has its collector.
+  if (group.profiles.length || group.counterTracks?.length) {
+    let count = 0
     for (const event of events) if (isTraceInstant(event)) count++
     if (!count) return group
     if (count > INSTANT_LIMITS.points) {
@@ -311,13 +375,7 @@ export function attachTraceInstantTracks(
       return group
     }
   }
-  try {
-    const tracks = importTraceInstantTracks(events, clock)
-    if (tracks.length) group.instantTracks = tracks
-  } catch (error) {
-    if (!mixed || !(error instanceof InstantEventResourceLimitError)) throw error
-    delete group.instantTracks
-    group.instantEventOmission = Object.freeze({count, reason: error.reason})
-  }
-  return group
+  const collector = new TraceInstantCollector(clock)
+  for (const event of events) collector.add(event)
+  return collector.finish(group)
 }

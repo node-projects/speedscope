@@ -8,7 +8,7 @@ import {
 } from '../lib/profile'
 import {TimeFormatter} from '../lib/value-formatters'
 import {importTraceCounterTracks} from './trace-event-counters'
-import {attachTraceInstantTracks} from './trace-event-instants'
+import {attachTraceInstantTracks, TraceInstantCollector} from './trace-event-instants'
 
 // This file concerns import from the "Trace Event Format", authored by Google
 // and used for Google's own chrome://trace.
@@ -861,10 +861,13 @@ function importTraceEventProfiles(rawProfile: Trace): ProfileGroup {
   }
 }
 
-export function importTraceEvents(rawProfile: Trace): ProfileGroup {
+export function importTraceEvents(
+  rawProfile: Trace,
+  instantCollector?: TraceInstantCollector,
+): ProfileGroup {
   const events = Array.isArray(rawProfile) ? rawProfile : rawProfile.traceEvents
   const counterTracks = importTraceCounterTracks(events)
   const group = importTraceEventProfiles(rawProfile)
   if (counterTracks.length) group.counterTracks = counterTracks
-  return attachTraceInstantTracks(group, events)
+  return instantCollector ? instantCollector.finish(group) : attachTraceInstantTracks(group, events)
 }
