@@ -1,5 +1,40 @@
 # Large trace performance follow-up
 
+## Long-timeline GPU precision (2026-11-21)
+
+The renderer previously uploaded absolute time coordinates as float32. Near
+6,000 seconds in a microsecond recording, endpoints 100 microseconds apart could
+round to the same GPU value, making a call disappear at high zoom. A synthetic
+[late-call recording](../sample/profiles/speedscope/long-late-calls.speedscope.json)
+reproduces that failure, including early and late rectangles in one wide batch.
+
+Rectangles are now clipped against the current atlas/source tile using CPU
+doubles, then normalized before upload. The shader transforms unit coordinates
+to the destination. Profile times, range-tree bounds, atlas keys, hit testing,
+frame colors and measured durations retain their existing identities and values.
+Each batch keeps one buffer and one full source-rectangle cache key; a shared
+staging allocation is capped at 1,200,000 bytes for 10,000 rectangles. Switching
+an uncached tile can require another bounded CPU normalization/upload; cached
+tiles and unchanged source rectangles reuse their data. Final profile and GPU
+buffer storage still scale with the recording.
+
+Five regressions check real uploaded float32 coordinates and the renderer's
+uniform transform, adjacent late calls, negative/spanning clipping, source
+origin/extent changes, shared staging ownership, buffer lifecycle and limits.
+Browser QA showed both 100-microsecond calls near 6,000 seconds, including after
+overview reset/refocus. The private PLC imported four profiles and rendered
+Time Order, Left Heavy and Sandwich's inverted callers/callees correctly during
+pan/zoom checks, with no browser errors.
+
+A warmed Node smoke using a preallocated-copy mock upload and source rectangles
+covering almost all 10,000 rectangles measured about 0.19 ms per repack and
+2.6 ms for 100,000 unchanged-source requests, with one buffer allocation. These are local CPU
+measurements, not browser/GPU frame-rate claims. This addresses the demonstrated
+float32 failure associated with [#467](https://github.com/jlfwong/speedscope/issues/467);
+the original upstream capture remains unavailable for direct comparison. These
+buffer/matrix tests also extend [#125](https://github.com/jlfwong/speedscope/issues/125),
+but do not replace a browser/GPU pixel-regression harness.
+
 ## Fixed-height Sandwich list geometry (2026-11-21)
 
 Sandwich already rendered a viewport window. It now calculates that window and
