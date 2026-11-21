@@ -8,15 +8,15 @@ Source: [upstream issues](https://github.com/jlfwong/speedscope/issues). [Machin
 
 | Kind | Implemented | Already supported | Partial | Planned | Needs reproduction | Declined | Obsolete | Total |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| bug | 20 | 9 | 13 | 7 | 6 | 0 | 1 | 56 |
+| bug | 20 | 9 | 14 | 7 | 5 | 0 | 1 | 56 |
 | feature | 27 | 9 | 7 | 23 | 0 | 4 | 0 | 70 |
-| maintenance | 4 | 1 | 1 | 1 | 0 | 1 | 0 | 8 |
+| maintenance | 4 | 1 | 2 | 0 | 0 | 1 | 0 | 8 |
 
 **Implemented** means the reviewed scope has an implementation. **Supported** means it already works or the established format is supported. **Partial** never means fully fixed. **Needs reproduction** means insufficient current evidence. A useful proposal can remain planned because it needs substantial design, fixtures or validation.
 
 P1: correctness/large-profile failures. P2: valuable product work. P3: lower-priority maintenance, integration or presentation. These priorities are engineering judgments, not upstream labels. Useful architectural work still includes broader worker coverage, streaming import, signed comparisons and synchronized tracks.
 
-## Remaining useful bugs (20)
+## Remaining useful bugs (21)
 
 | Issue | Kind | Useful? | Status | Priority | Work / evidence |
 | --- | --- | --- | --- | --- | --- |
@@ -29,6 +29,7 @@ P1: correctness/large-profile failures. P2: valuable product work. P3: lower-pri
 | [#347](https://github.com/jlfwong/speedscope/issues/347) Chrome crashes when viewing large profiles | bug | yes | partial | P1 | Final profile models, worker snapshots, sorting and full frame arrays, graph/color geometry and browser scroll-height limits still scale with the capture. Streaming coverage and original OOM reproductions remain incomplete; this is not an out-of-core viewer. |
 | [#508](https://github.com/jlfwong/speedscope/issues/508) RuntimeError: memory access out of bounds | bug | yes | partial | P2 | Native demangler exceptions preserve/cache original symbols instead of aborting loading. The public #507 compressed reproduction imports and completes demangling with warnings. This does not fix the native decoder itself. |
 | [#507](https://github.com/jlfwong/speedscope/issues/507) Index out of bounds when demangling rust symbol | bug | yes | partial | P2 | Native demangler exceptions preserve/cache original symbols instead of aborting loading. The public #507 compressed reproduction imports and completes demangling with warnings. This does not fix the native decoder itself. |
+| [#467](https://github.com/jlfwong/speedscope/issues/467) Incorrect rendering with long traces (thousands of seconds) | bug | conditional | partial | P2 | Compare the unavailable original upstream capture/zoom location before claiming every rendering symptom in that report fixed. Model/GPU storage still scales with capture size; pixel-regression coverage is tracked under #125. |
 | [#384](https://github.com/jlfwong/speedscope/issues/384) Some Instruments files don't load | bug | yes | planned | P2 | New Instruments .symbols binary storage needs a versioned decoder, not plist assumptions. Public archive was collected; no speculative reinterpretation of binary structures applied. |
 | [#446](https://github.com/jlfwong/speedscope/issues/446) souremaps arent being applied | bug | yes | partial | P3 | Automatic linked-map discovery/fetching and CORS handling remain unimplemented. Logs without source positions and ambiguous relative paths containing spaces still need producer-specific handling; the original Node/esbuild automatic-loading case is not claimed fixed. |
 | [#404](https://github.com/jlfwong/speedscope/issues/404) Use fetch instead of uint8array-json-parser for parsing JSON balls larger than the string limit | bug | yes | partial | P3 | Final profile models, worker snapshots, sorting and full frame arrays, graph/color geometry and browser scroll-height limits still scale with the capture. Streaming coverage and original OOM reproductions remain incomplete; this is not an out-of-core viewer. |
@@ -80,16 +81,15 @@ P1: correctness/large-profile failures. P2: valuable product work. P3: lower-pri
 
 | Issue | Kind | Useful? | Status | Priority | Work / evidence |
 | --- | --- | --- | --- | --- | --- |
-| [#125](https://github.com/jlfwong/speedscope/issues/125) Add tests for GL rendering | maintenance | yes | planned | P2 | Deterministic WebGL pixel tests need browser/GPU harness, tolerances and supported backend policy. Import/unit tests and browser smoke checks do not replace graphics regression coverage. |
+| [#125](https://github.com/jlfwong/speedscope/issues/125) Add tests for GL rendering | maintenance | yes | partial | P2 | A deterministic browser/GPU pixel harness still needs backend policy and tolerances, including cached/direct atlas rendering and outline/color coverage. Buffer/matrix tests and manual browser smoke do not replace that harness. |
 | [#354](https://github.com/jlfwong/speedscope/issues/354) Rewrite property based tests using `fast-check` instead of `jsverify` | maintenance | yes | partial | P3 | Migrate the math suite only after a justified inverse/solve error oracle preserves generated domains, growing-filter behavior and shrinking. Runtime math and the existing math suite, including #138 composition counterexamples, remain unchanged. |
 
-## Need a current reproduction (6)
+## Need a current reproduction (5)
 
 | Issue | Kind | Useful? | Status | Priority | Work / evidence |
 | --- | --- | --- | --- | --- | --- |
 | [#471](https://github.com/jlfwong/speedscope/issues/471) unable to load the json file and getting error for files size above 172 KB  | bug | conditional | needs-reproduction | P3 | Non-monotonic 172KB sampled input lacks an available fixture sufficient to reproduce the exact failure. Keep timestamp validation; do not sort samples blindly and change execution order. |
 | [#469](https://github.com/jlfwong/speedscope/issues/469) xcode 15 instrument data load fail | bug | conditional | needs-reproduction | P3 | The Xcode 15 report only says decode fail. Need a versioned .trace fixture and error details before changing the binary decoder. |
-| [#467](https://github.com/jlfwong/speedscope/issues/467) Incorrect rendering with long traces (thousands of seconds) | bug | conditional | needs-reproduction | P3 | Long 6000-second timeline may expose float32 rendering precision. Need a failing trace/zoom location; rebasing geometry per viewport is preferable to guessing units or reducing precision. |
 | [#452](https://github.com/jlfwong/speedscope/issues/452) Not support non-systemwide perf result | bug | conditional | needs-reproduction | P3 | Existing per-process and system-wide perf fixtures import. New hybrid/counter tests extend coverage; the unspecified failing recording still needs its perf script output. |
 | [#269](https://github.com/jlfwong/speedscope/issues/269) Table view doesn't update at 60fps during scrolling | bug | conditional | needs-reproduction | P3 | Original slow scrolling report references a 2013 Mac. Iterative traversals and bounded Call Tree improve scale; no evidence that the exact older scrolling problem is fixed. |
 | [#42](https://github.com/jlfwong/speedscope/issues/42) Low framerate in Chrome 66 on MBP | bug | conditional | needs-reproduction | P3 | Report targets Chrome 66 compositor behavior. Current supported browsers differ; need a current profile and rendering trace before applying historical GPU workarounds. |

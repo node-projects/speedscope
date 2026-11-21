@@ -1,0 +1,26 @@
+{
+  "$schema": "https://www.speedscope.app/file-format-schema.json",
+  "name": "Synthetic long trace with late narrow calls",
+  "shared": {
+    "frames": [
+      {"name": "root"},
+      {"name": "late_child_a"},
+      {"name": "late_child_b"}
+    ]
+  },
+  "profiles": [{
+    "type": "evented",
+    "name": "6000-second precision fixture",
+    "unit": "microseconds",
+    "startValue": 0,
+    "endValue": 6000000000,
+    "events": [
+      {"type": "O", "at": 0, "frame": 0},
+      {"type": "O", "at": 5999999000, "frame": 1},
+      {"type": "C", "at": 5999999100, "frame": 1},
+      {"type": "O", "at": 5999999100, "frame": 2},
+      {"type": "C", "at": 5999999200, "frame": 2},
+      {"type": "C", "at": 6000000000, "frame": 0}
+    ]
+  }]
+}

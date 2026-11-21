@@ -489,11 +489,11 @@
       "url": "https://github.com/jlfwong/speedscope/issues/467",
       "kind": "bug",
       "usefulness": "conditional",
-      "status": "needs-reproduction",
-      "priority": "P3",
+      "status": "partial",
+      "priority": "P2",
       "workstream": "Import formats and correctness",
-      "evidence": "Long 6000-second timeline may expose float32 rendering precision. Need a failing trace/zoom location; rebasing geometry per viewport is preferable to guessing units or reducing precision.",
-      "remaining": "Long 6000-second timeline may expose float32 rendering precision. Need a failing trace/zoom location; rebasing geometry per viewport is preferable to guessing units or reducing precision."
+      "evidence": "Reproduced and fixed float32 GPU endpoint collapse near 6e9 microseconds with a synthetic long trace. CPU double clipping and tile-normalized uploads preserve adjacent 100us calls, including early/late calls sharing one batch. Five buffer/matrix/cache regressions pass; browser QA verifies long-call visibility and PLC pan/zoom plus caller graphs. Shared staging is capped at 1,200,000 bytes. See docs/LARGE_TRACE_PERFORMANCE.md.",
+      "remaining": "Compare the unavailable original upstream capture/zoom location before claiming every rendering symptom in that report fixed. Model/GPU storage still scales with capture size; pixel-regression coverage is tracked under #125."
     },
     {
       "id": 465,
@@ -1425,11 +1425,11 @@
       "url": "https://github.com/jlfwong/speedscope/issues/125",
       "kind": "maintenance",
       "usefulness": "yes",
-      "status": "planned",
+      "status": "partial",
       "priority": "P2",
       "workstream": "Packaging, integration and maintenance",
-      "evidence": "Deterministic WebGL pixel tests need browser/GPU harness, tolerances and supported backend policy. Import/unit tests and browser smoke checks do not replace graphics regression coverage.",
-      "remaining": "Deterministic WebGL pixel tests need browser/GPU harness, tolerances and supported backend policy. Import/unit tests and browser smoke checks do not replace graphics regression coverage."
+      "evidence": "Added five lower-level rendering regressions against uploaded Float32 geometry, real uniform transforms, clipping, full source-rect cache identity, buffer ownership/lifecycle and size caps. Synthetic long-trace and PLC browser checks pass. These provide reproducible numeric renderer coverage but are not GPU pixel regressions.",
+      "remaining": "A deterministic browser/GPU pixel harness still needs backend policy and tolerances, including cached/direct atlas rendering and outline/color coverage. Buffer/matrix tests and manual browser smoke do not replace that harness."
     },
     {
       "id": 118,
