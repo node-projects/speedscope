@@ -1,5 +1,77 @@
 # Large trace performance follow-up
 
+## Scoped instant events and optional data limits (2026-11-21)
+
+Trace Event `i`, historical `I` and `R` records now produce independent scoped
+point lanes, including instant-only files. They do not alter call weights or
+counter values. The model caps instant data at 256 lanes, 250,000 observations,
+2,000,000 unique timestamp backing bytes and 4,194,304 metadata characters.
+Individual labels and details have separate limits. Completed metadata is frozen
+and reused, timestamp buffers transfer without a second numeric copy, and Blob
+export writes entries in chunks. See [instant-event semantics](INSTANT_EVENTS.md).
+
+The overview retains at most 4,096 representative glyphs across virtualized
+instant lanes; dense ranges report points not individually drawn. A 100-event
+paged inspector reads original observations without constructing a full DOM or
+filtered copy. Coincident events remain separate in source order. Stored source
+origins and offsets remain visible even when their sum rounds or overflows.
+Clock choices are now paged 64 at a time, preserving access to later groups.
+
+The real public #235/#236 capture contains 309,230 recognized instant events,
+above the point budget. Rejecting it would regress its existing stack/counter
+import. Mixed sources therefore exclude the **entire** instant set on a resource
+limit, with an explicit count/reason summary and visible notice in every view.
+Exports preserve the notice. Unimported marker records are not fully validated;
+there is no silent partial marker array. Instant-only overflows and strict
+native/model validation still fail. The public capture retains its 113 profiles,
+12 counter series and 406,923 numeric observations. Malformed imported points
+and resource limits are distinguished; ordinary CPU/JIT routing remains intact.
+
+The private PLC has no supported instant records. Its four profiles, 17,510
+frames and 1,039,656 call events retain the existing payload hashes
+`53b28f954a000a144a4b88d6806a8e20a79ee58b3ef748067d132232977bd75b`
+(explicit origins) and
+`522de77afbfc4dd94f1f30c3a9551979d12db506305ffef999db9c910ae8eddb`
+(origins stripped). These compare shared-frame/profile data, not whole-file
+metadata. Captures, diagnostic bundles and screenshots remain ignored.
+
+Browser checks covered the public omission notice and subsequent PLC reset,
+the exact #402 point at 829 microseconds, scoped mixed rows, 25,000 points with
+250 displayed ticks, all 250 inspection pages, literal script-looking text,
+native export of every point, keyboard focus restoration and clock group 65.
+The final local suite passed 779 tests across 112 suites with 310 snapshots;
+five Node tests, type/lint/schema/backlog checks and builds/package checks also
+passed. This adds bounded point data and rendering, not out-of-core profile
+storage, arbitrary asynchronous spans or DevTools annotation attachments.
+
+The streaming path also collects normalized marker metadata during event
+framing, releases each raw argument object and clears collected marker state
+when a budget is exhausted. It keeps only the first original bounded event for
+Hermes detection. Deferred errors preserve strict pure-point imports, the mixed
+whole-set omission policy and late CPU/sample-format fallback. Final model
+storage still depends on retained data, and generic fallback remains a full
+input parse.
+
+One fresh-process before/after pair per input compared the raw-marker-retaining
+feature commit `192a9dd` with incremental collection on Windows ARM64 / Node
+24.19.0:
+
+| Input | Peak import RSS before | After | Imported data |
+| --- | ---: | ---: | --- |
+| 100,000 normalized global points | 116.3 MiB | 94.0 MiB | All 100,000 points retained |
+| 300,000 points with 128-character arguments | 289.5 MiB | 91.0 MiB | All points explicitly omitted |
+| Public #235 capture | 576.1 MiB | 499.7 MiB | Same 113 profiles, 12 counters and omission summary |
+
+Every pair produced the same chunked Blob bytes and SHA-256. The public export
+is 30,579,207 bytes; its post-GC retained model heap remained essentially equal
+(73.12 to 72.97 MiB). These are single-pair observations rather than statistical
+speed or total-memory guarantees. In a separate forced-GC/WeakRef diagnostic,
+discarded-marker heap stayed around 5.59–5.65 MiB from 44,000 through 300,000
+points; retaining raw events grew from 20.1 to 104.7 MiB. All sampled argument
+objects were released after return. That diagnostic's forced-GC timing is not an
+import benchmark. Late CPU fallback, input event count and pending-byte guards
+were checked on both revisions.
+
 ## Bounded late-range Tracks seeking (2026-11-21)
 
 Tracks can now seek into an existing sample sequence instead of replaying every

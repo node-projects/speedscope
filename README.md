@@ -72,6 +72,7 @@ speedscope is designed to ingest profiles from a variety of different profilers 
   - [Differential folded files](docs/PROFILE_COMPARISON.md#differential-folded-files), using explicit import to preserve ordinary numeric symbol names.
   - [Producer frame colors](docs/SOURCE_AND_LABELS.md), with theme contrast adaptation and exact RGB export.
   - [Numeric counter charts](docs/COUNTERS.md), including Trace Event `C` input and independent native time/value axes.
+  - [Instant-event tracks](docs/INSTANT_EVENTS.md), with zero-duration points, coincident observations and bounded detail pages.
 
 Contributions to add support for additional formats are welcome! Open an issue in
 [this fork](https://github.com/node-projects/speedscope/issues). Upstream importer
@@ -127,6 +128,9 @@ units. Trace Event counters keep unspecified units as `unknown`; explicit native
 metadata can declare bytes or other gauges. Markers use original observations,
 and dense ranges show bounded min/max envelopes. Counter-only captures and export
 are supported. See [counter semantics and limits](docs/COUNTERS.md).
+Trace Event instant points appear in separate scoped rows without inventing call
+durations. Use **Inspect events** for original timestamps and plain-text details;
+see [instant-event scope and limits](docs/INSTANT_EVENTS.md).
 Use **Profile actions → Link to selected function…** to share a function selection.
 For local recordings, the recipient opens the link and imports the same file.
 Same-tab links and browser Back/Forward update the function selection without
