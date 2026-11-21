@@ -115,7 +115,7 @@ export async function importDurationTraceStream(
         paths: rootArray ? ['$.*'] : ['$.traceEvents.*'],
         keepStack: false,
       })
-      parser.onValue = ({value}) => acceptEvent(framedEvent ?? value)
+      parser.onValue = ({value: parsedValue}) => acceptEvent(framedEvent ?? parsedValue)
     }
     if (
       !rootArray &&

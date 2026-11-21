@@ -185,8 +185,8 @@ export function importFromChromeTimeline(events: TimelineEvent[], fileName: stri
 }
 
 const callFrameToFrameInfo = new Map<CPUProfileCallFrame, FrameInfo>()
-function frameInfoForCallFrame(callFrame: CPUProfileCallFrame) {
-  return getOrInsert(callFrameToFrameInfo, callFrame, callFrame => {
+function frameInfoForCallFrame(inputCallFrame: CPUProfileCallFrame) {
+  return getOrInsert(callFrameToFrameInfo, inputCallFrame, callFrame => {
     const file = callFrame.url
 
     // In Chrome profiles, line numbers & column numbers are both 0-indexed.

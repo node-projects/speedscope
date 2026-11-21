@@ -144,8 +144,8 @@ export function importFromV8ProfLog(v8log: V8LogProfile): Profile {
   const profile = new StackListProfileBuilder()
 
   const sToFrameInfo = new Map<number, FrameInfo>()
-  function getFrameInfo(t: number) {
-    return getOrInsert(sToFrameInfo, t, t => {
+  function getFrameInfo(codeIndex: number) {
+    return getOrInsert(sToFrameInfo, codeIndex, t => {
       const code = v8log.code[t]
       return codeToFrameInfo(code, v8log)
     })

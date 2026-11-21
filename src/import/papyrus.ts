@@ -60,10 +60,10 @@ export function importFromPapyrus(papyrusProfile: TextFileContent): Profile {
   let lastQueueFrameAt: number = -1
 
   function enterFrame(stackInt: number, at: number, frameName: string) {
-    function enterFrameHelper(at: number, frameName: string) {
-      frameStack.push(frameName)
-      profile.enterFrame(Frame.getOrInsert(nameSet, {name: frameName, key: frameName}), at)
-      lastEventAt = at
+    function enterFrameHelper(entryAt: number, enteredName: string) {
+      frameStack.push(enteredName)
+      profile.enterFrame(Frame.getOrInsert(nameSet, {name: enteredName, key: enteredName}), entryAt)
+      lastEventAt = entryAt
     }
     // Check if the last event was "QUEUE_PUSH"
     if (lastQueueFrameAt > -1) {
@@ -77,7 +77,8 @@ export function importFromPapyrus(papyrusProfile: TextFileContent): Profile {
     const stackFrameStr = `STACK ${stackInt}`
     // If the uppermost STACK frame on the frameStack isn't stackFrameStr
     if (
-      [...frameStack].reverse().find(frameName => frameName.startsWith('STACK ')) !== stackFrameStr
+      [...frameStack].reverse().find(nameInStack => nameInStack.startsWith('STACK ')) !==
+      stackFrameStr
     ) {
       // If we're at the bottom of the frameStack, STACK frames are kept open as long as functions only run in that
       // specific stack and closed with the function's end if the next function runs on a different stack.
@@ -144,13 +145,13 @@ export function importFromPapyrus(papyrusProfile: TextFileContent): Profile {
     }
   }
 
-  papyrusProfileLines.forEach((lineStr, i, papyrusProfileLines) => {
+  papyrusProfileLines.forEach((lineStr, i, profileLines) => {
     const parsedLine = parseLine(lineStr)
     if (parsedLine === null) return // continue
     if (parsedLine.event === 'PUSH') {
       enterFrame(parsedLine.stackInt, parsedLine.at, parsedLine.name)
       i += 1
-      let parsedNextLine = parseLine(papyrusProfileLines[i])
+      let parsedNextLine = parseLine(profileLines[i])
       // Search all future events in the current event for one that leaves the current frame. If it exists, leave now.
       // This way, we avoid speedscope choking on the possibly wrong order of events. The changed order is still
       // functionally correct, as the function took less than a millisecond to execute, which is measured as 0 (ms).
@@ -162,11 +163,11 @@ export function importFromPapyrus(papyrusProfile: TextFileContent): Profile {
         ) {
           tryToLeaveFrame(parsedNextLine.stackInt, parsedNextLine.at, parsedNextLine.name)
           // Delete the line that we successfully parsed and imported such that it is not processed twice
-          papyrusProfileLines.splice(i, 1)
+          profileLines.splice(i, 1)
           parsedNextLine = null
         } else {
           i += 1
-          if (i < papyrusProfileLines.length) parsedNextLine = parseLine(papyrusProfileLines[i])
+          if (i < profileLines.length) parsedNextLine = parseLine(profileLines[i])
         }
       }
     } else if (parsedLine.event === 'POP') {
