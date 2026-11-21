@@ -66,7 +66,7 @@ function change(select: HTMLSelectElement, value: string) {
   })
 }
 function chooseFile(name = 'candidate.json') {
-  const field = host.querySelector<HTMLInputElement>('input[type="file"]')!
+  const field = host.querySelector<HTMLInputElement>('input[type="file"]:not([aria-label])')!
   Object.defineProperty(field, 'files', {
     configurable: true,
     value: {item: () => new File(['{}'], name)},
@@ -167,6 +167,33 @@ test('imports a candidate separately and ignores its result after cancellation',
   await settle()
   expect(host.textContent).not.toContain('late candidate')
   expect(host.textContent).toContain('Candidate recording: Loaded recording')
+})
+
+test('explicit differential import compares its two columns and can restore the loaded recording', async () => {
+  const original = profile('original', 100)
+  const before = exportProfileGroup({name: 'original', indexToView: 0, profiles: [original]})
+  mockedImport.mockResolvedValueOnce({profiles: [profile('Baseline', 8), profile('Candidate', 3)]})
+  mount([original])
+  const field = host.querySelector<HTMLInputElement>('[aria-label="Differential folded file"]')!
+  Object.defineProperty(field, 'files', {
+    value: {item: () => new File(['work 8 3'], 'diff.folded')},
+  })
+  act(() => {
+    field.dispatchEvent(new Event('change', {bubbles: true}))
+  })
+  await settle()
+  expect(mockedImport.mock.calls[0][0].name).toBe('diff.folded.diff.folded')
+  expect(host.querySelectorAll('fieldset')[0].textContent).toContain('Baseline')
+  expect(host.querySelectorAll('fieldset')[1].textContent).toContain('Candidate')
+  click('Compare')
+  await settle()
+  expect(row('work-0').textContent).toContain('-5')
+  expect(exportProfileGroup({name: 'original', indexToView: 0, profiles: [original]})).toEqual(
+    before,
+  )
+  click('Use loaded recording')
+  expect(host.querySelectorAll('fieldset')[0].textContent).toContain('original')
+  expect(host.querySelectorAll('fieldset select')[0].textContent).not.toContain('Baseline')
 })
 
 test('successful external import compares without replacing the baseline and Escape aborts a later load', async () => {

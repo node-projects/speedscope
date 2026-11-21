@@ -10,6 +10,7 @@ import {
   ProfileComparison,
 } from '../lib/profile-comparison'
 import {importProfileFile, wereSymbolsLoaded} from '../import/profile-loader'
+import {isDifferentialFoldedName} from '../import/bg-differential'
 import {ProfileComparisonGraph} from './profile-comparison-graph'
 import {getProfileDialogStyle} from './profile-dialog-style'
 import {useTheme, withTheme} from './themes/theme'
@@ -116,11 +117,13 @@ export function ProfileComparisonDialog(props: {
   const style = getStyle(useTheme())
   const controller = useRef<AbortController | null>(null)
   const input = useRef<HTMLInputElement>(null)
+  const differentialInput = useRef<HTMLInputElement>(null)
   const dialog = useModal(props.onClose, () => {
     controller.current?.abort()
     controller.current = null
   })
   const [baselineIndex, setBaselineIndex] = useState(props.initialIndex)
+  const [baselineProfiles, setBaselineProfiles] = useState(props.profiles)
   const [candidate, setCandidate] = useState({
     profiles: props.profiles,
     index:
@@ -141,7 +144,7 @@ export function ProfileComparisonDialog(props: {
   const [results, setResults] = useState<ComparisonNode[] | null>(null)
   const [limited, setLimited] = useState(false)
   const [page, setPage] = useState(0)
-  const baseline = props.profiles[baselineIndex]
+  const baseline = baselineProfiles[baselineIndex]
   const candidateProfile = candidate.profiles[candidate.index]
   const clear = () => {
     controller.current?.abort()
@@ -220,6 +223,45 @@ export function ProfileComparisonDialog(props: {
         revision: old.revision + 1,
       }))
       setStatus('Comparison recording loaded. Choose its profile, then compare.')
+    })
+  }
+  const loadDifferential = (file: File) => {
+    clear()
+    void run('Loading differential folded stacks…', async active => {
+      // Explicit selection avoids confusing an ordinary symbol ending in a
+      // number with the first of two weight columns. Blob wrapping shares bytes.
+      const gzip = /\.gz$/i.test(file.name)
+      const named = isDifferentialFoldedName(file.name)
+        ? file
+        : new File([file], `${file.name}.diff.folded${gzip ? '.gz' : ''}`)
+      const group = await importProfileFile(named, {
+        signal: active.signal,
+        onProgress: progress => {
+          if (controller.current === active) setStatus(`${progress.phase}…`)
+        },
+      })
+      if (!group || group.profiles.length !== 2)
+        throw new Error('The differential file must contain baseline and candidate weight columns.')
+      if (!wereSymbolsLoaded(group)) {
+        for (const profile of group.profiles) {
+          if (active.signal.aborted) return
+          await profile.demangle()
+        }
+      }
+      if (active.signal.aborted || controller.current !== active) return
+      group.profiles[0].setName(`${file.name} — Baseline`)
+      group.profiles[1].setName(`${file.name} — Candidate`)
+      setBaselineProfiles(group.profiles)
+      setBaselineIndex(0)
+      setCandidate(old => ({
+        profiles: group.profiles,
+        index: 1,
+        source: file.name,
+        revision: old.revision + 1,
+      }))
+      setStatus(
+        'Differential folded file loaded: first column is baseline, second is candidate. Click Compare.',
+      )
     })
   }
   const search = (event: Event) => {
@@ -314,7 +356,7 @@ export function ProfileComparisonDialog(props: {
             <div className={css(style.columns)}>
               <ProfileChoice
                 label="Baseline"
-                profiles={props.profiles}
+                profiles={baselineProfiles}
                 index={baselineIndex}
                 disabled={!!busy}
                 onChange={index => {
@@ -336,6 +378,17 @@ export function ProfileComparisonDialog(props: {
             </div>
             <p className={css(common.source)}>Candidate recording: {candidate.source}</p>
             <input
+              ref={differentialInput}
+              type="file"
+              hidden
+              aria-label="Differential folded file"
+              onChange={event => {
+                const file = event.currentTarget.files?.item(0)
+                event.currentTarget.value = ''
+                if (file) loadDifferential(file)
+              }}
+            />
+            <input
               ref={input}
               type="file"
               hidden
@@ -354,13 +407,23 @@ export function ProfileComparisonDialog(props: {
               >
                 Open comparison recording…
               </button>
-              {candidate.profiles !== props.profiles && (
+              <button
+                type="button"
+                className={css(common.control)}
+                disabled={!!busy}
+                onClick={() => differentialInput.current?.click()}
+              >
+                Open differential folded…
+              </button>
+              {(candidate.profiles !== props.profiles || baselineProfiles !== props.profiles) && (
                 <button
                   type="button"
                   className={css(common.control)}
                   disabled={!!busy}
                   onClick={() => {
                     clear()
+                    setBaselineProfiles(props.profiles)
+                    setBaselineIndex(props.initialIndex)
                     setCandidate(old => ({
                       profiles: props.profiles,
                       index: props.initialIndex,
