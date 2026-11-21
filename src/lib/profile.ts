@@ -2,6 +2,7 @@ import {lastOf, KeyedSet, visitTree} from './utils'
 import {ValueFormatter, RawValueFormatter, TimeFormatter, ByteFormatter} from './value-formatters'
 import {FileFormat} from './file-format-spec'
 import {ProfileSnapshot, HydrationOptions} from './profile-snapshot'
+import type {CounterTrack} from './counter-track'
 
 export interface FrameInfo {
   key: string | number
@@ -116,6 +117,7 @@ export interface ProfileGroup {
   sourceName?: string
   indexToView: number
   profiles: Profile[]
+  counterTracks?: readonly CounterTrack[]
 }
 
 export interface CallTreeEvent {

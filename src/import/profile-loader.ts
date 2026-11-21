@@ -3,6 +3,7 @@ import {decodeBase64} from '../lib/utils'
 import workerSource from './trace-worker-source'
 import {ImportProgress, TraceWorkerResponse} from './trace-worker-protocol'
 import {textProfileKind, tryImportTextProfile} from './streaming-text-profile'
+import {hydrateCounterTracks} from '../lib/counter-track'
 
 const importer = () => import('./index')
 const preparedGroups = new WeakSet<ProfileGroup>()
@@ -91,7 +92,14 @@ async function loadWithWorker(
             for (const data of message.group.profiles)
               profiles.push(await Profile.fromSnapshot(data, {signal: options.signal}))
             checkAbort(options.signal)
-            const group = {...message.group, profiles}
+            const counterTracks = await hydrateCounterTracks(message.group.counterTracks, {
+              signal: options.signal,
+            })
+            const group = {
+              ...message.group,
+              profiles,
+              ...(counterTracks === undefined ? {} : {counterTracks}),
+            }
             preparedGroups.add(group)
             resolve(group)
           }

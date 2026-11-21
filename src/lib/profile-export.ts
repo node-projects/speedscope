@@ -1,5 +1,6 @@
 import {Frame, ProfileGroup} from './profile'
 import {FileFormat} from './file-format-spec'
+import {hydrateCounterTracks} from './counter-track'
 
 export interface ExportProgress {
   profilesCompleted: number
@@ -7,6 +8,8 @@ export interface ExportProgress {
   eventsWritten: number
   framesWritten: number
   frameCount: number
+  counterSamplesWritten?: number
+  counterCount?: number
 }
 
 export interface ExportOptions {
@@ -33,6 +36,9 @@ export async function exportProfileGroupToBlob(
     eventsWritten: 0,
     framesWritten: 0,
     frameCount: 0,
+    ...(group.counterTracks
+      ? {counterSamplesWritten: 0, counterCount: group.counterTracks.length}
+      : {}),
   }
   // Message tasks yield to input/rendering without nested timer clamping, which
   // can otherwise make a background-tab export take seconds between batches.
@@ -70,6 +76,10 @@ export async function exportProfileGroupToBlob(
 
   try {
     await pause()
+    const counterTracks = await hydrateCounterTracks(group.counterTracks, {
+      signal: options.signal,
+      yieldControl: pause,
+    })
     write(
       JSON.stringify({
         exporter: `${require('../../package.json').name}@${require('../../package.json').version}`,
@@ -122,7 +132,33 @@ export async function exportProfileGroupToBlob(
       write(JSON.stringify({name, file, line, col, color}))
       if (++progress.framesWritten % 4096 === 0) await pause()
     }
-    write(']}}')
+    write(']}')
+    if (counterTracks !== undefined) {
+      write(',"counterTracks":[')
+      let samplesWritten = 0
+      for (let trackIndex = 0; trackIndex < counterTracks.length; trackIndex++) {
+        const {times, values, ...metadata} = counterTracks[trackIndex]
+        if (trackIndex) write(',')
+        write(JSON.stringify(metadata).slice(0, -1) + ',"times":[')
+        for (let index = 0; index < times.length; index++) {
+          if (!Number.isFinite(times[index]))
+            throw new Error('Counter samples changed during export')
+          write((index ? ',' : '') + String(times[index]))
+          if (++samplesWritten % 16384 === 0) await pause()
+        }
+        write('],"values":[')
+        for (let index = 0; index < values.length; index++) {
+          if (!Number.isFinite(values[index]))
+            throw new Error('Counter samples changed during export')
+          write((index ? ',' : '') + String(values[index]))
+          progress.counterSamplesWritten!++
+          if (++samplesWritten % 16384 === 0) await pause()
+        }
+        write(']}')
+      }
+      write(']')
+    }
+    write('}')
     flush()
     checkAbort()
     options.onProgress?.({...progress})

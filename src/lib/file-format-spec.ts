@@ -13,6 +13,8 @@ export namespace FileFormat {
 
     // List of profile definitions
     profiles: Profile[]
+    // Independent measured series, never stack frames or synthetic samples.
+    counterTracks?: CounterTrack[]
 
     // The name of the contained profile group. If omitted, will use the name of
     // the file itself.
@@ -45,6 +47,22 @@ export namespace FileFormat {
      * @pattern ^#[0-9a-fA-F]{6}$
      */
     color?: string
+  }
+
+  export interface CounterTrack {
+    id: string
+    name: string
+    clock: string
+    timeUnit: 'nanoseconds' | 'microseconds' | 'milliseconds' | 'seconds'
+    // Raw source timestamp corresponding to counter-local zero.
+    start: number
+    // Independent gauge unit; use unknown when the producer provides none.
+    valueUnit: string
+    processId?: string
+    threadId?: string
+    category?: string
+    times: number[]
+    values: number[]
   }
 
   export enum ProfileType {

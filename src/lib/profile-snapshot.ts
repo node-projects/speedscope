@@ -1,5 +1,6 @@
 import type {FrameInfo, TimelineOrigin} from './profile'
 import type {FileFormat} from './file-format-spec'
+import type {CounterTrack} from './counter-track'
 
 // Internal worker transport, not an interchange format or a public package API.
 // Node records contain frame index, parent index, total weight and self weight.
@@ -23,15 +24,20 @@ export interface ProfileGroupSnapshot {
   sourceName?: string
   indexToView: number
   profiles: ProfileSnapshot[]
+  counterTracks?: readonly CounterTrack[]
 }
 
 export function snapshotTransferables(group: ProfileGroupSnapshot): ArrayBuffer[] {
-  const buffers: ArrayBuffer[] = []
+  const buffers = new Set<ArrayBuffer>()
   for (const p of group.profiles) {
     for (const array of [p.frameWeights, p.appendNodes, p.groupedNodes, p.samples, p.weights])
-      buffers.push(array.buffer as ArrayBuffer)
+      buffers.add(array.buffer as ArrayBuffer)
   }
-  return buffers
+  for (const track of group.counterTracks || []) {
+    buffers.add(track.times.buffer as ArrayBuffer)
+    buffers.add(track.values.buffer as ArrayBuffer)
+  }
+  return [...buffers]
 }
 
 export interface HydrationOptions {
