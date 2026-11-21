@@ -3,6 +3,24 @@
 The [README](../README.md#supported-file-formats) lists supported sources.
 This guide describes additional fork-specific behavior and its limits.
 
+## Instant events
+
+Trace Event phases `i`, historical `I` and `R` import as scoped points on
+independent lanes, including instant-only recordings. Missing scope defaults to
+thread; process and global scope remain distinct. Source wall `ts` uses
+microseconds regardless of `displayTimeUnit`. Equal-time points remain distinct;
+stack-looking metadata is inspectable text rather than invented execution.
+Recognized historical CPU-profile and JIT records retain their original routing.
+
+The [instant-event guide](INSTANT_EVENTS.md) defines metadata and point budgets,
+native export and the paged inspector. Native/instant-only input exceeding a
+budget fails explicitly. For a mixed recording with valid stack/counter data,
+an instant resource limit excludes the entire marker set and records its count
+and reason in `instantEventOmission`. The app displays that notice in every
+view, and exports preserve it. Records in an excluded marker set are not fully
+validated. Malformed marker data that is processed before a resource limit
+still fails; there is no silent truncation or reinterpretation as weighted calls.
+
 ## Perf clock weights
 
 Explicit `perf script` periods now determine aggregate weights. CPU/task-clock

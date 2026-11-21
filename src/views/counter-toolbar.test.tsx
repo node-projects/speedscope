@@ -4,6 +4,7 @@ import {Toolbar} from './toolbar'
 import {ViewMode} from '../lib/view-mode'
 import {StackListProfileBuilder} from '../lib/profile'
 import {CounterTrack} from '../lib/counter-track'
+import {StyleSheetTestUtils} from 'aphrodite'
 
 const series: CounterTrack = {
   id: 'heap',
@@ -17,12 +18,14 @@ const series: CounterTrack = {
 }
 let host: HTMLDivElement
 beforeEach(() => {
+  StyleSheetTestUtils.suppressStyleInjection()
   host = document.createElement('div')
   document.body.appendChild(host)
 })
 afterEach(() => {
   act(() => render(null, host))
   host.remove()
+  StyleSheetTestUtils.clearBufferAndResumeStyleInjection()
 })
 function props(profiles: any[] = []) {
   return {

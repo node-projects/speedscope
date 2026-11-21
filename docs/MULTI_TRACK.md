@@ -21,6 +21,14 @@ bounded min/max envelopes rather than reconstructed values or longer spikes.
 See [counter charts and native metadata](COUNTERS.md) for the exact model and
 separate point/storage budgets.
 
+[Instant-event lanes](INSTANT_EVENTS.md) show zero-duration observations at
+their source times. **Show events** jumps to them; **Inspect events** opens
+100-event pages for the captured visible range, retaining coincident points and
+plain-text details. The chart draws at most 4,096 glyphs across visible instant
+lanes and reports points not individually drawn. Marker-only recordings open
+directly in Tracks. Mixed recordings whose marker data exceeds import budgets
+retain their stack/counter data with a visible, export-preserved omission notice.
+
 ## Explicit origin metadata
 
 Trace Event B/E/X duration imports retain the earliest importable wall-clock
@@ -57,7 +65,7 @@ that both alignment and exclusion behavior can be reviewed.
 
 ## Bounded rendering and current scope
 
-Tracks inspects metadata for at most 10,000 profiles and offers at most 64 clock-group choices. Profiles without an origin, nonchronological/derived profiles, non-time units and invalid durations are excluded. Limits and incomplete rendering are reported explicitly.
+Tracks inspects metadata for at most 10,000 profiles and shows up to 64 clock-group choices per page. Use the previous/next clock-page controls to reach other groups; changing pages selects the first clock on that page. Profiles without an origin, nonchronological/derived profiles, non-time units and invalid durations are excluded. Limits and incomplete rendering are reported explicitly.
 
 The shared viewport has one time range across visible rows. Rows are virtualized: at most 24 rows are mounted, with up to the first eight call depths displayed per row. A viewport retains at most 12,000 extracted rectangles in total, and its canvas is capped at 4,096 by 2,048 pixels with device-pixel ratio capped at two. It does not retain a complete flamechart or a separate GPU atlas for every thread.
 

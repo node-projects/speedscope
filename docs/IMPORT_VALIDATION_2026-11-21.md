@@ -308,3 +308,40 @@ The shared-frame/profile payload hash above is unchanged.
 Browser checks covered rapid late-range zoom/pan, original call markers, source
 replacement resetting range/marker, and the authored example at 505 ms showing
 application/compute/read on the expected rows without console errors.
+
+## Scoped instant-event tracks
+
+The final local Node 22 run passed 779 tests across 112 suites with 310 snapshots.
+Five Node tests, typecheck, lint, schema/backlog checks and all build/package
+checks passed. Model/worker/native tests cover bounded ownership and frozen
+metadata reuse, explicit omissions, cancellation and chunked export. Importer
+regressions cover historical CPU routing, accessor-free detail reads, scope and
+timestamp semantics, resource-versus-malformed errors, tiny gzip/plain streams
+and the exact instant-only #402 input at 829 microseconds despite its ns display
+hint. Its stack array remains unresolved inspectable text.
+
+The public #235/#236 input still imports 113 profiles and 12 counter series with
+406,923 observations; its 309,230 instant events exceed the new point budget and
+are all explicitly omitted. The count/reason survives export and the browser
+shows the notice in stack and Tracks views. A subsequent PLC import clears the
+notice, retaining four profiles/four counters and both hashes recorded above.
+
+Browser tests also covered thread/process/global lanes, coincident source order,
+65 clock groups with 64 choices per page, original source origin/offset pairs,
+Escape/focus restoration and native omission-only metadata. An authored dense
+recording exposes all 25,000 events through 250 pages of at most 100 rows, draws
+250 representative ticks with an explicit 24,750 not-individually-drawn count,
+renders script-looking details as literal text, and exports all 25,000 points
+without synthetic profiles. No console errors were observed. The app preserves
+data or omission notices through stack actions, remapping, state and export.
+
+Incremental streaming collection avoids retaining raw instant arguments beyond
+the current record (plus the first bounded discriminator event). Resource
+failures release normalized marker state while preserving exact recognized
+counts. Mixed/pure error precedence, first-event Hermes behavior, late CPU
+fallback, source argument mutation and tiny raw-retention budgets are covered.
+Three fresh-process input pairs matched exact chunked export hashes: normalized
+100k points peak RSS 116.3→94.0 MiB; excluded 300k points 289.5→91.0 MiB; public
+#235 576.1→499.7 MiB. Forced-GC liveness checks are separate from timing and show
+discarded argument objects released. Measurements and limits are detailed in
+LARGE_TRACE_PERFORMANCE; diagnostic captures/archives remain ignored.

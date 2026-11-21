@@ -5,6 +5,7 @@ import {CallTreeProfileBuilder} from '../lib/profile'
 import {TimeFormatter} from '../lib/value-formatters'
 import {MultiTrackView} from './multi-track-view'
 import {CounterTrack} from '../lib/counter-track'
+import {InstantTrack} from '../lib/instant-track'
 
 let host: HTMLDivElement
 const context = {
@@ -67,6 +68,7 @@ async function mount(
   selectedProfileIndex = 0,
   onSelectProfile = jest.fn(),
   counterTracks?: readonly CounterTrack[],
+  instantTracks?: readonly InstantTrack[],
 ) {
   await act(async () => {
     render(
@@ -75,6 +77,7 @@ async function mount(
         selectedProfileIndex={selectedProfileIndex}
         onSelectProfile={onSelectProfile}
         counterTracks={counterTracks}
+        instantTracks={instantTracks}
       />,
       host,
     )
@@ -357,4 +360,132 @@ test('dense counters disclose min/max decimation and counter navigation stays vi
   )
   act(() => button('Show profiles').click())
   expect(host.querySelector<HTMLDivElement>('[aria-label^="Thread timelines;"]')!.scrollTop).toBe(0)
+})
+
+function instant(times: number[], name = 'Marks', clock = 'recording'): InstantTrack {
+  return {
+    id: name,
+    name,
+    clock,
+    timeUnit: 'microseconds',
+    start: 100,
+    scope: 'global',
+    times: Float64Array.from(times),
+    events: times.map((_, index) => ({
+      name: `point ${index}`,
+      category: 'markers',
+      details: `unresolved sf=${index}`,
+    })),
+  }
+}
+const inspectButton = () =>
+  Array.from(host.querySelectorAll('button')).find(
+    value => value.textContent?.startsWith('Inspect events:'),
+  )!
+
+test('single-point instant-only captures draw a zero-duration tick and inspect without selecting a stack profile', async () => {
+  const select = jest.fn()
+  await mount([], 0, select, undefined, [instant([0])])
+  expect(host.textContent).toContain('1 instant event lanes')
+  expect(host.textContent).toContain('Inspect events: Marks [global]')
+  expect(context.lineTo.mock.calls.every(call => call[0] === 0)).toBe(true)
+  expect(host.querySelector('canvas')!.getAttribute('data-instant-glyph-count')).toBe('1')
+  const opener = inspectButton()
+  act(() => {
+    opener.focus()
+    opener.click()
+  })
+  expect(host.querySelector('dialog')).not.toBeNull()
+  expect(host.textContent).toContain(
+    'Stored source origin: 100 microseconds; local offset: 0 microseconds',
+  )
+  expect(select).not.toHaveBeenCalled()
+  act(() => {
+    host.querySelector('dialog')!.dispatchEvent(new Event('cancel', {cancelable: true}))
+  })
+  expect(host.querySelector('dialog')).toBeNull()
+  expect(document.activeElement).toBe(opener)
+})
+
+test('coincident markers remain fully paged and hover cannot change an open inspector selection', async () => {
+  await mount([], 0, jest.fn(), undefined, [instant(Array(10001).fill(0))])
+  expect(host.querySelector('canvas')!.getAttribute('data-instant-glyph-count')).toBe('1')
+  expect(host.textContent).toContain(`${(10000).toLocaleString()} points not individually drawn`)
+  act(() => inspectButton().click())
+  expect(host.querySelectorAll('[data-instant-event-index]')).toHaveLength(100)
+  act(() => button('Next page').click())
+  expect(host.textContent).toContain('Events 101–200 of 10001')
+  act(() => {
+    host
+      .querySelector('canvas')!
+      .dispatchEvent(new MouseEvent('mousemove', {bubbles: true, clientX: 500, clientY: 60}))
+  })
+  expect(host.textContent).toContain('Events 101–200 of 10001')
+  expect(host.querySelector('dialog h2')!.textContent).toContain('Marks')
+})
+
+test('the global point glyph budget stays bounded across virtualized lanes', async () => {
+  const lanes = Array.from({length: 24}, (_, index) =>
+    instant(
+      Array.from({length: 1000}, (_point, point) => point),
+      `lane ${index}`,
+    ),
+  )
+  await mount([], 0, jest.fn(), undefined, lanes)
+  expect(
+    Number(host.querySelector('canvas')!.getAttribute('data-instant-glyph-count')),
+  ).toBeLessThanOrEqual(4096)
+  expect(host.querySelectorAll('button').length).toBeLessThan(40)
+  expect(host.textContent).not.toContain('Inspect events: lane 23')
+})
+
+test('clock pages expose every instant lane and a replacement source closes details and resets its clock', async () => {
+  const lanes = Array.from({length: 65}, (_, index) =>
+    instant([0], `lane ${index}`, `clock ${index}`),
+  )
+  await mount([], 0, jest.fn(), undefined, lanes)
+  expect(host.querySelector('select')!.options).toHaveLength(64)
+  await act(async () => {
+    button('Next clocks').click()
+    await Promise.resolve()
+  })
+  expect(host.querySelector('select')!.options).toHaveLength(1)
+  expect(inspectButton().textContent).toContain('lane 64')
+  act(() => inspectButton().click())
+  expect(host.querySelector('dialog')).not.toBeNull()
+  await mount(
+    [],
+    0,
+    jest.fn(),
+    undefined,
+    lanes.map(lane => ({...lane, name: `new ${lane.name}`})),
+  )
+  expect(host.querySelector('dialog')).toBeNull()
+  expect(button('Previous clocks').disabled).toBe(true)
+  expect(inspectButton().textContent).toContain('new lane 0')
+  await act(async () => {
+    button('Next clocks').click()
+    await Promise.resolve()
+  })
+  expect(inspectButton().textContent).toContain('new lane 64')
+  await act(async () => {
+    button('Previous clocks').click()
+    await Promise.resolve()
+  })
+  expect(inspectButton().textContent).toContain('new lane 0')
+})
+
+test('an explicitly selected profile beyond the first clock page remains the default group', async () => {
+  const profiles = Array.from({length: 65}, (_, index) =>
+    profile(`profile ${index}`, 100, `clock ${index}`),
+  )
+  await mount(profiles, 64)
+  expect(host.querySelector('select')!.selectedOptions[0].textContent).toContain('clock 64')
+  expect(button('Next clocks').disabled).toBe(true)
+  expect(host.textContent).toContain('Open profile: profile 64 (selected)')
+  await act(async () => {
+    button('Previous clocks').click()
+    await Promise.resolve()
+  })
+  expect(host.textContent).toContain('Open profile: profile 0')
 })

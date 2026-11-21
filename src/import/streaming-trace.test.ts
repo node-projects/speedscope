@@ -114,7 +114,7 @@ test('resource limits reject rather than silently truncating or retrying the ful
 
 test('ignored payloads do not consume the retained-event budget', async () => {
   const work = {ph: 'X', ts: 0, dur: 5, name: 'work'}
-  const ignored = {ph: 'i', ts: 1, args: {unused: 'x'.repeat(500)}}
+  const ignored = {ph: 'Z', ts: 1, args: {unused: 'x'.repeat(500)}}
   const text = JSON.stringify([work, ...Array(5000).fill(ignored)])
   const group = await importDurationTraceStream(source(text, 65536), 'trace.json', {
     limits: {maxRetainedBytes: 256},
@@ -211,4 +211,51 @@ test('native record parsing still rejects invalid record and outer-document gram
     '{"traceEvents":[{"ph":"X","ts":0}] "otherData":{}}',
   ])
     await expect(importDurationTraceStream(source(text, 3), 'trace.json')).rejects.toThrow()
+})
+
+test('instant metadata uses its own bounded collector instead of retaining raw events under duration budget', async () => {
+  const work = {ph: 'X', ts: 0, dur: 10, name: 'work'}
+  for (const count of [100, 5000]) {
+    const marker = {ph: 'i', ts: 1, name: 'mark', args: {text: 'x'.repeat(1000)}}
+    const text = JSON.stringify([work, ...new Array(count).fill(marker)])
+    const expected = (await importProfileGroupFromText('mixed.json', text))!
+    const actual = (await importDurationTraceStream(source(text, 65536), 'mixed.json', {
+      limits: {maxRetainedBytes: 256},
+    }))!
+    expect(actual.profiles[0].getTotalWeight()).toBe(10)
+    expect(exportProfileGroup(actual)).toEqual(exportProfileGroup(expected))
+    if (count === 100) expect(actual.instantTracks![0].times).toHaveLength(100)
+    else {
+      expect(actual.instantTracks).toBeUndefined()
+      expect(actual.instantEventOmission).toEqual({count, reason: 'metadata-limit'})
+    }
+  }
+})
+
+test('first instant preserves Hermes discrimination while later CPU payloads override deferred marker errors', async () => {
+  const args = {
+    line: 7,
+    column: 2,
+    name: 'f',
+    category: 'js',
+    url: 'app.js',
+    params: '',
+    allocatedCategory: '',
+    allocatedName: '',
+  }
+  const text = JSON.stringify([
+    {ph: 'i', ts: 1, name: 'mark', args},
+    {ph: 'X', ts: 2, dur: 3, name: 'f', args},
+  ])
+  const expected = (await importProfileGroupFromText('hermes.json', text))!
+  const actual = (await importDurationTraceStream(source(text), 'hermes.json'))!
+  expect(exportProfileGroup(actual)).toEqual(exportProfileGroup(expected))
+  expect(Array.from(actual.profiles[0].getFrames())[0]).toMatchObject({file: 'app.js', line: 7})
+  const cpu = JSON.stringify([
+    {ph: 'i', ts: 1, name: 'invalid', s: 'bad'},
+    {ph: 'P', name: 'ProfileChunk'},
+  ])
+  expect(await importDurationTraceStream(source(cpu), 'cpu.json')).toBeNull()
+  const native = '{"traceEvents":[{"ph":"i","ts":1,"name":"invalid","s":"bad"}],"samples":[]}'
+  expect(await importDurationTraceStream(source(native), 'samples.json')).toBeNull()
 })

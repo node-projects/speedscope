@@ -3,6 +3,11 @@ import {ProfileGroup} from '../lib/profile'
 import {importTraceEvents, TraceEvent} from './trace-event'
 import {StringBackedTextFileContent} from './utils'
 import {sourceFileName} from '../lib/profile-context'
+import {
+  isChromeCPUProfileRecord,
+  isTraceInstant,
+  TraceInstantCollector,
+} from './trace-event-instants'
 
 // These are input-complexity limits, not measurements of browser heap usage.
 // Profile construction and rendering still need memory proportional to the trace.
@@ -35,7 +40,8 @@ function checkAbort(signal?: AbortSignal) {
 
 // No whole-document string or parsed event array is created. Only one event is
 // assembled at a time; unmatched root properties and ignored events are dropped.
-// Events must still be retained for stable sorting of out-of-order timestamps.
+// Stack/counter events remain available for sorting; instant events enter a
+// bounded normalized collector and release each parsed raw payload immediately.
 export async function importDurationTraceStream(
   stream: ReadableStream<Uint8Array>,
   name: string,
@@ -72,6 +78,7 @@ export async function importDurationTraceStream(
   let lastProgress = 0
   let framedEvent: unknown
   const events: TraceEvent[] = []
+  const instantCollector = new TraceInstantCollector()
 
   const acceptEvent = (value: unknown) => {
     completedOffset = offset + 1
@@ -81,13 +88,11 @@ export async function importDurationTraceStream(
     const event = value as TraceEvent
     // Chrome sampled CPU events and Hermes sample tables need the original
     // detector. This check deliberately includes markers late in the document.
-    if (
-      event.ph !== 'C' &&
-      (event.name === 'CpuProfile' || event.name === 'Profile' || event.name === 'ProfileChunk')
-    )
-      throw new NotDurationTrace()
+    if (isChromeCPUProfileRecord(event)) throw new NotDurationTrace()
     const duration = event.ph === 'B' || event.ph === 'E' || event.ph === 'X'
     const counter = event.ph === 'C'
+    const instant = isTraceInstant(event)
+    if (instant) instantCollector.add(event)
     if ((duration || counter) && !('ts' in event)) throw new NotDurationTrace()
     const metadata =
       event.ph === 'M' && (event.name === 'process_name' || event.name === 'thread_name')
@@ -301,7 +306,7 @@ export async function importDurationTraceStream(
     checkAbort(options.signal)
     options.onProgress?.(bytes)
     checkAbort(options.signal)
-    const group = importTraceEvents(events)
+    const group = importTraceEvents(events, instantCollector)
     group.name = name
     group.sourceName = sourceFileName(name)
     return group

@@ -8,6 +8,7 @@ import {
 } from '../lib/profile'
 import {TimeFormatter} from '../lib/value-formatters'
 import {importTraceCounterTracks} from './trace-event-counters'
+import {attachTraceInstantTracks, TraceInstantCollector} from './trace-event-instants'
 
 // This file concerns import from the "Trace Event Format", authored by Google
 // and used for Google's own chrome://trace.
@@ -15,7 +16,8 @@ import {importTraceCounterTracks} from './trace-event-counters'
 // The file format is extremely general, and we only support the parts of it
 // that logically map onto speedscope's visualization capabilities.
 // Stack profiles support the "B", "E", and "X" event types. Numeric "C" events
-// are imported separately as counter time series, never stack weights. Other
+// are imported separately as counter time series, never stack weights. Scoped
+// i/I/R observations become independent zero-duration instant lanes. Other
 // event types are ignored. We do, however, support import of profiles that are
 // multi-process/multi-threaded. Each process is split into a separate profile.
 //
@@ -859,10 +861,13 @@ function importTraceEventProfiles(rawProfile: Trace): ProfileGroup {
   }
 }
 
-export function importTraceEvents(rawProfile: Trace): ProfileGroup {
+export function importTraceEvents(
+  rawProfile: Trace,
+  instantCollector?: TraceInstantCollector,
+): ProfileGroup {
   const events = Array.isArray(rawProfile) ? rawProfile : rawProfile.traceEvents
   const counterTracks = importTraceCounterTracks(events)
   const group = importTraceEventProfiles(rawProfile)
   if (counterTracks.length) group.counterTracks = counterTracks
-  return group
+  return instantCollector ? instantCollector.finish(group) : attachTraceInstantTracks(group, events)
 }

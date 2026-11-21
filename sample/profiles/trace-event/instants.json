@@ -1,0 +1,12 @@
+{
+  "traceEvents": [
+    {"name":"hi","cat":"none","ph":"i","pid":22630,"tid":22630,"ts":829,"stack":["a","b","c"]},
+    {"name":"earlier","ph":"I","pid":22630,"tid":22630,"ts":825.5,"args":{"query":"SELECT * FROM jobs WHERE id = 7"}},
+    {"name":"process notice","ph":"R","s":"p","pid":7,"tid":99,"ts":830,"args":{"status":true}},
+    {"name":"global one","ph":"i","s":"g","pid":1,"tid":2,"ts":834,"args":{"value":1}},
+    {"name":"global two","ph":"i","s":"g","pid":3,"tid":4,"ts":834,"args":{"value":2}},
+    {"name":"work","ph":"X","pid":22630,"tid":22630,"ts":824,"dur":20},
+    {"name":"queue size","ph":"C","pid":22630,"tid":22630,"ts":825,"args":{"value":4}}
+  ],
+  "displayTimeUnit":"ns"
+}

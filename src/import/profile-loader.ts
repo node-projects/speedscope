@@ -4,6 +4,7 @@ import workerSource from './trace-worker-source'
 import {ImportProgress, TraceWorkerResponse} from './trace-worker-protocol'
 import {textProfileKind, tryImportTextProfile} from './streaming-text-profile'
 import {hydrateCounterTracks} from '../lib/counter-track'
+import {hydrateInstantTracks, validateInstantTrackOmissionState} from '../lib/instant-track'
 
 const importer = () => import('./index')
 const preparedGroups = new WeakSet<ProfileGroup>()
@@ -92,13 +93,25 @@ async function loadWithWorker(
             for (const data of message.group.profiles)
               profiles.push(await Profile.fromSnapshot(data, {signal: options.signal}))
             checkAbort(options.signal)
+            const instantEventOmission = validateInstantTrackOmissionState(
+              message.group.instantTracks,
+              message.group.instantEventOmission,
+            )
             const counterTracks = await hydrateCounterTracks(message.group.counterTracks, {
               signal: options.signal,
             })
             const group = {
               ...message.group,
               profiles,
+              ...(instantEventOmission ? {instantEventOmission} : {}),
               ...(counterTracks === undefined ? {} : {counterTracks}),
+              ...(message.group.instantTracks === undefined
+                ? {}
+                : {
+                    instantTracks: await hydrateInstantTracks(message.group.instantTracks, {
+                      signal: options.signal,
+                    }),
+                  }),
             }
             preparedGroups.add(group)
             resolve(group)

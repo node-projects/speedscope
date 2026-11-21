@@ -72,7 +72,9 @@ function HelpDialog(props: {onClose(): void}) {
               profile for deeper stacks. Profiles without a shared origin are excluded with reasons.
               Numeric counter rows use their own value axis and unit; Show counters jumps to them.
               Counter-only recordings open here. Dense rows show an envelope of observed minima and
-              maxima so brief spikes remain visible.
+              maxima so brief spikes remain visible. Instant-event rows show points without
+              assigning duration. Use Inspect events to read original names, timestamps and details,
+              including coincident events.
             </li>
           </ul>
           <p>
