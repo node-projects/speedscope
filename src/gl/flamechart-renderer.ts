@@ -1,5 +1,5 @@
 import {Flamechart} from '../lib/flamechart'
-import {RectangleBatch, RectangleBatchRenderer} from './rectangle-batch-renderer'
+import {RectangleBatch, RectangleBatchRenderer, MAX_BATCH_SIZE} from './rectangle-batch-renderer'
 import {Vec2, Rect, AffineTransform} from '../lib/math'
 import {Color} from '../lib/color'
 import {KeyedSet} from '../lib/utils'
@@ -7,8 +7,6 @@ import {RowAtlas} from './row-atlas'
 import {Graphics} from './graphics'
 import {FlamechartColorPassRenderer} from './flamechart-color-pass-renderer'
 import {renderInto} from './utils'
-
-const MAX_BATCH_SIZE = 10000
 
 interface RangeTreeNode {
   getBounds(): Rect
