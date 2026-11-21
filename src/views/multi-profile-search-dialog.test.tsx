@@ -38,6 +38,37 @@ function setup() {
 const flush = async () => {
   for (let i = 0; i < 4; i++) await new Promise(resolve => setTimeout(resolve, 0))
 }
+
+test('regex mode reports unsupported syntax and finds ordinary results after correction', async () => {
+  setup()
+  const mode = host.querySelector('select')!
+  const input = host.querySelector<HTMLInputElement>('input:not([type="checkbox"])')!
+  act(() => {
+    mode.value = SearchMode.REGEX
+    mode.dispatchEvent(new Event('change', {bubbles: true}))
+    input.value = '(render)\\1'
+    input.dispatchEvent(new Event('input', {bubbles: true}))
+  })
+  act(() => {
+    host
+      .querySelector('form')!
+      .dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}))
+  })
+  await flush()
+  expect(host.querySelector('[role="alert"]')).not.toBeNull()
+  act(() => {
+    input.value = '^REN(DER)$'
+    input.dispatchEvent(new Event('input', {bubbles: true}))
+  })
+  act(() => {
+    host
+      .querySelector('form')!
+      .dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}))
+  })
+  await flush()
+  expect(host.querySelector('[role="alert"]')).toBeNull()
+  expect(host.querySelectorAll('tbody tr')).toHaveLength(2)
+})
 const submit = () =>
   host.querySelector('form')!.dispatchEvent(new Event('submit', {bubbles: true, cancelable: true}))
 test('results distinguish profiles and select the original matching frame', async () => {

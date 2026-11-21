@@ -1,6 +1,7 @@
 import {Profile, Frame, CallTreeNode} from './profile'
 import {Flamechart, FlamechartFrame} from './flamechart'
 import {Rect, Vec2} from './math'
+import {compileSearchRegex} from './regex-search'
 
 export const SEARCH_LIMITS = {
   cachedFrames: 4096,
@@ -18,9 +19,28 @@ export enum SearchMode {
   SUBSTRING = 'substring',
   WHOLE_WORD = 'whole-word',
   EXACT = 'exact',
+  REGEX = 'regex',
 }
 
 export function createTextMatcher(pattern: string, mode: SearchMode) {
+  if (mode === SearchMode.REGEX) {
+    const regex = compileSearchRegex(pattern)
+    return {
+      hasMatch: (text: string) => !!pattern && regex.test(text),
+      ranges: (text: string, limit = Infinity): [number, number][] => {
+        if (!pattern) return []
+        const matcher = regex.matcher(text)
+        const ranges: [number, number][] = []
+        // Zero-width matches select frames but do not paint nonexistent characters.
+        // Count them toward the highlight budget so empty matches cannot scan
+        // an entire huge symbol just to fill 64 visible ranges.
+        for (let count = 0; count < limit && matcher.find(); count++) {
+          if (matcher.end() > matcher.start()) ranges.push([matcher.start(), matcher.end()])
+        }
+        return ranges
+      },
+    }
+  }
   if (mode === SearchMode.EXACT) {
     const lowerPattern = pattern.toLocaleLowerCase()
     const hasMatch = (text: string) => !!pattern && text.toLocaleLowerCase() === lowerPattern
@@ -48,7 +68,7 @@ export function createTextMatcher(pattern: string, mode: SearchMode) {
       },
     }
   }
-  // User input is always literal. These fixed patterns have no nested
+  // Whole-word input is literal. These fixed patterns have no nested
   // quantifiers or user-provided expressions that could stall large searches.
   const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const word = '\\p{L}\\p{N}\\p{M}_'
@@ -70,6 +90,16 @@ export function createTextMatcher(pattern: string, mode: SearchMode) {
       }
       return ranges
     },
+  }
+}
+
+export function getSearchQueryError(pattern: string, mode: SearchMode): string | null {
+  if (mode !== SearchMode.REGEX) return null
+  try {
+    compileSearchRegex(pattern)
+    return null
+  } catch (error) {
+    return `Regex: ${error instanceof Error ? error.message : String(error)}`
   }
 }
 

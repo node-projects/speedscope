@@ -109,6 +109,7 @@ export function MultiProfileSearchDialog(props: {
             <option value={SearchMode.SUBSTRING}>Contains</option>
             <option value={SearchMode.WHOLE_WORD}>Whole word</option>
             <option value={SearchMode.EXACT}>Exact</option>
+            <option value={SearchMode.REGEX}>Regex (RE2)</option>
           </select>
         </label>
         <label>

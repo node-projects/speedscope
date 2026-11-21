@@ -1,7 +1,8 @@
 import {h, render} from 'preact'
 import {act} from 'preact/test-utils'
 import {SearchView} from './search-view'
-import {searchIsActiveAtom, searchQueryAtom} from '../app-state'
+import {searchIsActiveAtom, searchQueryAtom, searchModeAtom} from '../app-state'
+import {SearchMode} from '../lib/profile-search'
 
 test('explicit match zoom is available only with a selected result and does not navigate matches', () => {
   const host = document.createElement('div')
@@ -43,6 +44,41 @@ test('explicit match zoom is available only with a selected result and does not 
     act(() => render(null, host))
     host.remove()
     searchIsActiveAtom.set(false)
+  }
+})
+
+test('regex mode displays invalid syntax and recovers when the pattern is corrected', () => {
+  const host = document.createElement('div')
+  document.body.appendChild(host)
+  act(() => {
+    searchIsActiveAtom.set(true)
+    searchModeAtom.set(SearchMode.REGEX)
+    searchQueryAtom.set('[')
+    render(
+      <SearchView
+        resultIndex={null}
+        numResults={null}
+        selectNext={() => {}}
+        selectPrev={() => {}}
+      />,
+      host,
+    )
+  })
+  try {
+    expect(host.querySelector('option[value="regex"]')!.textContent).toBe('Regex (RE2)')
+    expect(host.querySelector('[role="alert"]')!.textContent).toContain('Regex:')
+    act(() => searchQueryAtom.set('run\\d+$'))
+    expect(host.querySelector('[role="alert"]')).toBeNull()
+    act(() => searchQueryAtom.set('a'.repeat(257)))
+    expect(host.querySelector('[role="alert"]')!.textContent).toContain('256 regex characters')
+    act(() => searchModeAtom.set(SearchMode.SUBSTRING))
+    expect(host.querySelector('[role="alert"]')).toBeNull()
+  } finally {
+    act(() => render(null, host))
+    host.remove()
+    searchIsActiveAtom.set(false)
+    searchQueryAtom.set('')
+    searchModeAtom.set(SearchMode.SUBSTRING)
   }
 })
 

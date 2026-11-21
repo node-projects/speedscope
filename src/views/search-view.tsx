@@ -3,7 +3,7 @@ import {h, createContext, ComponentChildren, Fragment} from 'preact'
 import {useCallback, useRef, useEffect, useMemo} from 'preact/hooks'
 import {memo} from 'preact/compat'
 import {Sizes, FontSize} from './style'
-import {ProfileSearchResults, SearchMode} from '../lib/profile-search'
+import {ProfileSearchResults, SearchMode, getSearchQueryError} from '../lib/profile-search'
 import {Profile} from '../lib/profile'
 import {useActiveProfileState} from '../app-state/active-profile-state'
 import {useTheme, withTheme} from './themes/theme'
@@ -27,6 +27,7 @@ export const ProfileSearchContextProvider = ({children}: {children: ComponentChi
     if (!profile || !searchIsActive || searchQuery.length === 0) {
       return null
     }
+    if (getSearchQueryError(searchQuery, searchMode)) return null
     return new ProfileSearchResults(profile, searchQuery, searchMode)
   }, [searchIsActive, searchQuery, searchMode, profile])
 
@@ -58,6 +59,10 @@ export const SearchView = memo(
     const searchIsActive = useAtom(searchIsActiveAtom)
     const searchQuery = useAtom(searchQueryAtom)
     const searchMode = useAtom(searchModeAtom)
+    const queryError = useMemo(
+      () => getSearchQueryError(searchQuery, searchMode),
+      [searchQuery, searchMode],
+    )
     const setSearchQuery = searchQueryAtom.set
     const setSearchIsActive = searchIsActiveAtom.set
 
@@ -158,11 +163,14 @@ export const SearchView = memo(
           <option value={SearchMode.SUBSTRING}>Contains</option>
           <option value={SearchMode.WHOLE_WORD}>Whole word</option>
           <option value={SearchMode.EXACT}>Exact</option>
+          <option value={SearchMode.REGEX}>Regex (RE2)</option>
         </select>
         <span className={css(style.inputContainer, zoomToMatch && style.zoomInput)}>
           <input
             maxLength={4096}
             aria-label="Search functions or files"
+            aria-invalid={!!queryError}
+            aria-describedby={queryError ? 'profile-search-error' : undefined}
             className={css(style.input)}
             value={searchQuery}
             onInput={onInput}
@@ -228,6 +236,11 @@ export const SearchView = memo(
         {resultsLimited && (
           <div role="status" className={css(style.limitNotice)}>
             Navigation limited to the first {numResults} matches. Refine your search.
+          </div>
+        )}
+        {queryError && (
+          <div role="alert" id="profile-search-error" className={css(style.limitNotice)}>
+            {queryError}
           </div>
         )}
       </div>
