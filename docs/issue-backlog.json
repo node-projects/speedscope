@@ -214,11 +214,11 @@
       "url": "https://github.com/jlfwong/speedscope/issues/511",
       "kind": "feature",
       "usefulness": "yes",
-      "status": "planned",
-      "priority": "P2",
+      "status": "implemented",
+      "priority": "none",
       "workstream": "Weight correctness and comparison",
-      "evidence": "Comparison/differential graphs require signed weights, baseline normalization and a new visual encoding. Existing nonnegative profile weights cannot represent negative deltas honestly.",
-      "remaining": "Comparison/differential graphs require signed weights, baseline normalization and a new visual encoding. Existing nonnegative profile weights cannot represent negative deltas honestly."
+      "evidence": "Profile actions now provides an in-app A/B comparison of two loaded profiles or an explicitly opened candidate recording. A separate bounded comparison model preserves both nonnegative originals, aligns full caller paths by source identity, and computes signed total/self deltas. Absolute mode requires matching units; normalized mode compares shares of each total (including idle) in percentage points. A viewport-bounded red/blue union graph supports selection and zoom; profile choices, result rows and search matches are paged/capped. Cancellation and changed-recording invalidation prevent stale results. Real PLC comparison and browser checks passed; see docs/IMPORT_VALIDATION_2026-11-21.md.",
+      "remaining": "Reviewed A/B comparison scope is implemented. This does not add signed-weight inputs, Brendan Gregg differential-folded parsing, statistical confidence, chronological alignment, or persisted/exported comparison models; signed-input work remains tracked separately by #228 and #370."
     },
     {
       "id": 510,
@@ -313,7 +313,7 @@
       "status": "partial",
       "priority": "P2",
       "workstream": "Synchronized tracks and annotations",
-      "evidence": "Corrected the prior classification: OpenTelemetry Profiles contain sampled stacks, not distributed spans. Current v1development dictionary/stack-table OTLP Profiles JSON now imports with exact references and uint64 epochs/addresses, metric units, full inline chains, separate resources/profiles/threads, safe aggregate weights and cancellation/resource guards. Timestamp-only samples contribute one per declared unit; period metadata does not multiply values. Native speedscope schema retains detection priority. Synthetic fixture, 42 tests and pinned official-schema provenance are documented in docs/OTEL_PROFILES.md.",
+      "evidence": "Corrected the prior classification: OpenTelemetry Profiles contain sampled stacks, not distributed spans. Current v1development dictionary/stack-table OTLP Profiles JSON now imports with exact references and uint64 epochs/addresses, metric units, full inline chains, separate resources/profiles/threads, safe aggregate weights and cancellation/resource guards. Timestamp-only samples contribute one per declared unit; period metadata does not multiply values. Native speedscope schema retains detection priority. Synthetic fixture, 42 tests and pinned official-schema provenance are documented in docs/OTEL_PROFILES.md. The dedicated worker now explicitly skips main-thread cooperative timer yields without changing weights or adding observation arrays; main-thread fallback retains yielding/cancellation. Two fresh-process million-sample current-schema JSON runs improved from 19.51-19.75 s to 1.396-1.399 s (about 14x), including parsing and snapshot construction but excluding browser worker startup/transfer. RSS was higher in these runs, retained heap comparable; this is a timing optimization, not a memory-reduction claim. See docs/OTEL_PROFILES.md for exact methodology and caveats.",
       "remaining": "Support is current-schema aggregate JSON, parsed in memory. Binary OTLP protobuf, older development layouts, original payload decoding and chronological/multitrack visualization remain unsupported. Development-schema changes require explicit revalidation; generic attributes/profile IDs/span links are not retained in viewer exports."
     },
     {
@@ -538,11 +538,11 @@
       "url": "https://github.com/jlfwong/speedscope/issues/445",
       "kind": "feature",
       "usefulness": "yes",
-      "status": "planned",
-      "priority": "P2",
+      "status": "implemented",
+      "priority": "none",
       "workstream": "Weight correctness and comparison",
-      "evidence": "Comparison/differential graphs require signed weights, baseline normalization and a new visual encoding. Existing nonnegative profile weights cannot represent negative deltas honestly.",
-      "remaining": "Comparison/differential graphs require signed weights, baseline normalization and a new visual encoding. Existing nonnegative profile weights cannot represent negative deltas honestly."
+      "evidence": "Profile actions now provides an in-app A/B comparison of two loaded profiles or an explicitly opened candidate recording. A separate bounded comparison model preserves both nonnegative originals, aligns full caller paths by source identity, and computes signed total/self deltas. Absolute mode requires matching units; normalized mode compares shares of each total (including idle) in percentage points. A viewport-bounded red/blue union graph supports selection and zoom; profile choices, result rows and search matches are paged/capped. Cancellation and changed-recording invalidation prevent stale results. Real PLC comparison and browser checks passed; see docs/IMPORT_VALIDATION_2026-11-21.md.",
+      "remaining": "Reviewed A/B comparison scope is implemented. This does not add signed-weight inputs, Brendan Gregg differential-folded parsing, statistical confidence, chronological alignment, or persisted/exported comparison models; signed-input work remains tracked separately by #228 and #370."
     },
     {
       "id": 444,
@@ -781,8 +781,8 @@
       "status": "planned",
       "priority": "P1",
       "workstream": "Weight correctness and comparison",
-      "evidence": "Negative Go heap delta weights require signed/differential representation. Silently dropping negative samples would produce incorrect allocation totals.",
-      "remaining": "Negative Go heap delta weights require signed/differential representation. Silently dropping negative samples would produce incorrect allocation totals."
+      "evidence": "The new A/B comparison model computes signed deltas between two ordinary nonnegative profiles. Negative Go heap delta pprof samples remain unsupported by the input/model path; a comparison dialog does not repair their import or justify dropping negative samples.",
+      "remaining": "Implement and validate signed Go heap delta import with an explicit differential representation and fixtures preserving allocation/deallocation totals. Keep this planned independently of the completed A/B comparison UI."
     },
     {
       "id": 369,
@@ -1165,8 +1165,8 @@
       "status": "planned",
       "priority": "P2",
       "workstream": "Weight correctness and comparison",
-      "evidence": "Comparison/differential graphs require signed weights, baseline normalization and a new visual encoding. Existing nonnegative profile weights cannot represent negative deltas honestly.",
-      "remaining": "Comparison/differential graphs require signed weights, baseline normalization and a new visual encoding. Existing nonnegative profile weights cannot represent negative deltas honestly."
+      "evidence": "A/B comparison of ordinary nonnegative recordings now has a separate signed-delta model and graph (#511/#445). That does not implement Brendan Gregg differential-folded input or change the ordinary profile model to accept signed samples.",
+      "remaining": "Define and fixture-test differential-folded column/negative-weight semantics, route them into an explicit signed representation, and retain both sides or a sound width envelope. Do not silently discard negative samples or reinterpret a differential input as ordinary folded counts."
     },
     {
       "id": 226,

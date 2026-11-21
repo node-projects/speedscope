@@ -102,6 +102,11 @@ Choose **Profile actions → Search all profiles…** to find functions across t
 and open a result in its original profile. Sandwich's table and caller/callee
 panes can now be resized with draggable or keyboard-operated dividers. See
 [search and layout controls](docs/SEARCH_AND_LAYOUT.md).
+Choose **Profile actions → Compare profiles…** to compare a baseline and candidate,
+including a second local recording. The differential flamegraph and paged table
+show signed total/self changes, with absolute or normalized weights. Both inputs
+remain in memory while comparing; graph rendering and comparison preparation have
+explicit limits. See [comparison semantics and limits](docs/PROFILE_COMPARISON.md).
 Use **Profile actions → Link to selected function…** to share a function selection.
 For local recordings, the recipient opens the link and imports the same file.
 Same-tab links and browser Back/Forward update the function selection without

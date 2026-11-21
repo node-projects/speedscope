@@ -73,7 +73,12 @@ The JSON document is currently parsed in memory; this is not a streaming JSON or
 protobuf importer. Import processing avoids an expanded observation/record array
 and does not retain flattened copies of every dictionary stack. Memory consists
 of the parsed JSON, output profiles, per-thread builder state and one stack.
-Processing yields every 4,096 counted operations and checks cancellation.
+Main-thread processing yields every 4,096 counted operations and checks
+cancellation. The dedicated import worker explicitly disables these timer
+yields, because cancelling the worker terminates its execution externally.
+The worker keeps the same limits and weight checks. Main-thread fallback keeps
+cooperative yielding, including when no cancellation signal was supplied; the
+optimization never infers worker execution from the presence of a signal.
 
 Limits are one million dictionary entries total; one million elements per input
 array; 100,000 expanded frames per stack; 4,096 attributes per set; 4,096
@@ -87,3 +92,26 @@ automatic network collection, and chronological OTLP visualization remain
 unsupported. Binary protobuf has no unique identifying magic; the importer does
 not guess it ahead of existing pprof detection. The synthetic fixture and its
 provenance are in `sample/profiles/otel-profiles`.
+
+## Worker import performance check
+
+On Windows on 2026-11-21, two fresh Node processes per case imported generated
+current-schema JSON based on `synthetic.json`: its samples were replaced with
+100,000 or 1,000,000 distinct `{stackIndex: 1, values: [String(i % 3 + 1)]}`
+objects. This exercises ordinary JSON detection and parsing, not a pre-parsed
+importer call. The benchmark invoked `processTraceInWorker` directly, including
+snapshot construction; it excludes browser worker startup and message transfer.
+The before case restored timer yielding in the worker options only.
+
+| Samples   | JSON size | Main thread   | Worker before | Worker without timer yields |
+| --------- | --------- | ------------- | ------------- | --------------------------- |
+| 100,000   | 3.05 MiB  | 1.82–1.91 s   | 1.94 s        | 0.159–0.170 s               |
+| 1,000,000 | 30.52 MiB | 19.00–19.46 s | 19.51–19.75 s | 1.396–1.399 s               |
+
+The worker removes 122 and 1,220 timer waits respectively. Totals remained
+199,999 and 1,999,999 nanoseconds. Main-thread yielding remains enabled.
+This is a timing optimization, not a new memory reduction: process high-water
+RSS for the million-sample runs was 359–382 MiB before and 392–402 MiB after,
+including fixture generation and all Node runtime allocations. Post-import
+retained heap was comparable. There is no additional observation array or stack
+cache; whole-document JSON parsing remains the dominant memory limitation.

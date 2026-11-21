@@ -40,6 +40,8 @@ import {
 export interface ImportReadOptions {
   signal?: AbortSignal
   onProgress?: (progress: ImportProgress) => void
+  // Internal worker fast path; main-thread callers retain cooperative yielding.
+  yieldToMainThread?: boolean
 }
 
 function checkImportAbort(options: ImportReadOptions) {
@@ -217,7 +219,7 @@ async function _importProfileGroup(
       return importSpeedscopeProfiles(parsed)
     } else if (isOTELProfiles(parsed)) {
       console.log('Importing as OTLP Profiles JSON')
-      return importFromOTELProfiles(parsed, fileName, options.signal)
+      return importFromOTELProfiles(parsed, fileName, options)
     } else if (parsed['systemHost'] && parsed['systemHost']['name'] == 'Firefox') {
       console.log('Importing as Firefox profile')
       return toGroup(importFromFirefox(parsed))

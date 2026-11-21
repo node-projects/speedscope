@@ -44,6 +44,7 @@
     "docs/RELEASING.md",
     "docs/LARGE_TRACE_PERFORMANCE.md",
     "docs/PROFILE_FILTERS.md",
+    "docs/PROFILE_COMPARISON.md",
     "docs/SEARCH_AND_LAYOUT.md",
     "docs/SOURCE_AND_LABELS.md",
     "docs/JAVA_THREAD_DUMPS.md",

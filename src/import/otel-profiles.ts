@@ -54,8 +54,10 @@ function safe(value: any, label: string): number {
 export async function importFromOTELProfiles(
   input: any,
   fileName: string,
-  signal?: AbortSignal,
+  options: {signal?: AbortSignal; yieldToMainThread?: boolean} = {},
 ): Promise<ProfileGroup> {
+  const {signal} = options
+  const yieldToMainThread = options.yieldToMainThread !== false
   object(input, 'document')
   if (input.developmentVersion != null && String(input.developmentVersion) !== '1') {
     fail('unsupported developmentVersion (only 1 is supported)')
@@ -143,7 +145,7 @@ export async function importFromOTELProfiles(
   function checkpoint(): boolean {
     if (++work > 10_000_000) fail('expanded input exceeds 10,000,000 operations')
     if (signal?.aborted) throw new DOMException('Import cancelled', 'AbortError')
-    return (work & 4095) === 0
+    return yieldToMainThread && (work & 4095) === 0
   }
   let profileNumber = 0
   for (const resource of array(input.resourceProfiles, 'resourceProfiles')) {
