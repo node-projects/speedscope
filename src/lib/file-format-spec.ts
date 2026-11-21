@@ -15,6 +15,8 @@ export namespace FileFormat {
     profiles: Profile[]
     // Independent measured series, never stack frames or synthetic samples.
     counterTracks?: CounterTrack[]
+    instantTracks?: InstantTrack[]
+    instantEventOmission?: InstantEventOmission
 
     // The name of the contained profile group. If omitted, will use the name of
     // the file itself.
@@ -65,6 +67,27 @@ export namespace FileFormat {
     values: number[]
   }
 
+  export interface InstantEventOmission {
+    count: number
+    reason: 'point-limit' | 'track-limit' | 'metadata-limit' | 'details-limit'
+  }
+  export interface InstantEventInfo {
+    name: string
+    category?: string
+    details?: string
+  }
+  export interface InstantTrack {
+    id: string
+    name: string
+    clock: string
+    timeUnit: 'nanoseconds' | 'microseconds' | 'milliseconds' | 'seconds'
+    start: number
+    scope: 'thread' | 'process' | 'global'
+    processId?: string
+    threadId?: string
+    times: number[]
+    events: InstantEventInfo[]
+  }
   export enum ProfileType {
     EVENTED = 'evented',
     SAMPLED = 'sampled',

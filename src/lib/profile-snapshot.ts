@@ -1,6 +1,7 @@
 import type {FrameInfo, TimelineOrigin} from './profile'
 import type {FileFormat} from './file-format-spec'
 import type {CounterTrack} from './counter-track'
+import type {InstantTrack, InstantEventOmission} from './instant-track'
 
 // Internal worker transport, not an interchange format or a public package API.
 // Node records contain frame index, parent index, total weight and self weight.
@@ -25,6 +26,8 @@ export interface ProfileGroupSnapshot {
   indexToView: number
   profiles: ProfileSnapshot[]
   counterTracks?: readonly CounterTrack[]
+  instantTracks?: readonly InstantTrack[]
+  instantEventOmission?: InstantEventOmission
 }
 
 export function snapshotTransferables(group: ProfileGroupSnapshot): ArrayBuffer[] {
@@ -37,6 +40,7 @@ export function snapshotTransferables(group: ProfileGroupSnapshot): ArrayBuffer[
     buffers.add(track.times.buffer as ArrayBuffer)
     buffers.add(track.values.buffer as ArrayBuffer)
   }
+  for (const track of group.instantTracks || []) buffers.add(track.times.buffer as ArrayBuffer)
   return [...buffers]
 }
 

@@ -1,6 +1,7 @@
 import {Frame, ProfileGroup} from './profile'
 import {FileFormat} from './file-format-spec'
 import {hydrateCounterTracks} from './counter-track'
+import {hydrateInstantTracks, validateInstantTrackOmissionState} from './instant-track'
 
 export interface ExportProgress {
   profilesCompleted: number
@@ -10,6 +11,8 @@ export interface ExportProgress {
   frameCount: number
   counterSamplesWritten?: number
   counterCount?: number
+  instantPointsWritten?: number
+  instantTrackCount?: number
 }
 
 export interface ExportOptions {
@@ -38,6 +41,9 @@ export async function exportProfileGroupToBlob(
     frameCount: 0,
     ...(group.counterTracks
       ? {counterSamplesWritten: 0, counterCount: group.counterTracks.length}
+      : {}),
+    ...(group.instantTracks
+      ? {instantPointsWritten: 0, instantTrackCount: group.instantTracks.length}
       : {}),
   }
   // Message tasks yield to input/rendering without nested timer clamping, which
@@ -76,7 +82,15 @@ export async function exportProfileGroupToBlob(
 
   try {
     await pause()
+    const instantEventOmission = validateInstantTrackOmissionState(
+      group.instantTracks,
+      group.instantEventOmission,
+    )
     const counterTracks = await hydrateCounterTracks(group.counterTracks, {
+      signal: options.signal,
+      yieldControl: pause,
+    })
+    const instantTracks = await hydrateInstantTracks(group.instantTracks, {
       signal: options.signal,
       yieldControl: pause,
     })
@@ -86,6 +100,7 @@ export async function exportProfileGroupToBlob(
         name: group.name,
         activeProfileIndex: group.indexToView,
         $schema: 'https://www.speedscope.app/file-format-schema.json',
+        ...(instantEventOmission ? {instantEventOmission} : {}),
       }).slice(0, -1) + ',"profiles":[',
     )
     for (let index = 0; index < group.profiles.length; index++) {
@@ -153,6 +168,29 @@ export async function exportProfileGroupToBlob(
           write((index ? ',' : '') + String(values[index]))
           progress.counterSamplesWritten!++
           if (++samplesWritten % 16384 === 0) await pause()
+        }
+        write(']}')
+      }
+      write(']')
+    }
+    if (instantTracks !== undefined) {
+      write(',"instantTracks":[')
+      let pointsWritten = 0
+      for (let trackIndex = 0; trackIndex < instantTracks.length; trackIndex++) {
+        const {times, events, ...metadata} = instantTracks[trackIndex]
+        if (trackIndex) write(',')
+        write(JSON.stringify(metadata).slice(0, -1) + ',"times":[')
+        for (let index = 0; index < times.length; index++) {
+          if (!Number.isFinite(times[index]))
+            throw new Error('Instant timestamps changed during export')
+          write((index ? ',' : '') + String(times[index]))
+          if (++pointsWritten % 1024 === 0) await pause()
+        }
+        write('],"events":[')
+        for (let index = 0; index < events.length; index++) {
+          write((index ? ',' : '') + JSON.stringify(events[index]))
+          progress.instantPointsWritten!++
+          if (++pointsWritten % 1024 === 0) await pause()
         }
         write(']}')
       }

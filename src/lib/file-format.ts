@@ -11,8 +11,17 @@ import {TimeFormatter, ByteFormatter, RawValueFormatter} from './value-formatter
 import {FileFormat} from './file-format-spec'
 import {ExportOptions, exportProfileGroupToBlob} from './profile-export'
 import {exportCounterTracks, importCounterTracks} from './counter-track'
+import {
+  exportInstantTracks,
+  importInstantTracks,
+  validateInstantTrackOmissionState,
+} from './instant-track'
 
 export function exportProfileGroup(profileGroup: ProfileGroup): FileFormat.File {
+  const instantEventOmission = validateInstantTrackOmissionState(
+    profileGroup.instantTracks,
+    profileGroup.instantEventOmission,
+  )
   const frames: FileFormat.Frame[] = []
 
   const indexForFrame = new Map<Frame, number>()
@@ -40,6 +49,10 @@ export function exportProfileGroup(profileGroup: ProfileGroup): FileFormat.File 
     $schema: 'https://www.speedscope.app/file-format-schema.json',
     shared: {frames},
     profiles: [],
+    ...(instantEventOmission ? {instantEventOmission} : {}),
+    ...(profileGroup.instantTracks
+      ? {instantTracks: exportInstantTracks(profileGroup.instantTracks)}
+      : {}),
     ...(profileGroup.counterTracks
       ? {counterTracks: exportCounterTracks(profileGroup.counterTracks)}
       : {}),
@@ -173,6 +186,10 @@ function importSpeedscopeProfile(
 }
 
 export function importSpeedscopeProfiles(serialized: FileFormat.File): ProfileGroup {
+  const instantEventOmission = validateInstantTrackOmissionState(
+    serialized.instantTracks,
+    serialized.instantEventOmission,
+  )
   for (const frame of serialized.shared.frames) {
     if (
       frame.color !== undefined &&
@@ -185,6 +202,10 @@ export function importSpeedscopeProfiles(serialized: FileFormat.File): ProfileGr
     name: serialized.name || serialized.profiles[0]?.name || 'profile',
     indexToView: serialized.activeProfileIndex || 0,
     profiles: serialized.profiles.map(p => importSpeedscopeProfile(p, serialized.shared.frames)),
+    ...(instantEventOmission ? {instantEventOmission} : {}),
+    ...(serialized.instantTracks === undefined
+      ? {}
+      : {instantTracks: importInstantTracks(serialized.instantTracks)}),
     ...(serialized.counterTracks === undefined
       ? {}
       : {counterTracks: importCounterTracks(serialized.counterTracks)}),

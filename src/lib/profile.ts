@@ -3,6 +3,7 @@ import {ValueFormatter, RawValueFormatter, TimeFormatter, ByteFormatter} from '.
 import {FileFormat} from './file-format-spec'
 import {ProfileSnapshot, HydrationOptions} from './profile-snapshot'
 import type {CounterTrack} from './counter-track'
+import type {InstantTrack, InstantEventOmission} from './instant-track'
 import {CallEventRangeIndexOptions, ProfileCallEventRangeIndex} from './profile-call-event-index'
 
 export interface FrameInfo {
@@ -119,6 +120,8 @@ export interface ProfileGroup {
   indexToView: number
   profiles: Profile[]
   counterTracks?: readonly CounterTrack[]
+  instantTracks?: readonly InstantTrack[]
+  instantEventOmission?: InstantEventOmission
 }
 
 export interface CallTreeEvent {
