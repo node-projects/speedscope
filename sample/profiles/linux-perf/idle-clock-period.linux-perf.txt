@@ -1,0 +1,43 @@
+# Synthetic stacks using the 13 timestamp/period header facts from upstream #393.
+# Source: https://github.com/jlfwong/speedscope/files/9230041/profile.out.gz
+# Original gzip SHA-256: 40b9123046dc918018f40030426851d15622077843a8cd2923371750a6fa5efa
+# 13 * 20408163 ns = 265306119 ns sampled CPU time; wall span is 30.230697 s.
+DiscoveryClient 2609559/2614953 [064] 14958227.127527:   20408163 cpu-clock:
+  100 app.Worker.poll (/synthetic/app)
+
+DiscoveryClient 2609559/2614953 [064] 14958227.147936:   20408163 cpu-clock:
+  100 app.Worker.poll (/synthetic/app)
+
+DiscoveryClient 2609559/2614953 [016] 14958227.157707:   20408163 cpu-clock:
+  100 app.Worker.poll (/synthetic/app)
+
+DiscoveryClient 2609559/2614953 [016] 14958227.178116:   20408163 cpu-clock:
+  100 app.Worker.poll (/synthetic/app)
+
+DiscoveryClient 2609559/2614953 [016] 14958227.198524:   20408163 cpu-clock:
+  100 app.Worker.poll (/synthetic/app)
+
+DiscoveryClient 2609559/2614953 [016] 14958227.218932:   20408163 cpu-clock:
+  100 app.Worker.poll (/synthetic/app)
+
+DiscoveryClient 2609559/2614953 [016] 14958227.239340:   20408163 cpu-clock:
+  100 app.Worker.poll (/synthetic/app)
+
+DiscoveryClient 2609559/2614953 [030] 14958257.252087:   20408163 cpu-clock:
+  100 app.Worker.poll (/synthetic/app)
+
+DiscoveryClient 2609559/2614953 [030] 14958257.272495:   20408163 cpu-clock:
+  100 app.Worker.poll (/synthetic/app)
+
+DiscoveryClient 2609559/2614953 [030] 14958257.292903:   20408163 cpu-clock:
+  100 app.Worker.poll (/synthetic/app)
+
+DiscoveryClient 2609559/2614953 [078] 14958257.317407:   20408163 cpu-clock:
+  100 app.Worker.poll (/synthetic/app)
+
+DiscoveryClient 2609559/2614953 [078] 14958257.337816:   20408163 cpu-clock:
+  100 app.Worker.poll (/synthetic/app)
+
+DiscoveryClient 2609559/2614953 [078] 14958257.358224:   20408163 cpu-clock:
+  100 app.Worker.poll (/synthetic/app)
+

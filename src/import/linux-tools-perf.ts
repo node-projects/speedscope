@@ -69,11 +69,17 @@ function parseEvent(rawEvent: string[]): PerfEvent | null {
   let inlineFrame: PerfStackFrame | null = null
   if (timeMatch) {
     event.time = parseFloat(timeMatch[1])
-    const fields = /^(?:(\d+)\s+)?(\S+):(?:\s+(.*))?$/.exec(
+    const fields = /^(?:([+-]?\d+)\s+)?(\S+):(?:\s+(.*))?$/.exec(
       firstLine.slice(timeMatch.index + timeMatch[0].length),
     )
     if (fields) {
-      if (fields[1]) event.period = Number(fields[1])
+      if (fields[1]) {
+        event.period = Number(fields[1])
+        if (!Number.isSafeInteger(event.period) || event.period < 0)
+          throw new Error(
+            'perf sample periods must be finite non-negative safe integers (at most 9007199254740991). Record with a smaller event period.',
+          )
+      }
       event.eventType = normalizeEventType(fields[2])
       // With --hide-call-graph perf prints the sampled IP, symbol and DSO on
       // the header itself. Keep this leaf only when no real callchain follows.
@@ -112,14 +118,43 @@ export interface LinuxPerfParserOptions {
   maxSamples?: number
 }
 
+type PerfWeightMode = 'nanoseconds' | 'counter' | 'samples' | 'inferred'
+
+function weightMode(event: PerfEvent): PerfWeightMode {
+  // cpu-clock/task-clock periods are nanoseconds, not timestamp distances:
+  // kernel/events/core.c perf_swevent_init_hrtimer() / ns_to_ktime(period).
+  // perf record --off-cpu likewise reports sleeping time in nanosecond periods.
+  // https://github.com/torvalds/linux/blob/master/tools/perf/Documentation/perf-record.txt
+  const clock = /^(?:cpu-clock|task-clock|offcpu-time)(?::.*)?$/.test(event.eventType)
+  if (event.period !== null) return clock ? 'nanoseconds' : 'counter'
+  // Retain the original timestamp inference only when its sample period is
+  // unavailable. The profile label explicitly distinguishes this estimate.
+  return /^(?:cycles|cpu-clock|task-clock)(?::.*)?$/.test(event.eventType) ? 'inferred' : 'samples'
+}
+
+function weightLabel(type: string, mode: PerfWeightMode): string {
+  const name = type || 'unknown event'
+  switch (mode) {
+    case 'nanoseconds':
+      return `${name}; ${
+        /^offcpu-time(?::.*)?$/.test(type) ? 'sampled off-CPU time' : 'sampled CPU time'
+      }`
+    case 'inferred':
+      return `${name}; inferred timeline, period missing`
+    case 'samples':
+      return `${name}; sample count, period missing`
+    default:
+      return name
+  }
+}
+
 // Sync and streaming callers share sample identity and weight semantics. Only
 // the current event's lines are retained in addition to the output builders.
 export function createLinuxPerfParser(options: LinuxPerfParserOptions = {}) {
   const profiles = new Map<
     string,
-    {builder: StackListProfileBuilder; name: string; type: string; counter: boolean}
+    {builder: StackListProfileBuilder; name: string; type: string; mode: PerfWeightMode}
   >()
-  const eventTypes = new Set<string>()
   let missingStacks = false
   let pending: string[] = []
   let pendingChars = 0
@@ -137,22 +172,28 @@ export function createLinuxPerfParser(options: LinuxPerfParserOptions = {}) {
       throw new Error('Streaming text import limit exceeded (stack depth)')
     if (++samples > (options.maxSamples ?? Infinity))
       throw new Error('Streaming text import limit exceeded (sample count)')
-    eventTypes.add(event.eventType)
 
     let profileNameParts = []
     if (event.command) profileNameParts.push(event.command)
     if (event.processID != null) profileNameParts.push(`pid: ${event.processID}`)
     if (event.threadID != null) profileNameParts.push(`tid: ${event.threadID}`)
     const profileName = profileNameParts.join(' ')
-    const counter = !/^(?:cycles|cpu-clock|task-clock)(?::.*)?$/.test(event.eventType)
+    const mode = weightMode(event)
     const builderState = getOrInsert(
       profiles,
-      JSON.stringify([profileName, event.eventType]),
+      JSON.stringify([profileName, event.eventType, mode]),
       () => {
         const builder = new StackListProfileBuilder()
         builder.setName(profileName)
-        builder.setValueFormatter(counter ? new RawValueFormatter() : new TimeFormatter('seconds'))
-        return {builder, name: profileName, type: event.eventType, counter}
+        builder.setValueFormatter(
+          mode === 'nanoseconds'
+            ? new TimeFormatter('nanoseconds')
+            : mode === 'inferred'
+              ? new TimeFormatter('seconds')
+              : new RawValueFormatter(),
+        )
+        builder.setChronological(mode === 'inferred')
+        return {builder, name: profileName, type: event.eventType, mode}
       },
     )
 
@@ -164,8 +205,8 @@ export function createLinuxPerfParser(options: LinuxPerfParserOptions = {}) {
         file: file,
       }
     })
-    if (counter) builder.appendSampleWithWeight(stack, event.period ?? 1)
-    else builder.appendSampleWithTimestamp(stack, event.time)
+    if (mode === 'inferred') builder.appendSampleWithTimestamp(stack, event.time)
+    else builder.appendSampleWithWeight(stack, event.period ?? 1)
   }
 
   const flush = () => {
@@ -196,8 +237,7 @@ export function createLinuxPerfParser(options: LinuxPerfParserOptions = {}) {
       return null
     }
     for (const state of profiles.values()) {
-      if (eventTypes.size > 1 || state.counter)
-        state.builder.setName(`${state.name} [${state.type}]`)
+      state.builder.setName(`${state.name} [${weightLabel(state.type, state.mode)}]`)
     }
     return {
       name: profiles.size === 1 ? Array.from(profiles.values())[0].builder.getName() : '',

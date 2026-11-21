@@ -72,7 +72,8 @@ test('hybrid CPU event names do not discard migrated samples (#554)', () => {
     .join('\n')
   const group = importFromLinuxPerf(new StringBackedTextFileContent(text))!
   expect(group.profiles).toHaveLength(1)
-  expect(group.profiles[0].getTotalWeight()).toBe(2)
+  expect(group.profiles[0].getTotalWeight()).toBe(30)
+  expect(group.profiles[0].getWeightUnit()).toBe('none')
 })
 
 test('perf counter profiles use event weights and keep separate event kinds (#335)', () => {

@@ -1,5 +1,6 @@
 {
   "reviewedOn": "2026-11-18",
+  "inventoryCheckedOn": "2026-11-21",
   "source": "https://github.com/jlfwong/speedscope/issues",
   "scope": "All currently open upstream issues; fork-local status, not upstream closure. Closed issues are outside this inventory.",
   "issues": [
@@ -309,11 +310,11 @@
       "url": "https://github.com/jlfwong/speedscope/issues/490",
       "kind": "feature",
       "usefulness": "yes",
-      "status": "planned",
+      "status": "partial",
       "priority": "P2",
       "workstream": "Synchronized tracks and annotations",
-      "evidence": "OTEL distributed spans include asynchronous relationships and clock/resource attributes beyond a synchronous call tree. Prefer a specified span-to-track mapping with cross-process fixtures.",
-      "remaining": "OTEL distributed spans include asynchronous relationships and clock/resource attributes beyond a synchronous call tree. Prefer a specified span-to-track mapping with cross-process fixtures."
+      "evidence": "Corrected the prior classification: OpenTelemetry Profiles contain sampled stacks, not distributed spans. Current v1development dictionary/stack-table OTLP Profiles JSON now imports with exact references and uint64 epochs/addresses, metric units, full inline chains, separate resources/profiles/threads, safe aggregate weights and cancellation/resource guards. Timestamp-only samples contribute one per declared unit; period metadata does not multiply values. Native speedscope schema retains detection priority. Synthetic fixture, 42 tests and pinned official-schema provenance are documented in docs/OTEL_PROFILES.md.",
+      "remaining": "Support is current-schema aggregate JSON, parsed in memory. Binary OTLP protobuf, older development layouts, original payload decoding and chronological/multitrack visualization remain unsupported. Development-schema changes require explicit revalidation; generic attributes/profile IDs/span links are not retained in viewer exports."
     },
     {
       "id": 489,
@@ -528,7 +529,7 @@
       "status": "partial",
       "priority": "P3",
       "workstream": "Import formats and correctness",
-      "evidence": "V8 log import now preserves source coordinates for Unicode/spaced method names, Windows paths, URLs and absolute paths containing spaces. Sourcemap matching normalizes Windows separators and accepts an exact first mapping; an end-to-end local-map regression verifies remapped names and positions. Profile actions now offers explicit linked source-map discovery from an HTTP(S) generated-script URL, preview and Apply. It honors exposed SourceMap headers or safely tokenized trailing sourceMappingURL comments, validates generated-file identity, resolves original sources relative to the map, and caps downloads/decoded mappings/changed frames. Network access begins only after Load preview; CORS errors retain local-map fallback.",
+      "evidence": "V8 log import now preserves source coordinates for Unicode/spaced method names, Windows paths, URLs and absolute paths containing spaces. Sourcemap matching normalizes Windows separators and accepts an exact first mapping; an end-to-end local-map regression verifies remapped names and positions. Profile actions now offers explicit linked source-map discovery from an HTTP(S) generated-script URL, preview and Apply. It honors exposed SourceMap headers or safely tokenized trailing sourceMappingURL comments, validates generated-file identity, resolves original sources relative to the map, and caps downloads/decoded mappings/changed frames. Network access begins only after Load preview; CORS errors retain local-map fallback. Embedded-source symbol inference now uses a 16-source sparse checkpoint LRU capped at 256 KiB typed storage rather than repeated prefix scans. Random-order lookup and cache/line-boundary regressions preserve results; previews yield after 8 ms or 128 frames. The maintained source-map benchmark checks identical lookup/remapping outputs. SourceMapConsumer decoding remains synchronous under existing linked limits.",
       "remaining": "Unattended automatic map fetching, local filesystem discovery, credentialed/redirected requests, inline data maps and scripts without safe annotation/header discovery remain unsupported. Logs without usable source positions and ambiguous producer paths still need separate handling; the original Node/esbuild automatic-loading case is not claimed fixed."
     },
     {
@@ -672,8 +673,8 @@
       "status": "planned",
       "priority": "P1",
       "workstream": "Weight correctness and comparison",
-      "evidence": "Off-CPU attribution cannot be corrected using sample timestamps alone. Need sched-switch/period-aware recording support and tests separating blocked time from CPU work; do not label idle intervals as execution.",
-      "remaining": "Off-CPU attribution cannot be corrected using sample timestamps alone. Need sched-switch/period-aware recording support and tests separating blocked time from CPU work; do not label idle intervals as execution."
+      "evidence": "Recorded cpu-clock/task-clock periods now produce aggregate sampled CPU nanoseconds, offcpu-time remains separate aggregate blocked time, and cycle/other periods remain raw event counts. Missing-period clock/cycle timelines are explicitly inferred and mixed modes stay separate. Unsafe individual periods fail clearly. The public 13-sample DiscoveryClient case now reports 265306119 ns instead of a 30.230697-second timestamp span. Generic and streaming exports agree; authored regression and period/unit/zero/mixed-mode tests pass. See docs/PERF_IMPORT.md.",
+      "remaining": "Exact wall-time idle-hole placement and aligned CPU/off-CPU timelines still require scheduler-switch intervals and associations. Missing-period clock/cycle captures retain labeled interpolation rather than measured CPU-time claims; record periods to obtain corrected aggregate weights."
     },
     {
       "id": 389,

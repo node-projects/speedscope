@@ -2,6 +2,8 @@ import {readFileSync, writeFileSync} from 'node:fs'
 
 const data = JSON.parse(readFileSync('docs/issue-backlog.json', 'utf8'))
 const issues = data.issues
+if (data.inventoryCheckedOn && !/^\d{4}-\d{2}-\d{2}$/.test(data.inventoryCheckedOn))
+  throw new Error('Invalid upstream inventory check date')
 const ids = new Set()
 for (const issue of issues) {
   if (
@@ -39,6 +41,11 @@ const statuses = [
   'obsolete',
 ]
 let output = `# Upstream issue backlog\n\n**We have not fixed every speedscope issue.** This inventory covers all **${issues.length} open upstream issues** checked on ${data.reviewedOn}. It does not claim to audit closed issues or close upstream reports.\n\nSource: [upstream issues](${data.source}). [Machine-readable classifications](issue-backlog.json) · [Detailed review evidence](UPSTREAM_ISSUE_REVIEW.md) · [Performance work](LARGE_TRACE_PERFORMANCE.md).\n\n## Summary\n\n| Kind | Implemented | Already supported | Partial | Planned | Needs reproduction | Declined | Obsolete | Total |\n| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |\n`
+if (data.inventoryCheckedOn)
+  output = output.replace(
+    '\n\nSource:',
+    `\n\nOpen-issue IDs were rechecked on ${data.inventoryCheckedOn}; this is an inventory check, not a fresh review of every discussion.\n\nSource:`,
+  )
 for (const kind of ['bug', 'feature', 'maintenance']) {
   const rows = issues.filter(i => i.kind === kind)
   output += `| ${kind} | ${statuses

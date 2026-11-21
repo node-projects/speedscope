@@ -49,6 +49,8 @@
     "docs/JAVA_THREAD_DUMPS.md",
     "docs/JAVA_THREAD_DUMP_ZIP.md",
     "docs/IMPORT_FORMATS.md",
+    "docs/PERF_IMPORT.md",
+    "docs/OTEL_PROFILES.md",
     "docs/OFFLINE.md",
     "docs/SINGLE_FILE.md",
     "docs/PROPERTY_TESTS.md",

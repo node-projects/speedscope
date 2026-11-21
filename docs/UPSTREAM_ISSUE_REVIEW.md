@@ -180,5 +180,19 @@ and fast combined-stack inversion. The PLC download matches the standard exporte
 exactly and reimports with original totals. See
 [large-trace measurements and limits](LARGE_TRACE_PERFORMANCE.md) for reproducible
 benchmark commands and the throughput/memory tradeoff of cooperative export.
-Large JSON imports remain in-memory/main-thread operations; the OOM issues are
-still partially resolved, and synchronized tracks/comparisons remain deferred.
+At that point large JSON imports still materialized their input on the main
+thread. Subsequent streaming/worker work is recorded in the maintained backlog;
+the OOM issues remain partial, and synchronized tracks/comparisons remain open.
+
+## Inventory refresh, 2026-11-21
+
+The GitHub open-issue inventory was fetched again using `gh issue list` with a
+200-issue limit. It contained exactly the same 134 issue IDs as the maintained
+backlog: no new open issues or removed IDs. This checks membership, not the
+current validity of every comment or the completeness of every implementation.
+
+The #490 follow-up corrected a substantive classification error: OpenTelemetry
+Profiles describe sampled stacks, rather than distributed tracing spans.
+Its importer work follows the actual current OTLP Profiles schema. The #393
+follow-up uses explicit perf sample periods to distinguish recorded counter/clock
+weights from timestamp gaps; missing-period timelines remain inferred.

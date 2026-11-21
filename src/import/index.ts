@@ -30,6 +30,7 @@ import {importFromJSSelfProfiling, isJSSelfProfiling} from './js-self-profiling'
 import {importFromJavaThreadDump, isJavaThreadDump} from './java-thread-dump'
 import type {ImportProgress} from './trace-worker-protocol'
 import {importFromAndroidMethodTrace, isAndroidMethodTrace} from './android-method-trace'
+import {importFromOTELProfiles, isOTELProfiles} from './otel-profiles'
 import {
   checkJavaThreadDumpZipFileSize,
   importFromJavaThreadDumpZip,
@@ -214,6 +215,9 @@ async function _importProfileGroup(
     if (parsed['$schema'] === 'https://www.speedscope.app/file-format-schema.json') {
       console.log('Importing as speedscope json file')
       return importSpeedscopeProfiles(parsed)
+    } else if (isOTELProfiles(parsed)) {
+      console.log('Importing as OTLP Profiles JSON')
+      return importFromOTELProfiles(parsed, fileName, options.signal)
     } else if (parsed['systemHost'] && parsed['systemHost']['name'] == 'Firefox') {
       console.log('Importing as Firefox profile')
       return toGroup(importFromFirefox(parsed))
