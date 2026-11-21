@@ -35,7 +35,7 @@ export class Color {
   }
 
   static fromCSSHex(hex: string) {
-    if (hex.length !== 7 || hex[0] !== '#') {
+    if (hex.length !== 7 || !/^#[0-9a-f]{6}$/i.test(hex)) {
       throw new Error(`Invalid color input ${hex}`)
     }
     const r = parseInt(hex.substr(1, 2), 16) / 255
