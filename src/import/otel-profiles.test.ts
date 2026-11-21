@@ -216,13 +216,15 @@ test('aborts before importing and yields while processing large observation arra
   const input = fixture()
   const controller = new AbortController()
   controller.abort()
-  await expect(importFromOTELProfiles(input, 'cancelled', controller.signal)).rejects.toMatchObject(
-    {name: 'AbortError'},
-  )
+  await expect(
+    importFromOTELProfiles(input, 'cancelled', {signal: controller.signal}),
+  ).rejects.toMatchObject({name: 'AbortError'})
   const active = new AbortController()
   profile(input).samples = [{stackIndex: 1, values: new Array(20000).fill('1')}]
   setTimeout(() => active.abort(), 0)
-  await expect(importFromOTELProfiles(input, 'cancelled', active.signal)).rejects.toMatchObject({
+  await expect(
+    importFromOTELProfiles(input, 'cancelled', {signal: active.signal}),
+  ).rejects.toMatchObject({
     name: 'AbortError',
   })
 })

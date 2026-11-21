@@ -27,6 +27,7 @@ export async function processTraceInWorker(
       progress('Parsing profile')
       group = await importProfilesFromArrayBuffer(request.name, buffer, {
         onProgress: update => progress(update.phase),
+        yieldToMainThread: false,
       })
     }
   } catch (error) {
