@@ -1,0 +1,4 @@
+# Synthetic perf script --hide-call-graph output with inline IP, symbol and DSO.
+  V8 WorkerThread 41/42 [001] 1.000000: 100 cycles:u: 0000000000000100 leaf+0x12 (/work/my app)
+  V8 WorkerThread 41/42 [000] 2.000000: 200 cycles:u: 0000000000000200 [unknown] ([unknown])
+  V8 WorkerThread 41/42 [001] 3.000000: 100 cycles:u: 0000000000000100 leaf+0x18 (/work/my app)

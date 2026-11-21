@@ -35,7 +35,13 @@ function normalizeEventType(eventType: string): string {
 function* parseEvents(contents: TextFileContent): Generator<PerfEvent | null> {
   let buffer: string[] = []
   for (let line of contents.splitLines()) {
-    if (line === '') {
+    line = line.replace(/\r$/, '')
+    // Without callchains, perf prints consecutive sample headers without blank
+    // separators. Retain at most one event instead of buffering the recording.
+    if (/^\s*(\S.*?)\s+(\d+)(?:\/(\d+))?\s+/.test(line) && /\s+\d+\.\d+:\s+/.test(line)) {
+      if (buffer.length) yield parseEvent(buffer)
+      buffer = [line]
+    } else if (line.trim() === '') {
       yield parseEvent(buffer)
       buffer = []
     } else buffer.push(line)
@@ -64,7 +70,7 @@ function parseEvent(rawEvent: string[]): PerfEvent | null {
   // Note: command name may contain spaces, e.g.
   //
   //  V8 WorkerThread 25607 4794564.109216: cycles:
-  const eventStartMatch = /^(\S.*?)\s+(\d+)(?:\/(\d+))?\s+/.exec(firstLine)
+  const eventStartMatch = /^\s*(\S.*?)\s+(\d+)(?:\/(\d+))?\s+/.exec(firstLine)
   if (!eventStartMatch) return null
 
   event.command = eventStartMatch[1]
@@ -78,15 +84,26 @@ function parseEvent(rawEvent: string[]): PerfEvent | null {
   }
 
   const timeMatch = /\s+(\d+\.\d+):\s+/.exec(firstLine)
+  let inlineFrame: PerfStackFrame | null = null
   if (timeMatch) {
     event.time = parseFloat(timeMatch[1])
-    const period = /^(\d+)\s+\S+:/.exec(firstLine.slice(timeMatch.index + timeMatch[0].length))
-    if (period) event.period = Number(period[1])
-  }
-
-  const evName = /(\S+):\s*$/.exec(firstLine)
-  if (evName) {
-    event.eventType = normalizeEventType(evName[1])
+    const fields = /^(?:(\d+)\s+)?(\S+):(?:\s+(.*))?$/.exec(
+      firstLine.slice(timeMatch.index + timeMatch[0].length),
+    )
+    if (fields) {
+      if (fields[1]) event.period = Number(fields[1])
+      event.eventType = normalizeEventType(fields[2])
+      // With --hide-call-graph perf prints the sampled IP, symbol and DSO on
+      // the header itself. Keep this leaf only when no real callchain follows.
+      // See Linux tools/perf/builtin-script.c: no_callchain and PERF_OUTPUT_IP.
+      const leaf = /^([\da-f]+)\s+(.+) \(([^()]*)\)\s*$/i.exec(fields[3] || '')
+      if (leaf)
+        inlineFrame = {
+          address: `0x${leaf[1]}`,
+          symbolName: leaf[2].replace(/\+0x[\da-f]+$/i, ''),
+          file: leaf[3],
+        }
+    }
   }
 
   for (let line of lines) {
@@ -102,6 +119,7 @@ function parseEvent(rawEvent: string[]): PerfEvent | null {
     event.stack.push({address: `0x${address}`, symbolName, file})
   }
   event.stack.reverse()
+  if (event.stack.length === 0 && inlineFrame) event.stack.push(inlineFrame)
 
   return event
 }
@@ -155,7 +173,7 @@ export function importFromLinuxPerf(contents: TextFileContent): ProfileGroup | n
   if (profiles.size === 0) {
     if (missingStacks)
       throw new Error(
-        'perf output contains no call stacks. Record with -g and use perf script without --hide-call-graph.',
+        'perf output contains no call stacks or sampled symbols. Record with -g and use perf script without --hide-call-graph, or include ip,sym,dso fields for leaf-only samples.',
       )
     return null
   }
