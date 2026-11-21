@@ -159,6 +159,10 @@ The Sandwich view is a table view in which you can find a list of all functions 
 
 ## Navigation
 
+**Help** opens an overlay inside the app with view descriptions, keyboard
+shortcuts, import guidance and large-file/offline tips. Close it with Escape
+or **Close help**; it also works without a network connection.
+
 Function selection follows you between Time Order, Left Heavy and Sandwich;
 each view keeps its own call instance and zoom within the active profile.
 

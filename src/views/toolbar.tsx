@@ -25,6 +25,7 @@ import {openProfileSearchMatch} from '../app-state/search-navigation'
 import {SourceLinksDialog} from './source-links-dialog'
 import {compactFrameLabelsAtom} from '../app-state/display-preferences'
 import {FrameInfo} from '../lib/profile'
+import {HelpButton} from './help'
 
 interface ToolbarProps extends ApplicationProps {
   browseForFile(): void
@@ -303,15 +304,9 @@ function ToolbarRightContent(props: ToolbarProps) {
   )
 
   const help = (
-    <div className={css(style.toolbarTab)}>
-      <a
-        href="https://github.com/node-projects/speedscope#usage"
-        className={css(style.noLinkStyle)}
-        target="_blank"
-      >
-        <span className={css(style.emoji)}>❓</span>Help
-      </a>
-    </div>
+    <HelpButton className={css(style.toolbarTab)}>
+      <span className={css(style.emoji)}>❓</span>Help
+    </HelpButton>
   )
 
   return (
@@ -507,10 +502,6 @@ const getStyle = withTheme(theme =>
       verticalAlign: 'middle',
       paddingTop: '0px',
       marginRight: '0.3em',
-    },
-    noLinkStyle: {
-      textDecoration: 'none',
-      color: 'inherit',
     },
   }),
 )

@@ -51,8 +51,10 @@ For a new version, it attaches the newly built npm tarball as well.
 
 ## npm trusted publishing after the first publication
 
-The npm trusted publisher was created successfully on 2026-11-18 for
-`@node-projects/speedscope`. It authorizes the following GitHub Actions identity:
+The original npm trusted publisher, created on 2026-11-18, expired before its
+first automated publication. It was recreated on 2026-11-21 and successfully
+published **2.1.0** through the [release workflow retry](https://github.com/node-projects/speedscope/actions/runs/44884626601/attempts/2).
+This validates end-to-end OIDC publication for the following GitHub Actions identity:
 
 - Organization/user: `node-projects`
 - Repository: `speedscope`
@@ -79,16 +81,27 @@ npm trust github @node-projects/speedscope --repository node-projects/speedscope
 ```
 
 npm requires fresh two-factor authentication for these account operations. The
-setup was completed through the CLI's browser authentication flow; no credentials
-were added to the repository. Recreating an existing publisher is not a routine
+original setup used the CLI's browser authentication flow; the replacement used
+npm's package settings in the browser. No credentials were added to the repository.
+Recreating an existing publisher is not a routine
 release step.
 
 New publisher configurations must complete their first successful automated
 publish within **two days**, otherwise npm expires them. Creating a GitHub release
 for an already-published version does not validate OIDC because this workflow
 skips the npm publish step for that version. Use the next new version (for example
-`v2.0.1`) when ready. Until that first workflow publish, setup is verified but an
-end-to-end OIDC publication has not been exercised.
+`v2.0.1`) when ready. The recreated connection completed this validation with
+2.1.0; the two-day deadline applies to new, unvalidated connections.
+
+If publication fails with `E404` while the package exists, inspect **Trusted
+Publisher** in npm package settings. On 2026-11-21 this displayed **Expired**;
+the runner's Node/npm versions and OIDC permission were already correct. Delete
+the expired connection, recreate the same identity with direct publication
+allowed, then retry the failed job or dispatch the existing release tag.
+npm may require separate fresh authentication checks to view settings, delete
+the expired connection and save its replacement. Verify the retry's publish
+step and the registry's version/dist-tag afterward. No code or tag change was
+needed for this recovery.
 
 See [npm's trusted publisher setup](https://docs.npmjs.com/trusted-publishers/).
 The repository URL in package.json points to this fork, as required for provenance.

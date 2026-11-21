@@ -21,6 +21,7 @@ import {canUseXHR} from '../app-state'
 import {ProfileGroupState} from '../app-state/profile-group'
 import {HashParams} from '../lib/hash-params'
 import {StatelessComponent} from '../lib/preact-helpers'
+import {HelpButton} from './help'
 import {SandwichViewContainer} from './sandwich-view'
 import {CallTreeView} from './call-tree-view'
 import {
@@ -601,16 +602,8 @@ export class Application extends StatelessComponent<ApplicationProps> {
           </div>
 
           <p className={css(style.landingP)}>
-            See the{' '}
-            <a
-              className={css(style.link)}
-              href="https://github.com/node-projects/speedscope#usage"
-              target="_blank"
-            >
-              documentation
-            </a>{' '}
-            for information about supported file formats, keyboard shortcuts, and how to navigate
-            around the profile.
+            See the <HelpButton>in-app help</HelpButton> for information about supported file
+            formats, keyboard shortcuts, and how to navigate around the profile.
           </p>
 
           <p className={css(style.landingP)}>
