@@ -1,4 +1,59 @@
-# Source-code links and compact graph labels
+# Source maps, source-code links and compact graph labels
+
+## Load a linked JavaScript source map
+
+Choose **Profile actions → Load linked source map…** after loading a recording.
+Enter the generated JavaScript's HTTP(S) URL as it appears in the recording.
+The dialog suggests the selected function's HTTP(S) source URL when available.
+Opening the dialog or selecting a function performs no network request.
+
+1. Choose **Load preview** to fetch that script and its linked source map.
+2. Review the generated-script URL, resolved map URL and number of frames that
+   would change. The recording remains unchanged during preview.
+3. Choose **Apply source map** to update matching symbols and source locations
+   across the loaded profiles. Weights, profile flags and recording metadata
+   remain intact. Editing the URL invalidates the preview.
+
+The map applies only to the chosen generated-script URL, including its query
+string. It may have a different or hashed filename. Relative original-source
+URLs are resolved against the fetched map URL; original source files are never
+fetched. A script's exposed `SourceMap` response header takes precedence over
+`X-SourceMap` and its trailing `sourceMappingURL` comment. JavaScript comments
+are located with a tokenizer, so annotation-like text inside strings and
+templates cannot initiate a map request. The script is never executed.
+
+Both requests omit cookies and other credentials, use CORS and `no-store`, and
+reject redirects. Use a direct URL whose server allows cross-origin access.
+For a cross-origin `SourceMap` header, the server must also expose that header
+with `Access-Control-Expose-Headers`. HTTP errors, CORS failures, missing links
+and unmatched source positions stay visible in the dialog. **Cancel load**,
+Escape and Close abort pending work. Importing another recording or changing
+the profile models closes the dialog and invalidates its captured preview.
+
+The downloaded script body is limited to 8 MiB when it must be inspected; an
+exposed map header allows its body to be cancelled immediately. A map is limited
+to 2 MiB. Before decoding mappings, the loader limits their encoded segment
+count to 100,000 across nested index maps, with at most 1,000 indexed sections,
+32 nesting levels and 128 encoded characters in one VLQ segment. The preview
+retains at most 100,000 changed frames. Loading has a 30-second timeout and yields
+between token/preview batches so cancellation can be handled. These limits
+bound the additional work; they do not make the underlying recording independent
+of browser memory limits.
+
+For local scripts/maps, choose **Import** and open the `.map` file after loading
+your recording. This also provides a fallback when CORS or credentials prevent
+remote loading, a limit is exceeded, or the generated script cannot be fetched.
+Both workflows need usable recorded line and column positions.
+The browser does not read arbitrary local paths from a recording. Inline
+`data:` maps, non-HTTP(S) links and URLs containing embedded credentials are
+unsupported in the linked-map dialog. JavaScript syntax unrecognized by its
+ES2020 tokenizer requires an exposed map header or local-map import.
+
+This is explicit linked-map discovery for upstream
+[#446](https://github.com/jlfwong/speedscope/issues/446), not automatic filesystem
+discovery for Node/esbuild logs. Logs without usable source positions still
+cannot be mapped. The linking/header behavior follows
+[ECMA-426](https://tc39.es/ecma426/2024/#sec-retrieving-source-maps).
 
 ## Open a source location
 

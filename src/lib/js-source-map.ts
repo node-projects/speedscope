@@ -19,9 +19,63 @@ import {findIndexBisect} from './utils'
 
 const DEBUG = false
 
+export interface SourceMapRemapOptions {
+  // An explicitly selected generated file overrides the map's optional file
+  // field and filename heuristic (linked maps need not share a basename).
+  generatedFile?: string
+  maxMappings?: number
+  sourceMapURL?: string
+}
+
+function canonicalHTTPFile(file: string | undefined): string | null {
+  if (file == null) return null
+  try {
+    const url = new URL(file)
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null
+    url.hash = ''
+    return url.href
+  } catch {
+    return null
+  }
+}
+
+// Count encoded segments before SourceMapConsumer expands its decoded arrays,
+// including nested index maps. Do not split the mappings string into an array.
+function checkMappingBudget(contents: unknown, maximum: number): void {
+  const pending = [{value: contents, depth: 0}]
+  let segments = 0,
+    sections = 0
+  while (pending.length) {
+    const {value, depth} = pending.pop()!
+    if (value == null || typeof value !== 'object') continue
+    const map = value as {mappings?: unknown; sections?: unknown}
+    if (typeof map.mappings === 'string') {
+      let segmentLength = 0
+      for (let i = 0; i < map.mappings.length; i++) {
+        const char = map.mappings[i]
+        if (char === ',' || char === ';') segmentLength = 0
+        else {
+          if (segmentLength++ === 0 && ++segments > maximum)
+            throw new Error(`Source map exceeds ${maximum.toLocaleString('en-US')} mappings`)
+          if (segmentLength > 128) throw new Error('Source map contains an oversized VLQ segment')
+        }
+      }
+    }
+    if (Array.isArray(map.sections)) {
+      if (depth >= 32) throw new Error('Source map index nesting exceeds 32 levels')
+      for (const section of map.sections) {
+        if (++sections > 1000) throw new Error('Source map exceeds 1,000 indexed sections')
+        if (section && typeof section === 'object')
+          pending.push({value: section.map, depth: depth + 1})
+      }
+    }
+  }
+}
+
 export async function importJavaScriptSourceMapSymbolRemapper(
   contentsString: string,
   sourceMapFileName: string,
+  options: SourceMapRemapOptions = {},
 ): Promise<SymbolRemapper | null> {
   const sourceMap = await sourceMapModule
 
@@ -30,15 +84,34 @@ export async function importJavaScriptSourceMapSymbolRemapper(
 
   try {
     contents = JSON.parse(contentsString)
-    consumer = new sourceMap.default.SourceMapConsumer(contents!)
+  } catch {
+    return null
+  }
+  if (
+    options.maxMappings !== undefined &&
+    (!Number.isSafeInteger(options.maxMappings) || options.maxMappings < 1)
+  )
+    throw new Error('Invalid source-map mapping limit')
+  if (options.maxMappings !== undefined) checkMappingBudget(contents, options.maxMappings)
+  try {
+    // source-map 0.6.1 accepts this public second argument, although its old
+    // bundled declarations omit it. It resolves relative sources against the
+    // fetched map URL without fetching any original source files.
+    const Consumer = sourceMap.default.SourceMapConsumer as unknown as {
+      new (raw: RawSourceMap, mapURL?: string): SourceMapConsumer
+    }
+    consumer = new Consumer(contents!, options.sourceMapURL)
   } catch (e) {
     return null
   }
 
   const mappingItems: MappingItem[] = []
-
   consumer.eachMapping(
     function (m: MappingItem) {
+      if (options.maxMappings !== undefined && mappingItems.length >= options.maxMappings)
+        throw new Error(
+          `Source map exceeds ${options.maxMappings.toLocaleString('en-US')} mappings`,
+        )
       // The sourcemap library uses 1-based line numbers, and 0-based column
       // numbers. speedscope uses 1-based line-numbers, and 1-based column
       // numbers for its in-memory representation, so we'll normalize that
@@ -59,11 +132,31 @@ export async function importJavaScriptSourceMapSymbolRemapper(
   if (!mappingItems.length) return null
 
   const sourceMapFileNameWithoutExt = sourceMapFileName.replace(/\\/g, '/').replace(/\.[^/]*$/, '')
+  const explicitGeneratedFile = canonicalHTTPFile(options.generatedFile)
+  let cachedContent: string | null = null
+  let cachedLineNumber = -1
+  let cachedLine: string | undefined
+  const sourceLine = (content: string, lineNumber: number) => {
+    if (content === cachedContent && lineNumber === cachedLineNumber) return cachedLine
+    cachedContent = content
+    cachedLineNumber = lineNumber
+    let start = 0
+    for (let i = 1; i < lineNumber; i++) {
+      const newline = content.indexOf('\n', start)
+      if (newline < 0) return (cachedLine = undefined)
+      start = newline + 1
+    }
+    const end = content.indexOf('\n', start)
+    return (cachedLine = content.slice(start, end < 0 ? content.length : end))
+  }
 
   return (frame: Frame) => {
     const frameFile = frame.file?.replace(/\\/g, '/')
     let fileMatches = false
-    if (contents?.file && contents.file.replace(/\\/g, '/') === frameFile) {
+    if (options.generatedFile !== undefined) {
+      fileMatches =
+        explicitGeneratedFile !== null && canonicalHTTPFile(frameFile) === explicitGeneratedFile
+    } else if (contents?.file && contents.file.replace(/\\/g, '/') === frameFile) {
       fileMatches = true
     } else if (
       ('/' + frameFile?.replace(/\.[^/]*$/, '')).endsWith('/' + sourceMapFileNameWithoutExt)
@@ -141,8 +234,7 @@ export async function importJavaScriptSourceMapSymbolRemapper(
       // throws instead of returning null.
       const content = consumer?.sourceContentFor(sourceMapItem.source, true)
       if (content) {
-        const lines = content.split('\n')
-        const line = lines[sourceMapItem.originalLine - 1]
+        const line = sourceLine(content, sourceMapItem.originalLine)
         if (line) {
           // It's possible this source map entry will contain stuff other than
           // the name, so let's only consider word-ish characters that are part
