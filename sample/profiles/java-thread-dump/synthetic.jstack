@@ -1,0 +1,39 @@
+2026-11-21 10:00:00
+Full thread dump OpenJDK 64-Bit Server VM (21 mixed mode):
+
+"main" #1 [101] prio=5 os_prio=0 cpu=10.0ms elapsed=20.0s tid=0x00000001 nid=101 runnable [0x1000]
+   java.lang.Thread.State: RUNNABLE
+        at app.Main.render(Main.java:20)
+        at app.Main.main(Main.java:10)
+
+"worker" #2 daemon prio=5 os_prio=0 tid=0x00000002 nid=0x102 waiting on condition [0x2000]
+   java.lang.Thread.State: WAITING (parking)
+        at jdk.internal.misc.Unsafe.park(Native Method)
+        - parking to wait for <0x1234> (a java.lang.Object)
+        at app.Worker.run(Worker.java:41)
+
+"worker" #3 prio=5 os_prio=0 tid=0x00000003 nid=0x103 runnable [0x3000]
+   java.lang.Thread.State: RUNNABLE
+        at java.base@21.0.1/java.lang.Thread.run(Unknown Source)
+
+"VM Thread" os_prio=0 tid=0x00000004 nid=0x104 runnable
+
+JNI global refs: 12
+
+2026-11-21 10:00:02
+Full thread dump OpenJDK 64-Bit Server VM (21 mixed mode):
+
+"main" #1 [101] prio=5 os_prio=0 cpu=11.0ms elapsed=22.0s tid=0x00000001 nid=101 runnable [0x1000]
+   java.lang.Thread.State: RUNNABLE
+        at app.Main.render(Main.java:21)
+        at app.Main.main(Main.java:10)
+
+"worker" #2 daemon prio=5 os_prio=0 tid=0x00000002 nid=0x102 runnable [0x2000]
+   java.lang.Thread.State: RUNNABLE
+        at app.Worker.work(Worker.java:90)
+        at app.Worker.run(Worker.java:41)
+
+Found one Java-level deadlock:
+=============================
+"worker":
+        at app.Worker.thisIsADiagnosticRepeat(Worker.java:999)

@@ -51,6 +51,7 @@ speedscope is designed to ingest profiles from a variety of different profilers 
   - [Importing from async‐profiler (Java)
 ](https://github.com/jlfwong/speedscope/wiki/Importing-from-async%E2%80%90profiler-(Java))
   - [Importing from Java Flight Recorder](https://github.com/jlfwong/speedscope/wiki/Importing-from-Java-Flight-Recorder)
+  - [Importing Java thread dumps (`jstack` / `Thread.print`)](docs/JAVA_THREAD_DUMPS.md)
 - Erlang/Elixir
   - [eflambe](https://github.com/Stratus3D/eflambe)
 - Native code
@@ -67,6 +68,8 @@ above are maintained upstream and remain useful for the supported file formats.
 
 Visit [the hosted app](https://node-projects.github.io/speedscope/), then browse for a
 profile file or drag it onto the page. Imported profiles stay in your browser.
+After a successful online visit, the hosted app can reopen offline and import a
+local recording. See [offline use and update behavior](docs/OFFLINE.md).
 
 Large JSON and trace captures import in the background with progress and a
 **Cancel import** button. This improves responsiveness; very large captures can
@@ -155,6 +158,9 @@ The Sandwich view is a table view in which you can find a list of all functions 
 
 
 ## Navigation
+
+Function selection follows you between Time Order, Left Heavy and Sandwich;
+each view keeps its own call instance and zoom within the active profile.
 
 The overview outlines the visible range. Tab to **Profile overview** for keyboard
 pan, plus/minus zoom, and Home to reset. See [overview controls](docs/SEARCH_AND_LAYOUT.md#navigate-the-overview).

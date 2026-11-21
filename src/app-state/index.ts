@@ -4,6 +4,7 @@ import {getHashParams, HashParams} from '../lib/hash-params'
 import {ProfileGroupAtom} from './profile-group'
 import {Vec2} from '../lib/math'
 import {SearchMode} from '../lib/profile-search'
+import {getProfileToView} from './getters'
 
 // True if recursion should be flattened when viewing flamegraphs
 export const flattenRecursionAtom = new Atom<boolean>(false, 'flattenRecursion')
@@ -22,11 +23,6 @@ export const viewModeAtom = new Atom<ViewMode>(ViewMode.CHRONO_FLAME_CHART, 'vie
 
 // The top-level profile group from which most other data will be derived
 export const profileGroupAtom = new ProfileGroupAtom(null, 'profileGroup')
-
-viewModeAtom.subscribe(() => {
-  // If we switch views, the hover information is no longer relevant
-  profileGroupAtom.clearHoverNode()
-})
 
 // Parameters defined by the URL encoded k=v pairs after the # in the URL
 const hashParams = getHashParams()
@@ -82,3 +78,26 @@ export const tableSortMethodAtom = new Atom<SortMethod>(
   },
   'tableSortMethod',
 )
+
+let synchronizingSelection = false
+function synchronizeSelection() {
+  if (synchronizingSelection) return
+  const active = profileGroupAtom.getActiveProfile()
+  if (!active) return
+  synchronizingSelection = true
+  try {
+    const model = getProfileToView({
+      profile: active.profile,
+      flattenRecursion: flattenRecursionAtom.get(),
+    })
+    profileGroupAtom.synchronizeSelection(viewModeAtom.get(), model)
+  } finally {
+    synchronizingSelection = false
+  }
+}
+profileGroupAtom.subscribe(synchronizeSelection)
+flattenRecursionAtom.subscribe(synchronizeSelection)
+viewModeAtom.subscribe(() => {
+  profileGroupAtom.clearHoverNode()
+  synchronizeSelection()
+})

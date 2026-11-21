@@ -35,6 +35,44 @@ A local PLC smoke check searched 17,510 frames across four profiles, found 40
 matches without truncation, and left all profile totals unchanged. It took about
 148 ms with ten yields in that Node run; this is not a browser latency guarantee.
 
+## Keep a function selected across views
+
+Selecting a function in Time Order, Left Heavy or Sandwich now carries that
+function into the other two views of the same profile. Selection uses the frame
+key, so same-named functions from different files remain distinct. Each view
+keeps its own valid call-tree instance and zoom. If it has no instance for the
+newly selected function, it chooses the first matching node in that view's
+depth-first tree order. The view does not automatically change its time range;
+an instance can therefore be outside the current zoom. Search navigation remains
+available to select and zoom into a particular occurrence.
+
+Clearing selection carries across views too. Different profiles/threads retain
+their own selection; a newly imported group or newly created derived profile
+starts fresh. Call Tree retains its independent expansion controls.
+
+Toggling recursion flattening keeps the function key but discards node/hover and
+caller/callee references from the old tree. Selection is resolved against the
+new visible model. Its aggregate/derived flags are now retained as well, so
+flattening does not accidentally enable Time Order for aggregate data or make a
+derived view count as an original recording.
+
+Only one resolved node per graph view and primitive selection keys are stored.
+Model identities use weak keys; there is no per-function occurrence index or
+additional profile copy. A first lookup can scan an entire target tree with
+O(depth) traversal storage. Resolved matches and absent occurrences are reused
+until the model/function changes, so hover and pan updates do not rescan the
+tree. Clearing hovers now emits at most one state update rather than four.
+Cross-profile search resolves directly into Sandwich instead of scanning the
+outgoing graph for an unused occurrence. UI selection is not exported.
+
+This implements [#107](https://github.com/jlfwong/speedscope/issues/107).
+Targeted tests cover distinct source files, exact per-view instances, profile
+isolation, empty groups, transformed models, unchanged hover updates and a
+30,000-level tree. In a PLC Node smoke check, first-occurrence lookup for the
+last source frame took about 7.6 ms in Time Order and 5.5 ms in the grouped tree;
+the full export hash remained unchanged. These are individual measurements,
+not browser responsiveness guarantees.
+
 ## Navigate the overview
 
 The overview above Time Order and Left Heavy shows an outlined **Visible range**
@@ -197,6 +235,23 @@ errors. A PLC streaming smoke retained four profiles, 17,510 frames and
 profile copy. Source-name metadata is one bounded string per group.
 
 ## Upstream review
+
+The 2026-11-21 shared-selection, Java text-dump, hosted-offline and numerical
+test follow-up passed all 393 Jest tests across 68 suites (307 snapshots), five
+Node tests, type checking, lint, schema/backlog checks, both release builds and
+npm package-content checks. Binary JFR signatures take precedence over embedded
+thread-dump text; the existing unnamed-recording regression covers this case.
+Browser checks covered per-view occurrence retention, same-named source frames,
+recursion/derived profiles, and importing a local Java dump after stopping the
+preview server. An uncached remote recording correctly failed offline.
+
+The private PLC streaming check retained four profiles, 17,510 exported frames
+and 1,039,656 call events with SHA-256
+`522de77afbfc4dd94f1f30c3a9551979d12db506305ffef999db9c910ae8eddb`
+(shared data followed by each exported profile, hashed separately). Its final
+Node run took about four seconds to import, with first-occurrence lookup for
+the last source frame taking 5.4 ms in Time Order and 4.2 ms in Left Heavy.
+These are local smoke measurements, not browser performance guarantees.
 
 On 2026-11-20, the 30 most recently created open upstream issues were checked.
 Their IDs were already present in the existing 134-issue inventory. This is a

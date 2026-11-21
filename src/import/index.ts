@@ -27,6 +27,7 @@ import {importFromPapyrus} from './papyrus'
 import {importFromPMCStatCallGraph} from './pmcstat-callgraph'
 import {importFromJfr, isJfrRecording} from './java-flight-recorder'
 import {importFromJSSelfProfiling, isJSSelfProfiling} from './js-self-profiling'
+import {importFromJavaThreadDump, isJavaThreadDump} from './java-thread-dump'
 
 export async function importProfileGroupFromText(
   fileName: string,
@@ -95,6 +96,13 @@ async function _importProfileGroup(dataSource: ProfileDataSource): Promise<Profi
     }
   }
 
+  // Binary JFR recordings can embed complete text thread dumps. Honor the
+  // binary signature before decoding or sniffing that embedded text.
+  if (isJfrRecording(buffer)) {
+    console.log('Importing as Java Flight Recorder profile')
+    return importFromJfr(fileName, buffer)
+  }
+
   const contents = await dataSource.readAsText()
 
   // First pass: Check known file format names to infer the file type
@@ -137,6 +145,15 @@ async function _importProfileGroup(dataSource: ProfileDataSource): Promise<Profi
   } else if (fileName.endsWith('.jfr')) {
     console.log('Importing as Java Flight Recorder profile')
     return await importFromJfr(fileName, buffer)
+  } else if (fileName.endsWith('.jstack')) {
+    console.log('Importing as Java thread dump snapshots')
+    return importFromJavaThreadDump(contents, fileName)
+  }
+
+  // Recognizable text dumps do not need a whole-document JSON parse attempt.
+  if (isJavaThreadDump(contents.firstChunk())) {
+    console.log('Importing as Java thread dump snapshots')
+    return importFromJavaThreadDump(contents, fileName)
   }
 
   // Second pass: Try to guess what file format it is based on structure
@@ -211,11 +228,6 @@ async function _importProfileGroup(dataSource: ProfileDataSource): Promise<Profi
     if (/^(Stack_|Script_|Obj_)\S+ log opened \(PC\)\n/.exec(contents.firstChunk())) {
       console.log('Importing as Papyrus profile')
       return toGroup(importFromPapyrus(contents))
-    }
-
-    if (isJfrRecording(buffer)) {
-      console.log('Importing as Java Flight Recorder profile')
-      return importFromJfr(fileName, buffer)
     }
 
     const fromLinuxPerf = importFromLinuxPerf(contents)

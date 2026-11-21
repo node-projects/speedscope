@@ -501,6 +501,8 @@ export class Profile {
     const flattenedProfile = builder.build()
     flattenedProfile.name = this.name
     flattenedProfile.valueFormatter = this.valueFormatter
+    flattenedProfile.setChronological(this.isChronological())
+    flattenedProfile.setDerived(this.isDerived())
 
     // When constructing a profile with recursion flattened,
     // counter-intuitive things can happen to "self time" measurements
