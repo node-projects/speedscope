@@ -1,6 +1,28 @@
 # Import-format validation, 2026-11-21
 
-This batch adds classic Android method traces, bounded Java thread-dump ZIP
+## Trace Event diagnostic follow-up
+
+Recording-wide diagnostic quotas now replace per-event warning floods, keeping
+two lazy examples for each of four matching categories plus one completed-import
+summary. Tests cover shared quotas across threads, reset between imports, exact
+recovery call geometry and repeated exports, empty/clean imports, skipped
+formatters, control escaping and 512/2,048-character snippet/message limits.
+
+The public #235/#236 capture's 212,789 warning calls / 60,150,871 bytes become
+nine calls / 1,745 bytes. The PLC's 26 calls / 6,050 bytes become six calls /
+1,180 bytes. Both full chunked Blob exports are byte-for-byte identical by size
+and SHA-256; retained counter/instant metadata is included in that comparison.
+The PLC still exports four profiles, 17,510 shared frames and 1,039,656 call
+events, with the original timeline/no-timeline payload hashes unchanged.
+See [measurements and limits](LARGE_TRACE_PERFORMANCE.md#bounded-trace-event-diagnostic-logging-2026-11-21).
+
+The full local Node 22.23.5 ARM64 suite passed **783 tests in 113 suites with
+310 snapshots**. All five Node tests, type checking, lint, schema/backlog checks,
+standalone/single-file/Pages builds and dry-run npm contents checks passed.
+Existing matching, automatic closure and ignored-end behavior is preserved;
+this change does not claim to repair crossing intervals or bound total memory.
+
+An earlier batch added classic Android method traces, bounded Java thread-dump ZIP
 archives, broader large-file worker routing, and pprof metadata corrections.
 See [format coverage and limitations](IMPORT_FORMATS.md) and
 [ZIP limits](JAVA_THREAD_DUMP_ZIP.md). It does not make generic formats streaming

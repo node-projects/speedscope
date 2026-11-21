@@ -1,5 +1,51 @@
 # Large trace performance follow-up
 
+## Bounded Trace Event diagnostic logging (2026-11-21)
+
+Duration-event matching previously wrote every warning to the console. The
+public #235/#236 capture generated 212,789 messages containing 60,150,871 UTF-8
+bytes. Logging now emits at most two examples per category across all threads,
+then one summary after a completed import: at most nine console calls. The
+collector stores four counts, never an event history or formatter closure.
+Suppressed messages skip formatting; displayed frame-key snippets are clipped
+before escaping control characters and capped at 512 UTF-16 code units. Each
+example, including its prefix, is capped at 2,048 code units.
+
+The public capture produces nine messages / 1,745 UTF-8 bytes while preserving
+all 212,789 diagnostic occurrences in its summary. The PLC produces six
+messages / 1,180 bytes rather than 26 / 6,050 bytes. Both retain identical
+chunked native export bytes and hashes. The public capture still has 113
+profiles, 12 counter series and the explicit 309,230-point omission; the PLC
+still has four profiles, 17,510 shared frames and 1,039,656 call events, with
+the payload hashes documented below unchanged.
+
+Three sequential fresh-process pairs per input compared `2f6fa35` with this
+change on Windows ARM64 / Node 24.19.0. The second pair reversed revision
+order, and no local builds/tests overlapped the timing windows. Native console
+output was forwarded to disk through the same lightweight call counter on both
+revisions. Import time and OS peak RSS were captured before export validation.
+
+| Input | Median import before → after (range, ms) | Median peak RSS before → after (range, MiB) |
+| --- | --- | --- |
+| Public #235 | 3,731 (3,671–3,775) → 2,870 (2,869–2,933) | 493.8 (487.7–501.3) → 469.9 (467.1–473.3) |
+| Private PLC | 2,463 (2,456–2,503) → 2,491 (2,438–3,018) | 592.9 (591.7–602.0) → 609.9 (605.0–621.6) |
+
+The warning-heavy public input improved in these runs. The PLC, with only 26
+original warnings, did not: its import time was similar overall and its measured
+transient peak RSS increased. Its median post-GC model heap stayed essentially
+equal (130.32 → 130.20 MiB). These measurements do not establish lower total
+memory for every input or browser performance. Reproduce streaming import with
+`node scripts/benchmark-profile.mjs <capture> stream-import`; private captures,
+diagnostic logs and comparison bundles remain uncommitted.
+
+These are matching diagnostics, not a count of invalid records. Begin/end
+arguments may differ. Existing ignored ends, automatic closures, timestamp
+ordering and recovery semantics are unchanged. This reduces console output
+and its formatting overhead; it does not bound frame-key serialization needed
+for matching, queue storage, profile models, browser console retention for
+other code, or total memory. OOM issues and crossing-interval reports remain
+partial. No application-wide console patch is installed.
+
 ## Scoped instant events and optional data limits (2026-11-21)
 
 Trace Event `i`, historical `I` and `R` records now produce independent scoped
