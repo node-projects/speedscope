@@ -6,9 +6,43 @@ jest.mock(
 )
 
 import {Application, GLCanvas} from './application'
-import {CallTreeProfileBuilder} from '../lib/profile'
+import {CallTreeProfileBuilder, StackListProfileBuilder, ProfileGroup} from '../lib/profile'
+import {createFunctionLink} from '../lib/function-link'
+import {getHashParams} from '../lib/hash-params'
+import {profileGroupAtom, viewModeAtom} from '../app-state'
 import * as fileFormat from '../lib/file-format'
 import {ViewMode} from '../lib/view-mode'
+
+test('function links restore the destination profile after loading and do not reapply to later imports', async () => {
+  const builder = new StackListProfileBuilder()
+  builder.setName('worker')
+  builder.appendSampleWithWeight([{key: 1, name: 'run', file: 'worker.ts', line: 2}], 1)
+  const profile = builder.build()
+  const profiles = [new CallTreeProfileBuilder().build(), profile]
+  const link = createFunctionLink('https://example.org/', profiles, 1, [...profile.getFrames()][0])
+  const app = new Application({
+    hashParams: getHashParams(new URL(link).hash),
+    setError: jest.fn(),
+    setLoading: jest.fn(),
+    viewMode: ViewMode.LEFT_HEAVY_FLAME_GRAPH,
+    setViewMode: (mode: ViewMode) => viewModeAtom.set(mode),
+    setProfileGroup: (group: ProfileGroup) => profileGroupAtom.setProfileGroup(group),
+  } as any)
+  app.forceUpdate = jest.fn()
+  try {
+    await (app as any).loadProfile(async () => ({name: 'capture', indexToView: 0, profiles}))
+    expect(viewModeAtom.get()).toBe(ViewMode.SANDWICH_VIEW)
+    expect(profileGroupAtom.getActiveProfile()!.profile).toBe(profile)
+    expect(
+      profileGroupAtom.getActiveProfile()!.sandwichViewState.callerCallee!.selectedFrame.key,
+    ).toBe(1)
+    await (app as any).loadProfile(async () => ({name: 'replacement', indexToView: 0, profiles}))
+    expect(profileGroupAtom.get()!.indexToView).toBe(0)
+  } finally {
+    profileGroupAtom.set(null)
+    viewModeAtom.set(ViewMode.CHRONO_FLAME_CHART)
+  }
+})
 
 test('a superseded import cannot replace a newer profile or clear its loading state', async () => {
   const group = (name: string) => ({

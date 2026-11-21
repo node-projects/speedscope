@@ -113,6 +113,11 @@ function HelpDialog(props: {onClose(): void}) {
             originals available. Source-code links and compact path labels are also configurable
             there.
           </p>
+          <p>
+            Link to selected function creates a bookmark that opens the function in Sandwich. Share
+            the original recording separately for local files; the link does not include the
+            recording or a particular call instance.
+          </p>
         </section>
         <section className={css(style.card)}>
           <h3 className={css(style.sectionTitle)}>Large files and offline use</h3>

@@ -1,0 +1,4 @@
+tid:101;main.py:<module>:1;main.py:run:12;worker.py:parse_payload:40 7
+tid:202;worker.py:run:8;<native> 5
+tid:101;main.py:<module>:1;main.py:run:12;<GC> 3
+tid:202;worker.py:run:8;λ_worker.py:<lambda>:23 2

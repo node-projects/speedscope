@@ -129,11 +129,11 @@
       "url": "https://github.com/jlfwong/speedscope/issues/528",
       "kind": "feature",
       "usefulness": "yes",
-      "status": "partial",
-      "priority": "P3",
+      "status": "supported",
+      "priority": "none",
       "workstream": "Import formats and correctness",
-      "evidence": "Collapsed stack traces use the existing folded importer, now including fractional/exponent weights and comments. A Python 3.15-specific fixture is still needed before claiming every alpha exporter variant supported.",
-      "remaining": "Collapsed stack traces use the existing folded importer, now including fractional/exponent weights and comments. A Python 3.15-specific fixture is still needed before claiming every alpha exporter variant supported."
+      "evidence": "Verified against CPython 3.15 CollapsedStackCollector at pinned commit a0a5af4: --collapsed output works through the existing folded importer. Synthetic fixture/tests preserve raw counts, tid roots, literal source labels, Unicode and special markers; 3-byte chunk detection and export round-trip pass. See sample/profiles/python-sampling/README.md.",
+      "remaining": "This covers --collapsed text only. Thread IDs remain stack roots in one aggregate profile; labels are not parsed into full source locations. Binary, pstats and generated HTML formats remain outside this claim."
     },
     {
       "id": 524,
@@ -168,8 +168,8 @@
       "status": "partial",
       "priority": "P1",
       "workstream": "Large profiles and responsiveness",
-      "evidence": "Cancellable streaming duration imports now frame one bounded event at a time for native JSON parsing, keeping byte/event/depth guards and format fallbacks. Three fresh-process PLC comparisons reduced median import time from 4336 to 2493 ms and median peak RSS from 613 to 579 MiB. Export equality verified; general out-of-core storage/rendering and original OOM cases remain open. Complete-event queues now reuse original begin events and retain compact end records; already chronological queues avoid sort workspace. Selected-stack details render at most 100 ancestors per page. Graph search now retains at most 10,000 navigation matches, 4,096 boolean frame results and 512 labels with at most 64 ranges each; truncation is explicit and matching continues outside the navigation window.",
-      "remaining": "Temporary import queues, selected-stack DOM and graph-search caches/navigation are reduced or bounded. Final profile models, worker snapshots, unordered sorting, graph geometry and Sandwich row lists still scale with the capture. Streaming coverage and original OOM reproductions remain incomplete; this is not an out-of-core viewer."
+      "evidence": "Cancellable streaming duration imports now frame one bounded event at a time for native JSON parsing, keeping byte/event/depth guards and format fallbacks. Three fresh-process PLC comparisons reduced median import time from 4336 to 2493 ms and median peak RSS from 613 to 579 MiB. Export equality verified; general out-of-core storage/rendering and original OOM cases remain open. Complete-event queues now reuse original begin events and retain compact end records; already chronological queues avoid sort workspace. Selected-stack details render at most 100 ancestors per page. Graph search now retains at most 10,000 navigation matches, 4,096 boolean frame results and 512 labels with at most 64 ranges each; truncation is explicit and matching continues outside the navigation window. Sandwich now uses fixed-height count/size geometry instead of per-frame size objects or a frame-index Map. Viewport arithmetic is constant time; repeated/adjacent/wrap selection lookup is cached, with one scan for unrelated selections. Resize/filter clamping is tested.",
+      "remaining": "Final profile models, worker snapshots, sorting and full frame arrays, graph/color geometry and browser scroll-height limits still scale with the capture. Streaming coverage and original OOM reproductions remain incomplete; this is not an out-of-core viewer."
     },
     {
       "id": 518,
@@ -261,11 +261,11 @@
       "url": "https://github.com/jlfwong/speedscope/issues/506",
       "kind": "feature",
       "usefulness": "yes",
-      "status": "planned",
+      "status": "partial",
       "priority": "P3",
       "workstream": "Search and navigation",
-      "evidence": "Stable selected-frame links need serialized frame identity plus profile/view/range state and URL versioning. Raw in-memory node IDs would be unstable after import/demangling.",
-      "remaining": "Stable selected-frame links need serialized frame identity plus profile/view/range state and URL versioning. Raw in-memory node IDs would be unstable after import/demangling."
+      "evidence": "Profile actions creates versioned function links that restore the original profile and a unique source identity in Sandwich after loading. Existing HTTP profile sources are bound to actual profile objects through weak keys; local files require reimport. Payloads are bounded; ambiguous identities and derived profiles are rejected. Encoding, stale-URL and application restoration regressions pass. See docs/SEARCH_AND_LAYOUT.md.",
+      "remaining": "Exact call occurrence, original graph view/zoom/time range, derived transformations and live same-tab hash navigation are not serialized. Symbol-remapped clones conservatively require local reimport. This is function-level sharing, not full trace-element deep linking."
     },
     {
       "id": 501,
@@ -384,8 +384,8 @@
       "status": "partial",
       "priority": "P1",
       "workstream": "Large profiles and responsiveness",
-      "evidence": "Cancellable streaming duration imports now frame one bounded event at a time for native JSON parsing, keeping byte/event/depth guards and format fallbacks. Three fresh-process PLC comparisons reduced median import time from 4336 to 2493 ms and median peak RSS from 613 to 579 MiB. Export equality verified; general out-of-core storage/rendering and original OOM cases remain open. Complete-event queues now reuse original begin events and retain compact end records; already chronological queues avoid sort workspace. Selected-stack details render at most 100 ancestors per page. Graph search now retains at most 10,000 navigation matches, 4,096 boolean frame results and 512 labels with at most 64 ranges each; truncation is explicit and matching continues outside the navigation window.",
-      "remaining": "Temporary import queues, selected-stack DOM and graph-search caches/navigation are reduced or bounded. Final profile models, worker snapshots, unordered sorting, graph geometry and Sandwich row lists still scale with the capture. Streaming coverage and original OOM reproductions remain incomplete; this is not an out-of-core viewer."
+      "evidence": "Cancellable streaming duration imports now frame one bounded event at a time for native JSON parsing, keeping byte/event/depth guards and format fallbacks. Three fresh-process PLC comparisons reduced median import time from 4336 to 2493 ms and median peak RSS from 613 to 579 MiB. Export equality verified; general out-of-core storage/rendering and original OOM cases remain open. Complete-event queues now reuse original begin events and retain compact end records; already chronological queues avoid sort workspace. Selected-stack details render at most 100 ancestors per page. Graph search now retains at most 10,000 navigation matches, 4,096 boolean frame results and 512 labels with at most 64 ranges each; truncation is explicit and matching continues outside the navigation window. Sandwich now uses fixed-height count/size geometry instead of per-frame size objects or a frame-index Map. Viewport arithmetic is constant time; repeated/adjacent/wrap selection lookup is cached, with one scan for unrelated selections. Resize/filter clamping is tested.",
+      "remaining": "Final profile models, worker snapshots, sorting and full frame arrays, graph/color geometry and browser scroll-height limits still scale with the capture. Streaming coverage and original OOM reproductions remain incomplete; this is not an out-of-core viewer."
     },
     {
       "id": 477,
@@ -624,8 +624,8 @@
       "status": "partial",
       "priority": "P3",
       "workstream": "Large profiles and responsiveness",
-      "evidence": "Cancellable streaming duration imports now frame one bounded event at a time for native JSON parsing, keeping byte/event/depth guards and format fallbacks. Three fresh-process PLC comparisons reduced median import time from 4336 to 2493 ms and median peak RSS from 613 to 579 MiB. Export equality verified; general out-of-core storage/rendering and original OOM cases remain open. Complete-event queues now reuse original begin events and retain compact end records; already chronological queues avoid sort workspace. Selected-stack details render at most 100 ancestors per page. Graph search now retains at most 10,000 navigation matches, 4,096 boolean frame results and 512 labels with at most 64 ranges each; truncation is explicit and matching continues outside the navigation window.",
-      "remaining": "Temporary import queues, selected-stack DOM and graph-search caches/navigation are reduced or bounded. Final profile models, worker snapshots, unordered sorting, graph geometry and Sandwich row lists still scale with the capture. Streaming coverage and original OOM reproductions remain incomplete; this is not an out-of-core viewer."
+      "evidence": "Cancellable streaming duration imports now frame one bounded event at a time for native JSON parsing, keeping byte/event/depth guards and format fallbacks. Three fresh-process PLC comparisons reduced median import time from 4336 to 2493 ms and median peak RSS from 613 to 579 MiB. Export equality verified; general out-of-core storage/rendering and original OOM cases remain open. Complete-event queues now reuse original begin events and retain compact end records; already chronological queues avoid sort workspace. Selected-stack details render at most 100 ancestors per page. Graph search now retains at most 10,000 navigation matches, 4,096 boolean frame results and 512 labels with at most 64 ranges each; truncation is explicit and matching continues outside the navigation window. Sandwich now uses fixed-height count/size geometry instead of per-frame size objects or a frame-index Map. Viewport arithmetic is constant time; repeated/adjacent/wrap selection lookup is cached, with one scan for unrelated selections. Resize/filter clamping is tested.",
+      "remaining": "Final profile models, worker snapshots, sorting and full frame arrays, graph/color geometry and browser scroll-height limits still scale with the capture. Streaming coverage and original OOM reproductions remain incomplete; this is not an out-of-core viewer."
     },
     {
       "id": 402,
@@ -696,8 +696,8 @@
       "status": "partial",
       "priority": "P1",
       "workstream": "Large profiles and responsiveness",
-      "evidence": "Cancellable streaming duration imports now frame one bounded event at a time for native JSON parsing, keeping byte/event/depth guards and format fallbacks. Three fresh-process PLC comparisons reduced median import time from 4336 to 2493 ms and median peak RSS from 613 to 579 MiB. Export equality verified; general out-of-core storage/rendering and original OOM cases remain open. Complete-event queues now reuse original begin events and retain compact end records; already chronological queues avoid sort workspace. Selected-stack details render at most 100 ancestors per page. Graph search now retains at most 10,000 navigation matches, 4,096 boolean frame results and 512 labels with at most 64 ranges each; truncation is explicit and matching continues outside the navigation window.",
-      "remaining": "Temporary import queues, selected-stack DOM and graph-search caches/navigation are reduced or bounded. Final profile models, worker snapshots, unordered sorting, graph geometry and Sandwich row lists still scale with the capture. Streaming coverage and original OOM reproductions remain incomplete; this is not an out-of-core viewer."
+      "evidence": "Cancellable streaming duration imports now frame one bounded event at a time for native JSON parsing, keeping byte/event/depth guards and format fallbacks. Three fresh-process PLC comparisons reduced median import time from 4336 to 2493 ms and median peak RSS from 613 to 579 MiB. Export equality verified; general out-of-core storage/rendering and original OOM cases remain open. Complete-event queues now reuse original begin events and retain compact end records; already chronological queues avoid sort workspace. Selected-stack details render at most 100 ancestors per page. Graph search now retains at most 10,000 navigation matches, 4,096 boolean frame results and 512 labels with at most 64 ranges each; truncation is explicit and matching continues outside the navigation window. Sandwich now uses fixed-height count/size geometry instead of per-frame size objects or a frame-index Map. Viewport arithmetic is constant time; repeated/adjacent/wrap selection lookup is cached, with one scan for unrelated selections. Resize/filter clamping is tested.",
+      "remaining": "Final profile models, worker snapshots, sorting and full frame arrays, graph/color geometry and browser scroll-height limits still scale with the capture. Streaming coverage and original OOM reproductions remain incomplete; this is not an out-of-core viewer."
     },
     {
       "id": 384,
@@ -912,8 +912,8 @@
       "status": "partial",
       "priority": "P1",
       "workstream": "Large profiles and responsiveness",
-      "evidence": "Cancellable streaming duration imports now frame one bounded event at a time for native JSON parsing, keeping byte/event/depth guards and format fallbacks. Three fresh-process PLC comparisons reduced median import time from 4336 to 2493 ms and median peak RSS from 613 to 579 MiB. Export equality verified; general out-of-core storage/rendering and original OOM cases remain open. Complete-event queues now reuse original begin events and retain compact end records; already chronological queues avoid sort workspace. Selected-stack details render at most 100 ancestors per page. Graph search now retains at most 10,000 navigation matches, 4,096 boolean frame results and 512 labels with at most 64 ranges each; truncation is explicit and matching continues outside the navigation window.",
-      "remaining": "Temporary import queues, selected-stack DOM and graph-search caches/navigation are reduced or bounded. Final profile models, worker snapshots, unordered sorting, graph geometry and Sandwich row lists still scale with the capture. Streaming coverage and original OOM reproductions remain incomplete; this is not an out-of-core viewer."
+      "evidence": "Cancellable streaming duration imports now frame one bounded event at a time for native JSON parsing, keeping byte/event/depth guards and format fallbacks. Three fresh-process PLC comparisons reduced median import time from 4336 to 2493 ms and median peak RSS from 613 to 579 MiB. Export equality verified; general out-of-core storage/rendering and original OOM cases remain open. Complete-event queues now reuse original begin events and retain compact end records; already chronological queues avoid sort workspace. Selected-stack details render at most 100 ancestors per page. Graph search now retains at most 10,000 navigation matches, 4,096 boolean frame results and 512 labels with at most 64 ranges each; truncation is explicit and matching continues outside the navigation window. Sandwich now uses fixed-height count/size geometry instead of per-frame size objects or a frame-index Map. Viewport arithmetic is constant time; repeated/adjacent/wrap selection lookup is cached, with one scan for unrelated selections. Resize/filter clamping is tested.",
+      "remaining": "Final profile models, worker snapshots, sorting and full frame arrays, graph/color geometry and browser scroll-height limits still scale with the capture. Streaming coverage and original OOM reproductions remain incomplete; this is not an out-of-core viewer."
     },
     {
       "id": 346,
@@ -1245,11 +1245,11 @@
       "url": "https://github.com/jlfwong/speedscope/issues/193",
       "kind": "bug",
       "usefulness": "yes",
-      "status": "partial",
-      "priority": "P3",
+      "status": "implemented",
+      "priority": "none",
       "workstream": "Import formats and correctness",
-      "evidence": "Perf records without stacks now reject with instructions to record with -g and avoid --hide-call-graph, instead of producing an empty profile.",
-      "remaining": "The known failure now has an actionable error. Additional producer-specific cases need fixtures; this is not evidence that every unsupported file imports."
+      "evidence": "perf script --hide-call-graph samples with inline IP, symbol and DSO now import as single-frame stacks, including consecutive padded headers and CRLF. Real callchains take precedence; existing timestamp/counter-period weighting remains unchanged. Five new regressions and the existing issue/perf suites passed (22 tests, 26 snapshots).",
+      "remaining": "No further work selected for the reviewed IP/symbol/DSO text layout. Custom -F layouts, tracepoint payloads and missing-symbol output are outside this support claim; missing symbols produce actionable guidance."
     },
     {
       "id": 192,

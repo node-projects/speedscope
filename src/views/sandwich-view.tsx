@@ -17,6 +17,7 @@ import {useAtom} from '../lib/atom'
 import {StatelessComponent} from '../lib/preact-helpers'
 import {SplitPane} from './split-pane'
 import {SelectedFrameDetails} from './selected-frame-details'
+import {createRowIndexLookup} from '../lib/fixed-size-list'
 
 interface SandwichViewProps {
   selectedFrame: Frame | null
@@ -211,14 +212,7 @@ export const SandwichViewContainer = memo((ownProps: SandwichViewContainerProps)
   }, [profile, profileSearchResults, tableSortMethod])
 
   const getIndexForFrame: (frame: Frame) => number | null = useMemo(() => {
-    const indexByFrame = new Map<Frame, number>()
-    for (let i = 0; i < rowList.length; i++) {
-      indexByFrame.set(rowList[i], i)
-    }
-    return (frame: Frame) => {
-      const index = indexByFrame.get(frame)
-      return index == null ? null : index
-    }
+    return createRowIndexLookup(rowList)
   }, [rowList])
 
   const getSearchMatchForFrame: (frame: Frame) => [number, number][] | null = useMemo(() => {

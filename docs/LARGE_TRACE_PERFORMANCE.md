@@ -1,5 +1,34 @@
 # Large trace performance follow-up
 
+## Fixed-height Sandwich list geometry (2026-11-21)
+
+Sandwich already rendered a viewport window. It now calculates that window and
+initial scroll offset directly from row count/height, removing the size object
+per frame and full-list geometry scans. A single cached selected-frame/index
+replaces the frame-index Map: repeated, adjacent and wrap-around navigation are
+constant time; unrelated new selections scan the existing sorted array once.
+Missing results are cached. Element resizing updates the viewport and filtering
+clamps stale scroll offsets, even without a browser-generated scroll event.
+
+Tests cover 100,000-row selection/navigation, billion-row arithmetic without a
+row allocation, visible-row bounds, filter shrink, resize and cleanup. The
+billion-row case tests arithmetic only: browser scroll-height limits still apply.
+The sorted row array, model, sorting and graph/color geometry remain proportional
+to the recording. These changes reduce auxiliary storage and repeated work;
+they do not establish a fully bounded-memory viewer.
+
+Combined validation passed 410 Jest tests in 71 suites (307 snapshots), five
+Node tests, type checking, lint, schema/backlog checks and both builds. The
+private PLC gzip still exported four profiles, 17,510 frames and 1,039,656 call
+events with the established SHA-256
+`522de77afbfc4dd94f1f30c3a9551979d12db506305ffef999db9c910ae8eddb`.
+The local Node streaming smoke took about 4.3 seconds to import; this is not a
+browser performance guarantee or a claim of faster importing in this batch.
+In browser QA the first PLC profile's 16,231-frame table rendered 40 rows at the
+scroll end, clamped to zero when filtered to one row, and updated to 49 rendered
+rows after a viewport resize. A generated local function link restored its
+selection after reopening the same PLC recording in another tab.
+
 Baseline: `eb93425`, reviewed 2026-11-18. These changes continue the open-issue
 review, prioritizing large profiles and the export request in issue #89.
 

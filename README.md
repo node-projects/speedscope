@@ -37,6 +37,7 @@ speedscope is designed to ingest profiles from a variety of different profilers 
   - [Importing from rbspy](https://github.com/jlfwong/speedscope/wiki/Importing-from-rbspy-(ruby))
   - [Importing from ruby-prof](https://github.com/jlfwong/speedscope/wiki/Importing-from-ruby-prof)
 - Python
+  - Python 3.15 `profiling.sampling --collapsed`: import the folded text output. Thread IDs remain stack roots and weights remain raw observation counts; see [format coverage](sample/profiles/python-sampling/README.md).
   - [Importing from py-spy](https://github.com/jlfwong/speedscope/wiki/Importing-from-py-spy-(python))
   - [pyspeedscope](https://github.com/windelbouwman/pyspeedscope)
   - [Importing from Austin](https://github.com/P403n1x87/austin-python#format-conversion)
@@ -84,6 +85,8 @@ Choose **Profile actions → Search all profiles…** to find functions across t
 and open a result in its original profile. Sandwich's table and caller/callee
 panes can now be resized with draggable or keyboard-operated dividers. See
 [search and layout controls](docs/SEARCH_AND_LAYOUT.md).
+Use **Profile actions → Link to selected function…** to share a function selection.
+For local recordings, the recipient opens the link and imports the same file.
 Selected-stack scope names are clickable; deep stacks page through at most 100
 ancestors at a time to keep details responsive.
 Window titles identify the loaded file. Sandwich shows the selected function's

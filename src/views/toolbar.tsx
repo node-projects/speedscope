@@ -26,6 +26,8 @@ import {SourceLinksDialog} from './source-links-dialog'
 import {compactFrameLabelsAtom} from '../app-state/display-preferences'
 import {FrameInfo} from '../lib/profile'
 import {HelpButton} from './help'
+import {createFunctionLink} from '../lib/function-link'
+import {FunctionLinkDialog} from './function-link-dialog'
 
 interface ToolbarProps extends ApplicationProps {
   browseForFile(): void
@@ -199,6 +201,7 @@ function ToolbarRightContent(props: ToolbarProps) {
   latestProps.current = props
   const compactLabels = useAtom(compactFrameLabelsAtom)
   const [sourceLinksShown, setSourceLinksShown] = useState(false)
+  const [functionLink, setFunctionLink] = useState<string | null>(null)
   const [searchProfiles, setSearchProfiles] = useState<Profile[] | null>(null)
   useEffect(() => {
     if (
@@ -225,6 +228,27 @@ function ToolbarRightContent(props: ToolbarProps) {
     select.value = ''
     const {activeProfileState, profileGroup} = props
     if (!activeProfileState || !profileGroup || props.loading || !action) return
+    if (action === 'function-link') {
+      const selected = profileGroup.profiles[activeProfileState.index].selectedFrameKey
+      const frame = selected == null ? undefined : activeProfileState.profile.getFrame(selected)
+      if (!frame) {
+        alert('Select a function in Time Order, Left Heavy or Sandwich first.')
+        return
+      }
+      try {
+        setFunctionLink(
+          createFunctionLink(
+            window.location.href,
+            profileGroup.profiles.map(p => p.profile),
+            activeProfileState.index,
+            frame,
+          ),
+        )
+      } catch (error) {
+        alert(error instanceof Error ? error.message : String(error))
+      }
+      return
+    }
     if (action === 'source-links') {
       setSourceLinksShown(true)
       return
@@ -333,6 +357,7 @@ function ToolbarRightContent(props: ToolbarProps) {
           <option value="filter">Filter frames…</option>
           <option value="search-all">Search all profiles…</option>
           <option value="source-links">Source-code links…</option>
+          <option value="function-link">Link to selected function…</option>
           <option value="compact-labels">
             {compactLabels ? 'Show full graph labels' : 'Compact graph path labels'}
           </option>
@@ -342,6 +367,9 @@ function ToolbarRightContent(props: ToolbarProps) {
       {importFile}
       {colorSchemeToggle}
       {help}
+      {functionLink && (
+        <FunctionLinkDialog url={functionLink} onClose={() => setFunctionLink(null)} />
+      )}
       {sourceLinksShown && (
         <SourceLinksDialog
           sample={(() => {
