@@ -1,4 +1,4 @@
-import * as jsc from 'jsverify'
+import * as fc from 'fast-check'
 import {LRUCache} from './lru-cache'
 
 class SlowLRUCache<K, V> {
@@ -90,11 +90,19 @@ type Command =
     }
   | {type: 'removeLRU'}
 
-const arbitraryCommand: jsc.Arbitrary<Command> = jsc.record({
-  type: jsc.elements(['has', 'get', 'getSize', 'insert', 'getOrInsert', 'removeLRU']),
-  key: jsc.elements(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']),
-  value: jsc.nat,
-}) as any
+const arbitraryCommand: fc.Arbitrary<Command> = fc.record({
+  type: fc.constantFrom<Command['type']>(
+    'has',
+    'get',
+    'getSize',
+    'insert',
+    'getOrInsert',
+    'removeLRU',
+  ),
+  key: fc.constantFrom('a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'),
+  // The previous JSVerify property ran with size <= 100.
+  value: fc.integer({min: 0, max: 100}),
+})
 
 function runCommand(cache: ILRUCache<string, number>, cmd: Command): any {
   switch (cmd.type) {
@@ -131,18 +139,19 @@ test('LRUCache', () => {
     {type: 'removeLRU'},
   ])
 
-  jsc.assert(
-    jsc.forall(
-      jsc.suchthat(jsc.uint8, n => n > 0),
-      jsc.nearray(arbitraryCommand),
+  fc.assert(
+    fc.property(
+      fc.integer({min: 1, max: 255}),
+      // JSVerify's logarithmic size capped these sequences at seven commands.
+      // Keep that domain and also exercise longer eviction histories.
+      fc.array(arbitraryCommand, {minLength: 1, maxLength: 100}),
       (cap, commands) => {
         verify(cap, commands)
         return true
       },
     ),
     {
-      size: 100,
-      tests: 1000,
+      numRuns: 1000,
     },
   )
 })
