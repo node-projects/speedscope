@@ -1,21 +1,12 @@
-// A simple implementation of an efficient scrolling list view which
-// renders only items within the viewport + a couple extra items.
-
+// Fixed-height rows render only the viewport and a quarter viewport of overscan.
+// Geometry and scroll lookup use O(1) storage/work, independent of row count.
 import {h, JSX} from 'preact'
 import {useState, useCallback, useRef, useMemo, useEffect} from 'preact/hooks'
-
-export interface ListItem {
-  size: number
-}
-
-interface RangeResult {
-  firstVisibleIndex: number
-  lastVisibleIndex: number
-  invisiblePrefixSize: number
-}
+import {fixedSizeListRange} from '../lib/fixed-size-list'
 
 interface ScrollableListViewProps {
-  items: ListItem[]
+  itemCount: number
+  itemSize: number
   axis: 'x' | 'y'
   renderItems: (
     firstVisibleIndex: number,
@@ -26,127 +17,77 @@ interface ScrollableListViewProps {
 }
 
 export const ScrollableListView = ({
-  items,
+  itemCount,
+  itemSize,
   axis,
   renderItems,
   className,
   initialIndexInView,
 }: ScrollableListViewProps) => {
   const [viewportSize, setViewportSize] = useState<number | null>(null)
-  const [viewportScrollOffset, setViewportScrollOffset] = useState<number>(0)
-
-  const viewportRef = useRef<HTMLDivElement | null>(null)
-
-  const widthOrHeight = axis === 'x' ? 'width' : 'height'
-  const leftOrTop = axis === 'x' ? 'left' : 'top'
-  const scrollLeftOrScrollTop = axis === 'x' ? 'scrollLeft' : 'scrollTop'
-
-  // This is kind of a weird hack, but I'm not sure what the better of doing something like this is.
-  const offset = initialIndexInView
-    ? items.reduce((a, b, i) => (i < initialIndexInView ? a + b.size : a), 0)
-    : 0
-  const initialScroll = useRef<number | null>(offset)
-
-  const viewportCallback = useCallback(
-    (viewport: HTMLDivElement | null) => {
-      if (viewport) {
-        requestAnimationFrame(() => {
-          setViewportSize(viewport.getBoundingClientRect()[widthOrHeight])
-          if (initialScroll.current != null) {
-            viewport.scrollTo({[leftOrTop]: initialScroll.current})
-            initialScroll.current = null
-          }
-        })
-      } else {
-        setViewportSize(null)
-      }
-      viewportRef.current = viewport
-    },
-    [setViewportSize, widthOrHeight, leftOrTop],
+  const [viewportScrollOffset, setViewportScrollOffset] = useState(0)
+  const viewportRef = useRef<HTMLDivElement>(null)
+  const initialScroll = useRef(
+    Math.max(0, Math.min(initialIndexInView || 0, Math.max(0, itemCount - 1))) * itemSize,
   )
-
-  const rangeResult: RangeResult | null = useMemo(() => {
-    if (viewportRef.current == null || viewportSize == null || viewportScrollOffset == null) {
-      return null
-    }
-
-    // We render items up to a quarter viewport height outside of the
-    // viewport both above and below to prevent flickering.
-    const minY = viewportScrollOffset - viewportSize / 4
-    const maxY = viewportScrollOffset + viewportSize + viewportSize / 4
-
-    let total = 0
-    let invisiblePrefixSize = 0
-
-    let i = 0
-    for (; i < items.length; i++) {
-      const item = items[i]
-      invisiblePrefixSize = total
-      total += item.size
-      if (total >= minY) {
-        break
-      }
-    }
-
-    const firstVisibleIndex = i
-
-    for (; i < items.length; i++) {
-      const item = items[i]
-      total += item.size
-      if (total >= maxY) {
-        break
-      }
-    }
-
-    const lastVisibleIndex = Math.min(i, items.length - 1)
-
-    return {
-      firstVisibleIndex,
-      lastVisibleIndex,
-      invisiblePrefixSize,
-    }
-  }, [viewportSize, viewportScrollOffset, items])
-
-  const totalSize = useMemo(() => items.reduce((a, b) => a + b.size, 0), [items])
-
+  const initialized = useRef(false)
+  const vertical = axis === 'y'
+  const totalSize = itemCount * itemSize
   const onViewportScroll = useCallback(() => {
-    if (viewportRef.current != null) {
-      setViewportScrollOffset(viewportRef.current[scrollLeftOrScrollTop])
-    }
-  }, [scrollLeftOrScrollTop])
+    const viewport = viewportRef.current
+    if (viewport) setViewportScrollOffset(vertical ? viewport.scrollTop : viewport.scrollLeft)
+  }, [vertical])
 
   useEffect(() => {
-    const resizeListener = () => {
-      if (viewportRef.current != null) {
-        setViewportSize(viewportRef.current.getBoundingClientRect()[widthOrHeight])
+    const viewport = viewportRef.current!
+    const measure = () => {
+      const size = viewport.getBoundingClientRect()[vertical ? 'height' : 'width']
+      setViewportSize(size)
+      if (!initialized.current) {
+        initialized.current = true
+        if (vertical) viewport.scrollTop = initialScroll.current
+        else viewport.scrollLeft = initialScroll.current
       }
+      // Filtering or resizing can shrink the scroll extent. Synchronize the
+      // stored offset even if the browser does not emit scroll on clamping.
+      const offset = vertical ? viewport.scrollTop : viewport.scrollLeft
+      const clamped = Math.max(0, Math.min(offset, Math.max(0, totalSize - size)))
+      if (vertical) viewport.scrollTop = clamped
+      else viewport.scrollLeft = clamped
+      setViewportScrollOffset(clamped)
     }
-
-    window.addEventListener('resize', resizeListener)
+    measure()
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(measure)
+    observer?.observe(viewport)
+    window.addEventListener('resize', measure)
     return () => {
-      window.removeEventListener('resize', resizeListener)
+      observer?.disconnect()
+      window.removeEventListener('resize', measure)
     }
-  }, [widthOrHeight])
+  }, [vertical, totalSize])
 
-  const visibleItems = useMemo(() => {
-    return rangeResult
-      ? renderItems(rangeResult.firstVisibleIndex, rangeResult.lastVisibleIndex)
-      : null
-  }, [renderItems, rangeResult])
-
-  const content = useMemo(() => {
-    return (
-      <div style={{height: totalSize}}>
-        <div style={{transform: `translateY(${rangeResult?.invisiblePrefixSize || 0}px)`}}>
+  const range = useMemo(
+    () =>
+      viewportSize == null
+        ? null
+        : fixedSizeListRange(itemCount, itemSize, viewportSize, viewportScrollOffset),
+    [itemCount, itemSize, viewportSize, viewportScrollOffset],
+  )
+  const visibleItems = useMemo(
+    () => (range ? renderItems(range.firstVisibleIndex, range.lastVisibleIndex) : null),
+    [renderItems, range],
+  )
+  return (
+    <div className={className} ref={viewportRef} onScroll={onViewportScroll}>
+      <div style={vertical ? {height: totalSize} : {width: totalSize}}>
+        <div
+          style={{
+            transform: `translate${vertical ? 'Y' : 'X'}(${range?.invisiblePrefixSize || 0}px)`,
+          }}
+        >
           {visibleItems}
         </div>
       </div>
-    )
-  }, [rangeResult, visibleItems, totalSize])
-
-  return (
-    <div className={className} ref={viewportCallback} onScroll={onViewportScroll}>
-      {content}
     </div>
   )
 }

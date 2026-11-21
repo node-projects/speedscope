@@ -4,10 +4,10 @@ import {Profile, Frame} from '../lib/profile'
 import {formatPercent} from '../lib/utils'
 import {FontSize, Sizes, commonStyle} from './style'
 import {ColorChit} from './color-chit'
-import {ListItem, ScrollableListView} from './scrollable-list-view'
+import {ScrollableListView} from './scrollable-list-view'
 import {createGetCSSColorForFrame, getFrameToColorBucket} from '../app-state/getters'
 import {memo} from 'preact/compat'
-import {useCallback, useMemo, useContext} from 'preact/hooks'
+import {useCallback, useContext} from 'preact/hooks'
 import {SandwichViewContext} from './sandwich-view'
 import {Color} from '../lib/color'
 import {useTheme, withTheme} from './themes/theme'
@@ -264,14 +264,6 @@ export const ProfileTableView = memo(
       ],
     )
 
-    const listItems: ListItem[] = useMemo(
-      () =>
-        sandwichContext == null
-          ? []
-          : sandwichContext.rowList.map(f => ({size: Sizes.FRAME_HEIGHT})),
-      [sandwichContext],
-    )
-
     const onTotalClick = useCallback(
       (ev: MouseEvent) => onSortClick(SortField.TOTAL, ev),
       [onSortClick],
@@ -327,7 +319,8 @@ export const ProfileTableView = memo(
         </table>
         <ScrollableListView
           axis={'y'}
-          items={listItems}
+          itemCount={sandwichContext?.rowList.length || 0}
+          itemSize={Sizes.FRAME_HEIGHT}
           className={css(style.scrollView)}
           renderItems={renderItems}
           initialIndexInView={
