@@ -17,7 +17,8 @@ import {Toolbar} from './toolbar'
 import {importJavaScriptSourceMapSymbolRemapper} from '../lib/js-source-map'
 import {Theme, withTheme} from './themes/theme'
 import {ViewMode} from '../lib/view-mode'
-import {canUseXHR} from '../app-state'
+import {canUseXHR, profileGroupAtom} from '../app-state'
+import {resolveFunctionSelection, rememberFunctionLinkSource} from '../lib/function-link'
 import {ProfileGroupState} from '../app-state/profile-group'
 import {HashParams} from '../lib/hash-params'
 import {StatelessComponent} from '../lib/preact-helpers'
@@ -198,6 +199,8 @@ export class Application extends StatelessComponent<ApplicationProps> {
   private importController: AbortController | null = null
   private importProgress: ImportProgress | null = null
   private importSequence = 0
+  private restoredFunctionLink = false
+  private functionLinkNotice = ''
 
   private async loadProfile(loader: (options: ImportOptions) => Promise<ProfileGroup | null>) {
     this.importController?.abort()
@@ -249,7 +252,29 @@ export class Application extends StatelessComponent<ApplicationProps> {
       ) {
         this.props.setViewMode(ViewMode.LEFT_HEAVY_FLAME_GRAPH)
       }
+      const selection = this.restoredFunctionLink ? undefined : this.props.hashParams.selection
+      const linkedFrame = selection
+        ? resolveFunctionSelection(profileGroup.profiles, selection)
+        : null
+      if (selection && linkedFrame) {
+        profileGroup = {...profileGroup, indexToView: selection.profileIndex}
+        this.props.setViewMode(ViewMode.SANDWICH_VIEW)
+      }
       this.props.setProfileGroup(profileGroup)
+      if (selection) {
+        this.functionLinkNotice = linkedFrame
+          ? ''
+          : 'The linked function was not found uniquely in this recording. Open the original recording to restore the selection.'
+        if (
+          linkedFrame &&
+          profileGroupAtom.getActiveProfile()?.profile ===
+            profileGroup.profiles[selection.profileIndex]
+        ) {
+          profileGroupAtom.setSelectedFrame(linkedFrame)
+          this.restoredFunctionLink = true
+        }
+        this.forceUpdate()
+      }
     } catch (e) {
       if (controller.signal.aborted || this.importController !== controller) return
       this.loadError = e instanceof Error ? e.message : String(e)
@@ -524,7 +549,18 @@ export class Application extends StatelessComponent<ApplicationProps> {
         if (filename.includes('/')) {
           filename = filename.slice(filename.lastIndexOf('/') + 1)
         }
-        return await importProfilesFromArrayBuffer(filename, await response.arrayBuffer(), options)
+        const group = await importProfilesFromArrayBuffer(
+          filename,
+          await response.arrayBuffer(),
+          options,
+        )
+        if (group)
+          rememberFunctionLinkSource(
+            group.profiles,
+            new URL(profileURL, window.location.href).href,
+            profileAccepts,
+          )
+        return group
       })
     } else if (this.props.hashParams.localProfilePath) {
       // There isn't good cross-browser support for XHR of local files, even from
@@ -753,6 +789,7 @@ export class Application extends StatelessComponent<ApplicationProps> {
           loading={this.props.loading || this.exportController !== null}
           viewMode={this.effectiveViewMode()}
         />
+        {this.functionLinkNotice && <p role="status">{this.functionLinkNotice}</p>}
         <div className={css(style.contentContainer)}>{this.renderContent()}</div>
         {this.props.dragActive && <div className={css(style.dragTarget)} />}
       </div>

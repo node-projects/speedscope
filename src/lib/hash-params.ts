@@ -1,4 +1,5 @@
 import {ViewMode} from '../lib/view-mode'
+import {FunctionSelection, parseFunctionSelection} from './function-link'
 
 export interface HashParams {
   profileURL?: string
@@ -6,6 +7,7 @@ export interface HashParams {
   title?: string
   localProfilePath?: string
   viewMode?: ViewMode
+  selection?: FunctionSelection
 }
 
 function getViewMode(value: string): ViewMode | null {
@@ -43,6 +45,9 @@ export function getHashParams(hashContents = window.location.hash): HashParams {
         result.localProfilePath = value
       } else if (key === 'profileAccepts') {
         result.profileAccepts = value
+      } else if (key === 'selection') {
+        const selection = parseFunctionSelection(value)
+        if (selection) result.selection = selection
       } else if (key === 'view') {
         const mode = getViewMode(value)
         if (mode !== null) {
