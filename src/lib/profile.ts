@@ -19,6 +19,7 @@ export interface FrameInfo {
 
   // Column in the file, 1-based.
   col?: number
+  color?: string
 }
 
 export type SymbolRemapper = (
@@ -63,6 +64,7 @@ export class Frame extends HasWeights {
 
   // Column in the file
   col?: number
+  color?: string
 
   private constructor(info: FrameInfo) {
     super()
@@ -71,6 +73,7 @@ export class Frame extends HasWeights {
     this.file = info.file
     this.line = info.line
     this.col = info.col
+    if (info.color !== undefined) this.color = info.color
   }
 
   static root = new Frame({
@@ -232,7 +235,14 @@ export class Profile {
       totalWeight: this.totalWeight,
       chronological: this.chronological,
       derived: this.derived,
-      frames: frames.map(({key, name, file, line, col}) => ({key, name, file, line, col})),
+      frames: frames.map(({key, name, file, line, col, color}) => ({
+        key,
+        name,
+        file,
+        line,
+        col,
+        color,
+      })),
       frameWeights,
       appendNodes,
       groupedNodes,

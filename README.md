@@ -37,6 +37,7 @@ speedscope is designed to ingest profiles from a variety of different profilers 
   - [Importing from rbspy](https://github.com/jlfwong/speedscope/wiki/Importing-from-rbspy-(ruby))
   - [Importing from ruby-prof](https://github.com/jlfwong/speedscope/wiki/Importing-from-ruby-prof)
 - Python
+  - [Native cProfile `.prof` / `.pstats` / `.cprofile` statistics](docs/PYTHON_CPROFILE.md): flat self time and explicit immediate-caller projections, without invented full stacks.
   - Python 3.15 `profiling.sampling --collapsed`: import the folded text output. Thread IDs remain stack roots and weights remain raw observation counts; see [format coverage](sample/profiles/python-sampling/README.md).
   - [Importing from py-spy](https://github.com/jlfwong/speedscope/wiki/Importing-from-py-spy-(python))
   - [pyspeedscope](https://github.com/windelbouwman/pyspeedscope)
@@ -45,6 +46,7 @@ speedscope is designed to ingest profiles from a variety of different profilers 
 - PHP
   - [Importing from phpspy or sj-i/php-profiler](https://github.com/sj-i/php-profiler/pull/101)
 - Go
+  - [Signed pprof heap deltas and contribution-pair comparison](docs/PPROF_IMPORT.md)
   - [Importing from pprof](https://github.com/jlfwong/speedscope/wiki/Importing-from-pprof-(go))  
 - Rust
   - [flamescope](https://github.com/coolreader18/flamescope)
@@ -67,6 +69,8 @@ speedscope is designed to ingest profiles from a variety of different profilers 
 - [Importing from .NET Core](https://github.com/jlfwong/speedscope/wiki/Importing-from-.NET-Core)
 - [Importing from GHC (Haskell)](https://github.com/jlfwong/speedscope/wiki/Importing-from-Haskell)
 - [Importing from custom sources](https://github.com/jlfwong/speedscope/wiki/Importing-from-custom-sources)
+  - [Differential folded files](docs/PROFILE_COMPARISON.md#differential-folded-files), using explicit import to preserve ordinary numeric symbol names.
+  - [Producer frame colors](docs/SOURCE_AND_LABELS.md), with theme contrast adaptation and exact RGB export.
 
 Contributions to add support for additional formats are welcome! Open an issue in
 [this fork](https://github.com/node-projects/speedscope/issues). Upstream importer
@@ -90,7 +94,9 @@ and duration traces stream plain/gzip input; generic fallback formats still
 materialize their input. Final profile models remain proportional to recording
 size. Very large captures can
 still exceed browser memory limits. Search offers Contains, Whole word and Exact
-matching for function names and source paths.
+matching for function names and source paths. **Regex (RE2)** supports bounded,
+linear-time regular-expression matching; unsupported syntax shows an error.
+See [regex syntax and resource limits](docs/SEARCH_AND_LAYOUT.md#regular-expression-search).
 Graph-search navigation retains at most 10,000 results and clearly marks larger
 result sets; refine the query to narrow them. Symbol/highlight caches are bounded.
 Chart search's **Zoom to match** refocuses a selected result after panning or

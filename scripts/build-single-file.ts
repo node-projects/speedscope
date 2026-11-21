@@ -43,6 +43,7 @@ async function main() {
     speedscope: await readFile('LICENSE', 'utf8'),
     'Source Code Pro': await readFile('assets/source-code-pro/LICENSE.md', 'utf8'),
     '@streamparser/json': await readFile('node_modules/@streamparser/json/LICENSE', 'utf8'),
+    re2js: await readFile('node_modules/re2js/LICENSE', 'utf8'),
   }
   const html = `<!DOCTYPE html>
 <html><head><meta charset="UTF-8">

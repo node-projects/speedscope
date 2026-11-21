@@ -31,6 +31,53 @@ memory or processing-time guarantee. This improves the chooser's portion of
 [#376](https://github.com/jlfwong/speedscope/issues/376); it does not make the
 canvas charts or every viewer control fully accessible.
 
+## Regular expression search
+
+The viewer and Search all profiles offer **Regex (RE2)** alongside the existing
+literal Contains, Whole word and Exact modes. Enter a pattern directly, such as
+`^render|worker[0-9]+` or `\.tsx?$`, without JavaScript `/.../flags` delimiters.
+Matching starts case-insensitive; RE2 inline flags can adjust it. Both function
+names and source paths are searched in full, with no symbol truncation.
+
+The engine is the pinned MIT-licensed
+[`re2js` 2.10.0](https://github.com/le0pard/re2js/tree/2.10.0), a pure JavaScript
+RE2 port. It uses linear-time matching rather than executing user patterns with
+native JavaScript's backtracking engine. Backreferences and lookaround are
+unsupported here and produce an error. RE2 syntax differs from JavaScript
+RegExp syntax; the app does not translate unsupported expressions or silently
+switch engines. Literal modes keep their previous behavior.
+
+Patterns are limited to 256 UTF-16 characters. A conservative preflight rejects
+counted-repeat bounds above 1,000 or estimated expansions above 4,096 states
+before compilation; the compiled program also has a 4,096-state ceiling. This
+can reject some otherwise valid RE2 expressions; simplify their repetitions.
+Invalid syntax and limits appear as errors in the search UI, without replacing
+the profile or crashing its rendering. Empty patterns match nothing. Zero-width
+matches select frames but do not paint nonexistent characters. Highlight offsets
+use UTF-16 indices, including after astral characters, as the existing label
+renderer expects.
+
+One compiled pattern is cached for validation/reuse; existing bounded frame and
+highlight caches and navigation/result caps still apply. At most 64 match
+attempts per visible label are used for highlights, counting zero-width matches
+toward this budget. Boolean matching still scans the complete symbol. Search
+across profiles yields between bounded batches; synchronous matching of an
+individual exceptionally long symbol can still take time proportional to its
+length. This is not a fixed wall-time guarantee or a cap on profile storage.
+
+The dependency has no runtime dependencies or external WASM/network load. An
+isolated esbuild minified browser import measured approximately 151 KB (46 KB
+gzip); final app bundle size depends on bundling and compression.
+
+A local PLC regression scanned 513,009 occurrences with a no-match regex in
+30 ms and retained about 0.60 MiB of search state after collection. A broad
+`^.*` query reached the existing 10,000-result navigation ceiling in 6 ms and
+retained about 1.02 MiB. Both runs preserved four profiles, 17,510 exported
+frames, 1,039,656 events and export hash
+`522de77afbfc4dd94f1f30c3a9551979d12db506305ffef999db9c910ae8eddb`.
+These are individual Windows ARM64 Node observations, not browser latency or
+total-memory guarantees; they exclude import and initial flamechart creation.
+
 ## Search all profiles
 
 Choose **Profile actions → Search all profiles…**, enter a function name or source
@@ -153,7 +200,7 @@ occurrences in depth-first order. If there are more, the count shows `10000+`
 and a visible status asks you to refine your search. This is a lower bound,
 not the full count. Previous/Next and Enter/Shift+Enter wrap within the retained
 window. A selected frame outside that window shows `?` for its navigation index.
-Use a more specific name/path or Whole word/Exact mode to narrow the query.
+Use a more specific name/path or Whole word/Exact/Regex mode to narrow the query.
 
 Matching and graph highlights still inspect full names and source paths, even
 outside the navigation window. Sparse queries can find late occurrences: the
@@ -168,7 +215,7 @@ and 512 highlight lists, evicting old entries and recomputing them when needed.
 Only labels/rows being drawn request name-highlight ranges, capped at the first
 64 ranges per name. A long, repetitive name can therefore match beyond its
 drawn underlines. File-only matches have no name underlines. Search input is
-limited to 4,096 characters. These are literal modes, not arbitrary regexes.
+limited to 4,096 characters in literal modes; Regex has the separate 256-character and compilation limits described above.
 
 Search no longer builds a full per-symbol highlight map or a rectangle for
 every matching call. Traversal uses O(depth) auxiliary storage and creates a

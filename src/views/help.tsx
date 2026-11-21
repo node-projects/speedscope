@@ -43,6 +43,11 @@ function HelpDialog(props: {onClose(): void}) {
             can be plain text or a bounded ZIP of snapshots from one JVM. Extract unsupported
             archive variants first. Java dumps count observed stacks, rather than elapsed time.
           </p>
+          <p>
+            Native cProfile files show flat self time and immediate callers, without inventing full
+            stacks. Signed pprof heap deltas show separate negative magnitudes and positive
+            contributions; compare positive minus negative in absolute mode for the net change.
+          </p>
         </section>
         <section className={css(style.card)}>
           <h3 className={css(style.sectionTitle)}>Choose a view</h3>
@@ -79,6 +84,11 @@ function HelpDialog(props: {onClose(): void}) {
             Exact matching help narrow results. Profile actions → Search all profiles searches
             across threads. Very large result sets are capped; refine your query to see more
             relevant matches.
+          </p>
+          <p>
+            Regex (RE2) matches full names and paths with a bounded, linear-time engine. Enter a
+            pattern without slash delimiters. Backreferences and lookaround are unsupported; invalid
+            or excessive patterns show an error. Literal modes remain available.
           </p>
         </section>
         <section className={css(style.card)}>
@@ -126,6 +136,11 @@ function HelpDialog(props: {onClose(): void}) {
             changes, then zoom into its call path. Absolute mode requires matching units; normalized
             mode compares shares of each recording. Both recordings stay in memory until you close
             the comparison. The graph and paged table have explicit resource limits.
+          </p>
+          <p>
+            Open differential folded in the comparison dialog reads two weight columns: baseline,
+            then candidate. It preserves both sides and the main recording. Ordinary folded import
+            keeps its single-column meaning, including numeric symbol names.
           </p>
         </section>
         <section className={css(style.card)}>

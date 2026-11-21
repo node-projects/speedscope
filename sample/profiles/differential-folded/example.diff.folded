@@ -1,0 +1,6 @@
+# Authored before/after weights; first column baseline, second candidate.
+main;retained 8 3
+main;removed 2 0
+main;added 0 9
+unicode;日本語 0.5 1.25
+zero 0 0

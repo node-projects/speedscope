@@ -150,3 +150,58 @@ planned: displaying signed differences between two valid nonnegative recordings
 does not add signed-input semantics to the ordinary profile model.
 
 Type checking, lint, schema/backlog checks, all three release builds and npm dry-pack passed. The package includes the comparison guide. A final narrow-tile regression checks that CSS padding and borders cannot enlarge tiny calls beyond their layout widths.
+
+## Native statistics, signed contributions, regex and producer colors
+
+The next batch implements the reviewed scopes of #477, #370, #228, #547 and
+#351. The final clean-cache Node 22.23.5 ARM64 run passed **635 tests across
+94 suites, with 310 snapshots**. All five Node CLI/release-helper tests, type
+checking, lint, schema/backlog checks, Pages/standalone/single-HTML builds and
+npm dry-pack passed. The package includes the native cProfile and signed pprof
+guides plus the re2js MIT notice; the single-HTML document embeds that notice.
+The earlier local Node 24 ARM64 Jest limitation remains documented.
+
+Native cProfile uses a restricted, nonexecuting marshal decoder with explicit
+allocation/input budgets. Real CPython 3.14.3 fixtures and wire encodings 0–5
+cover flat self time and immediate-caller attribution, recursion, references,
+malformed objects, overflow, cancellation and raw-file preflight. Both browser
+projections displayed the fixture's 26 ms total, with Time Order disabled and
+the two-frame projection labeled as immediate callers rather than full stacks.
+Generic compressed-wrapper expansion remains outside the native decoder bound.
+See [native cProfile semantics](PYTHON_CPROFILE.md).
+
+Differential folded tests cover explicit two-column parsing, numeric-symbol
+ambiguity, fractional/Unicode values, added/removed paths, tiny chunks, plain/gzip
+streaming without a whole-File read, actual worker snapshots, resource limits,
+cancellation and export round trips. Browser import in the comparison dialog
+retained the main recording and displayed -5, -2 and +9 changes for retained,
+removed and added paths respectively. Baseline/candidate totals were 10.5/13.25.
+
+Signed pprof tests preserve both contribution magnitudes, all-negative profiles,
+same-path cancellation, units, exact-integer failures and round trips. A locally
+authored Go 1.24.1 HTTP heap-delta recording also imported in the browser:
+16,777,600 negative and 78,112 positive bytes produced -16,699,488 net bytes
+(-15.93 MiB displayed). These are contribution projections, not reconstructed
+historical heap snapshots. See [pprof interpretation and limits](PPROF_IMPORT.md).
+
+Browser checks verified producer colors in dark/light main charts and minimaps,
+Left Heavy zoom, search highlights and selected outlines. Data/GPU regressions
+cover exact RGB serialization and worker ownership, color-aware combination,
+contrast, packed palette boundaries, COPY metadata through atlas/direct paths,
+resize/disposal and unchanged vertex stride. These checks do not replace the
+separate full GPU pixel-regression backlog. The custom-color palette is bounded;
+its documented overflow policy retains raw RGB but uses generated display colors.
+
+Regex tests cover nested-quantifier inputs, full million-character symbols,
+UTF-16 highlight offsets, precompile expansion rejection, unsupported syntax,
+zero-width budgets and UI error recovery. The PLC browser search for `^.*`
+reported the existing 10,000-match navigation limit explicitly, without console
+errors. Separate local regex timing/retained-heap observations and their limits
+are recorded in [search documentation](SEARCH_AND_LAYOUT.md#regular-expression-search).
+
+The final PLC import regression took 2,652 ms in one local run and retained four
+profiles, 17,510 exported frames and 1,039,656 events. Export SHA-256 stayed
+`522de77afbfc4dd94f1f30c3a9551979d12db506305ffef999db9c910ae8eddb`.
+This is a regression observation rather than a controlled speed comparison.
+Private captures, generated Go recordings and local measurement artifacts are
+excluded from Git.

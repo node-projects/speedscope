@@ -82,10 +82,11 @@ function metadata used by another location. The current importer retains the
 outermost entry of an inline-location chain; expanding all inlined functions
 is outside this change.
 
-This does not add signed/differential flamegraphs, exact arithmetic for weights
-larger than JavaScript's safe-integer range, or a metric chooser. Negative Go
-heap delta weights remain a separate unsupported case. See the
-[pprof schema used by the importer](../src/import/profile.proto).
+Negative Go heap delta weights now import as separate negative-magnitude and
+positive-contribution profiles. Compare positive minus negative in absolute mode
+to inspect net changes; see [signed pprof semantics and limits](PPROF_IMPORT.md).
+This does not add arbitrary-precision weights, a metric chooser or full inline
+chains. See the [pprof schema used by the importer](../src/import/profile.proto).
 
 ## Background import for large recordings
 

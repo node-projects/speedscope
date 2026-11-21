@@ -124,6 +124,7 @@ export interface FlamechartRendererOptions {
 
 export class FlamechartRenderer {
   private layers: RangeTreeNode[] = []
+  private frameColorPaletteTexture: Graphics.Texture | null = null
 
   constructor(
     private gl: Graphics.Context,
@@ -133,6 +134,7 @@ export class FlamechartRenderer {
     private colorPassRenderer: FlamechartColorPassRenderer,
     private options: FlamechartRendererOptions = {inverted: false},
   ) {
+    const palette = this.colorPassRenderer.createFrameColorPalette()
     const nLayers = flamechart.getLayers().length
     for (let stackDepth = 0; stackDepth < nLayers; stackDepth++) {
       const leafNodes: RangeTreeLeafNode[] = []
@@ -172,10 +174,13 @@ export class FlamechartRenderer {
         // the green channel to indicate the row,
         // and the blue channel to indicate the color bucket to render.
         // We add one to each so we have zero reserved for the background color.
+        const customIndex = frame.node.frame.color ? palette.getIndex(frame.node.frame.color) : null
         const color = new Color(
           (1 + (i % 255)) / 256,
           (1 + (stackDepth % 255)) / 256,
-          (1 + this.flamechart.getColorBucketForFrame(frame.node.frame)) / 256,
+          customIndex === null
+            ? (1 + this.flamechart.getColorBucketForFrame(frame.node.frame)) / 256
+            : -1 - customIndex,
         )
         batch.addRect(configSpaceBounds, color)
         rectCount++
@@ -194,6 +199,15 @@ export class FlamechartRenderer {
       // TODO(jlfwong): Making this into a binary tree
       // range than a tree of always-height-two might make this run faster
       this.layers.push(new RangeTreeInteriorNode(leafNodes))
+    }
+    const pixels = palette.getPixels()
+    if (pixels) {
+      this.frameColorPaletteTexture = gl.createTexture(
+        Graphics.TextureFormat.NEAREST_CLAMP,
+        256,
+        256,
+        pixels,
+      )
     }
   }
 
@@ -230,6 +244,8 @@ export class FlamechartRenderer {
   }
 
   free() {
+    this.frameColorPaletteTexture?.free()
+    this.frameColorPaletteTexture = null
     if (this.rectInfoRenderTarget) {
       this.rectInfoRenderTarget.free()
     }
@@ -370,6 +386,7 @@ export class FlamechartRenderer {
 
     this.colorPassRenderer.render({
       rectInfoTexture,
+      frameColorPalette: this.frameColorPaletteTexture,
       srcRect: new Rect(Vec2.zero, new Vec2(rectInfoTexture.width, rectInfoTexture.height)),
       dstRect: physicalSpaceDstRect,
       renderOutlines: props.renderOutlines,

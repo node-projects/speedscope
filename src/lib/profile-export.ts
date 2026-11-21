@@ -116,9 +116,9 @@ export async function exportProfileGroupToBlob(
     }
     write('],"shared":{"frames":[')
     for (let index = 0; index < frames.length; index++) {
-      const {name, file, line, col} = frames[index]
+      const {name, file, line, col, color} = frames[index]
       if (index) write(',')
-      write(JSON.stringify({name, file, line, col}))
+      write(JSON.stringify({name, file, line, col, color}))
       if (++progress.framesWritten % 4096 === 0) await pause()
     }
     write(']}}')

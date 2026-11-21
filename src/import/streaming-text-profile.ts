@@ -2,6 +2,7 @@ import {ProfileGroup, StackListProfileBuilder} from '../lib/profile'
 import {sourceFileName} from '../lib/profile-context'
 import {parseBGFoldedStack} from './bg-flamegraph'
 import {createLinuxPerfParser} from './linux-tools-perf'
+import {createDifferentialFoldedParser, isDifferentialFoldedName} from './bg-differential'
 
 export const TEXT_STREAM_LIMITS = Object.freeze({
   maxBytes: 1024 * 1024 * 1024,
@@ -19,10 +20,11 @@ export interface TextStreamOptions {
   // dedicated worker is terminated externally and can skip this timer overhead.
   yieldToMainThread?: boolean
 }
-type TextProfileKind = 'folded' | 'perf' | 'auto'
+type TextProfileKind = 'folded' | 'differential' | 'perf' | 'auto'
 class NotTextProfile extends Error {}
 
 export function textProfileKind(name: string): TextProfileKind | null {
+  if (isDifferentialFoldedName(name)) return 'differential'
   const plain = name.replace(/\.gz$/i, '')
   if (/\.(?:folded|collapsed|stacks)$|\.collapsedstack\.txt$/i.test(plain)) return 'folded'
   if (/\.linux-perf\.txt$|\.perf(?:\.txt)?$/i.test(plain)) return 'perf'
@@ -65,7 +67,9 @@ export async function importTextProfileStream(
     samples = 0,
     lastProgress = 0,
     lastYield = performance.now()
-  let detected: 'folded' | 'perf' | null = kind === 'auto' ? null : kind
+  let detected: 'folded' | 'differential' | 'perf' | null = kind === 'auto' ? null : kind
+  const differential =
+    kind === 'differential' ? createDifferentialFoldedParser(name, limits.maxStackDepth) : null
   const folded = new StackListProfileBuilder()
   folded.setChronological(false)
   const perf = createLinuxPerfParser({
@@ -74,6 +78,10 @@ export async function importTextProfileStream(
     maxSamples: limits.maxSamples,
   })
   const line = (value: string) => {
+    if (differential) {
+      if (differential.pushLine(value) && ++samples > limits.maxSamples) limit('sample count')
+      return
+    }
     let cachedSample: ReturnType<typeof parseBGFoldedStack> | undefined
     const foldedSample = () => {
       if (cachedSample === undefined) cachedSample = parseBGFoldedStack(value, limits.maxStackDepth)
@@ -112,7 +120,7 @@ export async function importTextProfileStream(
     // Reject recognizable JSON before waiting for its first newline. A renamed
     // minified JSON capture may be much larger than the pending-line limit.
     // Bracketed folded symbols such as [unknown] are still ordinary labels.
-    if (samples === 0) {
+    if (!differential && samples === 0) {
       const textPrefix =
         carry.replace(/^\s+/, '').slice(0, 64) + value.replace(/^\s+/, '').slice(0, 64)
       if (/^\{|^\[\s*(?:[\[\{"\]\d-]|true|false|null)/.test(textPrefix)) throw new NotTextProfile()
@@ -178,8 +186,9 @@ export async function importTextProfileStream(
     text(decoder.decode())
     if (carry) line(carry)
     abort(options.signal)
-    const group =
-      detected === 'perf'
+    const group = differential
+      ? differential.build()
+      : detected === 'perf'
         ? perf.build()
         : samples
           ? {name, indexToView: 0, profiles: [folded.build()]}

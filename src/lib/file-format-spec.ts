@@ -41,6 +41,10 @@ export namespace FileFormat {
     file?: string
     line?: number
     col?: number
+    /** Producer-selected RGB color. Presentation may adapt it for text contrast.
+     * @pattern ^#[0-9a-fA-F]{6}$
+     */
+    color?: string
   }
 
   export enum ProfileType {

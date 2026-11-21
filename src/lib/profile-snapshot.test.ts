@@ -7,7 +7,7 @@ import {snapshotTransferables} from './profile-snapshot'
 
 test('worker snapshots preserve timing, recursive weights, source identity and aggregate metadata', async () => {
   const builder = new CallTreeProfileBuilder(15)
-  const a = {key: 0, name: 'same', file: 'a.ts', line: 3, col: 2}
+  const a = {key: 0, name: 'same', file: 'a.ts', line: 3, col: 2, color: '#8a2BE2'}
   const b = {key: '0', name: 'same', file: 'b.ts'}
   builder.enterFrame(a, 2)
   builder.enterFrame(a, 3)

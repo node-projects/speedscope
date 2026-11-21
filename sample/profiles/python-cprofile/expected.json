@@ -1,0 +1,149 @@
+[
+  {
+    "file": "cprofile-fixture.py",
+    "line": 17,
+    "name": "recursive",
+    "primitive": 1,
+    "calls": 4,
+    "self": 0.008,
+    "cumulative": 0.011000000000000001,
+    "callers": [
+      {
+        "file": "cprofile-fixture.py",
+        "line": 17,
+        "name": "recursive",
+        "calls": 3,
+        "primitive": 1,
+        "self": 0.006,
+        "cumulative": 0.009000000000000001
+      },
+      {
+        "file": "cprofile-fixture.py",
+        "line": 20,
+        "name": "workload",
+        "calls": 1,
+        "primitive": 1,
+        "self": 0.002,
+        "cumulative": 0.011000000000000001
+      }
+    ]
+  },
+  {
+    "file": "cprofile-fixture.py",
+    "line": 20,
+    "name": "workload",
+    "primitive": 1,
+    "calls": 1,
+    "self": 0.004,
+    "cumulative": 0.025,
+    "callers": []
+  },
+  {
+    "file": "cprofile-fixture.py",
+    "line": 8,
+    "name": "leaf",
+    "primitive": 3,
+    "calls": 3,
+    "self": 0.006,
+    "cumulative": 0.009000000000000001,
+    "callers": [
+      {
+        "file": "cprofile-fixture.py",
+        "line": 17,
+        "name": "recursive",
+        "calls": 1,
+        "primitive": 1,
+        "self": 0.002,
+        "cumulative": 0.003
+      },
+      {
+        "file": "cprofile-fixture.py",
+        "line": 11,
+        "name": "left",
+        "calls": 1,
+        "primitive": 1,
+        "self": 0.002,
+        "cumulative": 0.003
+      },
+      {
+        "file": "cprofile-fixture.py",
+        "line": 14,
+        "name": "right",
+        "calls": 1,
+        "primitive": 1,
+        "self": 0.002,
+        "cumulative": 0.003
+      }
+    ]
+  },
+  {
+    "file": "cprofile-fixture.py",
+    "line": 11,
+    "name": "left",
+    "primitive": 1,
+    "calls": 1,
+    "self": 0.002,
+    "cumulative": 0.005,
+    "callers": [
+      {
+        "file": "cprofile-fixture.py",
+        "line": 20,
+        "name": "workload",
+        "calls": 1,
+        "primitive": 1,
+        "self": 0.002,
+        "cumulative": 0.005
+      }
+    ]
+  },
+  {
+    "file": "cprofile-fixture.py",
+    "line": 14,
+    "name": "right",
+    "primitive": 1,
+    "calls": 1,
+    "self": 0.002,
+    "cumulative": 0.005,
+    "callers": [
+      {
+        "file": "cprofile-fixture.py",
+        "line": 20,
+        "name": "workload",
+        "calls": 1,
+        "primitive": 1,
+        "self": 0.002,
+        "cumulative": 0.005
+      }
+    ]
+  },
+  {
+    "file": "~",
+    "line": 0,
+    "name": "<built-in method builtins.sum>",
+    "primitive": 3,
+    "calls": 3,
+    "self": 0.003,
+    "cumulative": 0.003,
+    "callers": [
+      {
+        "file": "cprofile-fixture.py",
+        "line": 8,
+        "name": "leaf",
+        "calls": 3,
+        "primitive": 3,
+        "self": 0.003,
+        "cumulative": 0.003
+      }
+    ]
+  },
+  {
+    "file": "~",
+    "line": 0,
+    "name": "<method 'disable' of '_lsprof.Profiler' objects>",
+    "primitive": 1,
+    "calls": 1,
+    "self": 0.001,
+    "cumulative": 0.001,
+    "callers": []
+  }
+]

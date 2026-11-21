@@ -2,6 +2,7 @@ import {Vec2, Rect, AffineTransform} from '../lib/math'
 import {Theme} from '../views/themes/theme'
 import {Graphics} from './graphics'
 import {setUniformAffineTransform} from './utils'
+import {FrameColorPalette} from './frame-color-palette'
 
 const vertexFormat = new Graphics.VertexFormat()
 vertexFormat.add('position', Graphics.AttributeType.FLOAT, 2)
@@ -29,6 +30,7 @@ const frag = (colorForBucket: string) => `
 
   varying vec2 vUv;
   uniform sampler2D colorTexture;
+  uniform sampler2D frameColorPalette;
 
   // https://en.wikipedia.org/wiki/HSL_and_HSV#From_luma/chroma/hue
   vec3 hcl2rgb(float H, float C, float L) {
@@ -86,13 +88,20 @@ const frag = (colorForBucket: string) => `
       gl_FragColor = vec4(0, 0, 0, 0);
     } else {
       // Not on an edge. Draw the appropriate color.
-      gl_FragColor = vec4(colorForBucket(here.z), here.a);
+      if (here.a < 1.0) {
+        vec2 paletteUV = vec2(floor(here.b * 255.0 + 0.5) - 0.5,
+                              floor(here.a * 255.0 + 0.5) + 0.5) / 256.0;
+        gl_FragColor = vec4(texture2D(frameColorPalette, paletteUV).rgb, 1);
+      } else {
+        gl_FragColor = vec4(colorForBucket(here.z), 1);
+      }
     }
   }
 `
 
 export interface FlamechartColorPassRenderProps {
   rectInfoTexture: Graphics.Texture
+  frameColorPalette: Graphics.Texture | null
   renderOutlines: boolean
   srcRect: Rect
   dstRect: Rect
@@ -104,7 +113,7 @@ export class FlamechartColorPassRenderer {
 
   constructor(
     private gl: Graphics.Context,
-    theme: Theme,
+    private theme: Theme,
   ) {
     const vertices = [
       {pos: [-1, 1], uv: [0, 1]},
@@ -123,6 +132,10 @@ export class FlamechartColorPassRenderer {
     this.buffer = gl.createVertexBuffer(vertexFormat.stride * vertices.length)
     this.buffer.uploadFloats(floats)
     this.material = gl.createMaterial(vertexFormat, vert, frag(theme.colorForBucketGLSL))
+  }
+
+  createFrameColorPalette(): FrameColorPalette {
+    return new FrameColorPalette(this.theme)
   }
 
   render(props: FlamechartColorPassRenderProps) {
@@ -152,6 +165,13 @@ export class FlamechartColorPassRenderer {
     )
 
     this.material.setUniformSampler('colorTexture', props.rectInfoTexture, 0)
+    // Keep both samplers bound even when no custom colors occur. The unused
+    // branch then shares the already allocated metadata texture.
+    this.material.setUniformSampler(
+      'frameColorPalette',
+      props.frameColorPalette || props.rectInfoTexture,
+      1,
+    )
     setUniformAffineTransform(this.material, 'uvTransform', uvTransform)
     this.material.setUniformFloat('renderOutlines', props.renderOutlines ? 1.0 : 0.0)
     this.material.setUniformVec2('uvSpacePixelSize', uvSpacePixelSize.x, uvSpacePixelSize.y)

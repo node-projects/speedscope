@@ -37,6 +37,7 @@ await writeFile(
   path.join(outdir, 'streamparser-json.LICENSE'),
   await readFile('node_modules/@streamparser/json/LICENSE'),
 )
+await writeFile(path.join(outdir, 're2js.LICENSE'), await readFile('node_modules/re2js/LICENSE'))
 await writeFile(
   path.join(outdir, 'release.txt'),
   `${pkg.name}@${pkg.version}\n${new Date().toISOString()}\n${execFileSync(

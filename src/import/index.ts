@@ -11,6 +11,12 @@ import {
 import {importFromStackprof} from './stackprof'
 import {importFromInstrumentsDeepCopy, importFromInstrumentsTrace} from './instruments'
 import {importFromBGFlameGraph} from './bg-flamegraph'
+import {isDifferentialFoldedName, importFromBGDifferential} from './bg-differential'
+import {
+  checkPythonCProfileFileSize,
+  importFromPythonCProfile,
+  isPythonCProfile,
+} from './python-cprofile'
 import {importFromFirefox} from './firefox'
 import {importSpeedscopeProfiles} from '../lib/file-format'
 import {importFromV8ProfLog} from './v8proflog'
@@ -18,7 +24,7 @@ import {importFromLinuxPerf} from './linux-tools-perf'
 import {importFromHaskell} from './haskell'
 import {isSafariTimeline, importFromSafari} from './safari'
 import {ProfileDataSource, TextProfileDataSource, MaybeCompressedDataReader} from './utils'
-import {importAsPprofProfile} from './pprof'
+import {importAsPprofProfileGroup} from './pprof'
 import {decodeBase64} from '../lib/utils'
 import {importFromChromeHeapProfile} from './v8heapalloc'
 import {isTraceEventFormatted, importTraceEvents} from './trace-event'
@@ -73,6 +79,7 @@ export async function importProfilesFromFile(
 ): Promise<ProfileGroup | null> {
   checkImportAbort(options)
   await checkJavaThreadDumpZipFileSize(file, options.signal)
+  await checkPythonCProfileFileSize(file, options.signal)
   return importProfileGroup(MaybeCompressedDataReader.fromFile(file), options)
 }
 
@@ -137,11 +144,16 @@ async function _importProfileGroup(
     return importFromAndroidMethodTrace(fileName, buffer)
   }
 
+  if (isPythonCProfile(buffer, fileName)) {
+    console.log('Importing native Python cProfile aggregate statistics')
+    return importFromPythonCProfile(buffer, fileName, options)
+  }
+
   {
-    const profile = importAsPprofProfile(buffer)
-    if (profile) {
+    const group = importAsPprofProfileGroup(buffer)
+    if (group) {
       console.log('Importing as protobuf encoded pprof file')
-      return toGroup(profile)
+      return group
     }
   }
 
@@ -153,6 +165,7 @@ async function _importProfileGroup(
   }
 
   const contents = await dataSource.readAsText()
+  if (isDifferentialFoldedName(fileName)) return importFromBGDifferential(contents, fileName)
 
   // First pass: Check known file format names to infer the file type
   if (fileName.endsWith('.speedscope.json')) {

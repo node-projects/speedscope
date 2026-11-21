@@ -4,6 +4,7 @@ import {snapshotTransferables} from '../lib/profile-snapshot'
 import {tryImportDurationTrace} from './streaming-trace'
 import {checkJavaThreadDumpZipFileSize} from './java-thread-dump-zip'
 import {tryImportTextProfile} from './streaming-text-profile'
+import {checkPythonCProfileFileSize} from './python-cprofile'
 
 export async function processTraceInWorker(
   request: TraceWorkerRequest,
@@ -11,6 +12,7 @@ export async function processTraceInWorker(
 ): Promise<TraceWorkerResponse> {
   progress('Reading profile')
   if (!(request.input instanceof ArrayBuffer)) await checkJavaThreadDumpZipFileSize(request.input)
+  if (!(request.input instanceof ArrayBuffer)) await checkPythonCProfileFileSize(request.input)
   let group = await tryImportDurationTrace(request.input, request.name, {
     onProgress: () => progress('Streaming profile'),
   })

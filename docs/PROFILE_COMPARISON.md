@@ -80,6 +80,39 @@ a memory guarantee for another capture. The original PLC export hash was unchang
 
 Comparison is transient. Closing the dialog releases the external candidate and
 comparison state; reopening starts a new comparison. Existing Export still saves
-the main recording. Signed differential input formats (including negative Go
-heap delta samples and folded differential files), comparison-file export,
-synchronized timelines and statistical comparison remain separate features.
+the main recording. Comparison-file export, synchronized timelines and
+statistical comparison remain separate features.
+
+## Differential folded files
+
+Use **Open differential folded…** inside the comparison dialog to open
+`difffolded.pl` output: `stack;leaf baselineWeight candidateWeight`. The two
+columns are nonnegative weights, not a weight and its signed delta. The first
+becomes Baseline and the second Candidate; click **Compare** to see their signed
+differences. Both sides are also available in the profile selectors. **Use loaded
+recording** restores the original choices. The main recording is unchanged.
+
+Alternatively, import a file named `capture.diff.folded` or
+`capture.differential.folded` (also `.collapsed`, `.stacks`, and gzip variants)
+through the main Import button. It creates two ordinary aggregate profiles;
+choose Compare profiles to visualize them. Export preserves both sides as
+ordinary speedscope profiles. No signed native schema extension is required.
+
+Selection is explicit because `function 12 3` could be an ordinary folded symbol
+named `function 12` with weight 3. Ordinary folded import retains that meaning.
+The differential picker supports any filename, using an internal format hint.
+It rejects malformed noncomment lines, negative/nonfinite weights, overflowing
+totals and mixed one/two-column files. Decimal/scientific notation is accepted;
+all-zero rows have no measured width. UTF-8 plain/native-gzip inputs stream with
+the existing text byte, line, sample and depth guards. Output models still scale
+with both sides; generic fallback decoding can materialize expanded input.
+
+The format follows the [producer's column definition](https://github.com/brendangregg/FlameGraph/blob/master/difffolded.pl).
+Our graph uses the documented union envelope and total-delta colors. It does not
+reproduce the producer SVG's candidate-only widths or self-only color scale.
+Weights already normalized by the producer are imported as supplied; choose
+absolute mode to avoid normalizing them again. See the
+[authored example](../sample/profiles/differential-folded/example.diff.folded).
+
+Signed pprof delta recordings use a related contribution-pair projection,
+explained in [pprof import](PPROF_IMPORT.md).

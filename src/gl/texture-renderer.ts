@@ -103,7 +103,8 @@ export class TextureRenderer {
       })(),
     )
 
-    this.gl.setUnpremultipliedBlendState()
+    // Used by RowAtlas to copy metadata. Alpha is a palette byte, not opacity.
+    this.gl.setCopyBlendState()
     this.gl.draw(Graphics.Primitive.TRIANGLE_STRIP, this.material, this.buffer)
   }
 }
