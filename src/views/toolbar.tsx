@@ -30,6 +30,7 @@ import {createFunctionLink} from '../lib/function-link'
 import {FunctionLinkDialog} from './function-link-dialog'
 import {LinkedSourceMapDialog} from './linked-source-map-dialog'
 import {ProfileComparisonDialog} from './profile-comparison-dialog'
+import {groupTimelineTracks, hasTimelineData} from '../lib/timeline-tracks'
 
 interface ToolbarProps extends ApplicationProps {
   browseForFile(): void
@@ -49,7 +50,7 @@ function ToolbarLeftContent(props: ToolbarProps) {
   const setCallTree = useSetViewMode(viewModeAtom.set, ViewMode.CALL_TREE)
   const setTracks = useSetViewMode(viewModeAtom.set, ViewMode.MULTI_TRACK)
 
-  if (!props.activeProfileState && !props.profileGroup?.counterTracks?.length) return null
+  if (!props.activeProfileState && !hasTimelineData(props.profileGroup)) return null
 
   return (
     <div className={css(style.toolbarLeft)}>
@@ -213,9 +214,7 @@ function ToolbarCenterContent(props: ToolbarProps): JSX.Element {
       )
     }
   }
-  return (
-    <Fragment>{profileGroup?.counterTracks?.length ? profileGroup.name : '🔬speedscope'}</Fragment>
-  )
+  return <Fragment>{hasTimelineData(profileGroup) ? profileGroup?.name : '🔬speedscope'}</Fragment>
 }
 
 function ToolbarRightContent(props: ToolbarProps) {
@@ -368,9 +367,7 @@ function ToolbarRightContent(props: ToolbarProps) {
       props.setProfileGroup({
         name: profileGroup.name,
         sourceName: profileGroup.sourceName,
-        ...(profileGroup.counterTracks === undefined
-          ? {}
-          : {counterTracks: profileGroup.counterTracks}),
+        ...groupTimelineTracks(profileGroup),
         indexToView: profileGroup.profiles.length,
         profiles: [...profileGroup.profiles.map(p => p.profile), derived],
       })
@@ -447,7 +444,7 @@ function ToolbarRightContent(props: ToolbarProps) {
           </option>
         </select>
       )}
-      {(props.activeProfileState || props.profileGroup?.counterTracks?.length) && exportFile}
+      {(props.activeProfileState || hasTimelineData(props.profileGroup)) && exportFile}
       {importFile}
       {colorSchemeToggle}
       {help}
@@ -499,7 +496,7 @@ function ToolbarRightContent(props: ToolbarProps) {
             current.setProfileGroup({
               name: group.name,
               sourceName: group.sourceName,
-              ...(group.counterTracks === undefined ? {} : {counterTracks: group.counterTracks}),
+              ...groupTimelineTracks(group),
               indexToView: group.indexToView,
               profiles,
             })
@@ -534,7 +531,7 @@ function ToolbarRightContent(props: ToolbarProps) {
             current.setProfileGroup({
               name: group.name,
               sourceName: group.sourceName,
-              ...(group.counterTracks === undefined ? {} : {counterTracks: group.counterTracks}),
+              ...groupTimelineTracks(group),
               indexToView: group.profiles.length,
               profiles: [...group.profiles.map(p => p.profile), derived],
             })

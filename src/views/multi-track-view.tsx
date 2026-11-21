@@ -3,6 +3,14 @@ import {useCallback, useEffect, useMemo, useRef, useState} from 'preact/hooks'
 import {css, StyleSheet} from 'aphrodite'
 import {Profile} from '../lib/profile'
 import {CounterTrack} from '../lib/counter-track'
+import {InstantTrack} from '../lib/instant-track'
+import {
+  InstantTimelineRow,
+  collectInstantGlyphs,
+  instantEventsNear,
+  MAX_VISIBLE_INSTANT_GLYPHS,
+} from '../lib/instant-track-layout'
+import {InstantEventsDialog} from './instant-events-dialog'
 import {
   CounterTimelineRow,
   CounterPlot,
@@ -31,6 +39,7 @@ import {TrackCallEventIndexCache} from '../lib/track-call-event-index-cache'
 export interface MultiTrackViewProps {
   profiles: readonly Profile[]
   counterTracks?: readonly CounterTrack[]
+  instantTracks?: readonly InstantTrack[]
   selectedProfileIndex: number
   onSelectProfile(index: number): void
 }
@@ -42,13 +51,22 @@ const MAX_VISIBLE_ROWS = 24
 const NO_TILES = new Map<number, TrackTiles>()
 const NO_PLOTS = new Map<number, CounterPlot>()
 const NO_COUNTERS: readonly CounterTrack[] = []
-type TrackRow = TimelineTrack | CounterTimelineRow
+const NO_INSTANTS: readonly InstantTrack[] = []
+type TrackRow = TimelineTrack | CounterTimelineRow | InstantTimelineRow
 const isCounter = (row: TrackRow): row is CounterTimelineRow => 'counter' in row
+const isInstant = (row: TrackRow): row is InstantTimelineRow => 'instant' in row
 const short = (name: string) => (name.length > 240 ? name.slice(0, 239) + '…' : name)
 const counterName = (counter: CounterTrack) =>
   short(
     `${counter.name}${counter.processId ? ` · pid ${counter.processId}` : ''}${
       counter.threadId ? ` · tid ${counter.threadId}` : ''
+    }`,
+  )
+
+const instantName = (instant: InstantTrack) =>
+  short(
+    `${instant.name}${instant.processId !== undefined ? ` · pid ${instant.processId}` : ''}${
+      instant.threadId !== undefined ? ` · tid ${instant.threadId}` : ''
     }`,
   )
 
@@ -121,9 +139,10 @@ export function MultiTrackView(props: MultiTrackViewProps) {
   const theme = useTheme(),
     style = getStyle(theme)
   const counters = props.counterTracks || NO_COUNTERS
+  const instants = props.instantTracks || NO_INSTANTS
   const layout = useMemo(
-    () => buildMultiTrackLayout(props.profiles, counters),
-    [props.profiles, counters],
+    () => buildMultiTrackLayout(props.profiles, counters, instants),
+    [props.profiles, counters, instants],
   )
   const compatibleCount = useMemo(
     () => layout.groups.reduce((sum, candidate) => sum + candidate.rows.length, 0),
@@ -140,19 +159,29 @@ export function MultiTrackView(props: MultiTrackViewProps) {
       ),
     [layout, props.selectedProfileIndex],
   )
-  const [groupKey, setGroupKey] = useState('')
+  const [groupChoice, setGroupChoice] = useState<{source: typeof layout; key: string} | null>(null)
+  const groupKey = groupChoice?.source === layout ? groupChoice.key : ''
+  const setGroupKey = useCallback((key: string) => setGroupChoice({source: layout, key}), [layout])
+  useEffect(() => setGroupChoice(null), [layout])
   const group = useMemo(
     () => layout.groups.find(candidate => candidate.key === groupKey) || defaultGroup,
     [layout, groupKey, defaultGroup],
   )
+  const groupIndex = useMemo(() => (group ? layout.groups.indexOf(group) : -1), [group, layout])
+  const clockPage = Math.max(0, Math.floor(groupIndex / 64))
   const rangeIndexCache = useMemo(
     () => new TrackCallEventIndexCache(),
     // Ownership changes intentionally create a new cache, even though the
     // factory needs no source data. Cleanup releases the previous session.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [props.profiles, counters, group?.key],
+    [props.profiles, counters, instants, group?.key],
   )
   useEffect(() => () => rangeIndexCache.clear(), [rangeIndexCache])
+  const [inspector, setInspector] = useState<{
+    scope: TrackCallEventIndexCache
+    row: InstantTimelineRow
+    viewport: MultiTrackViewport
+  } | null>(null)
   const [requested, setRequested] = useState<MultiTrackViewport>({left: 0, width: Infinity})
   const [viewportOwner, setViewportOwner] = useState(rangeIndexCache)
   // A new source/clock begins at full range immediately, before reset effects.
@@ -191,6 +220,19 @@ export function MultiTrackView(props: MultiTrackViewProps) {
   const data = rendered.group === group && rendered.key === requestKey ? rendered.rows : NO_TILES
   const plots = rendered.group === group && rendered.key === requestKey ? rendered.plots : NO_PLOTS
   const counterResolution = visible.some(isCounter) ? Math.min(1024, size.width) : 0
+  const instantResolution = visible.some(isInstant)
+    ? Math.min(MAX_VISIBLE_INSTANT_GLYPHS, size.width)
+    : 0
+  const instantGlyphData = useMemo(() => {
+    const rows = visible.filter(isInstant)
+    const cap = Math.floor(MAX_VISIBLE_INSTANT_GLYPHS / Math.max(1, rows.length))
+    return new Map(
+      rows.map(row => [
+        row.instantIndex,
+        collectInstantGlyphs(row, viewport, instantResolution, cap),
+      ]),
+    )
+  }, [visible, viewport, instantResolution])
   const format = useMemo(() => new TimeFormatter(group?.unit || 'microseconds'), [group?.unit])
   const axis = useMemo(
     () =>
@@ -217,8 +259,9 @@ export function MultiTrackView(props: MultiTrackViewProps) {
     setScrollTop(0)
     setRendered({key: '', rows: NO_TILES, plots: NO_PLOTS})
     setCrosshair(null)
+    setInspector(null)
     if (scroller.current) scroller.current.scrollTop = 0
-  }, [group?.key, props.profiles, counters, rangeIndexCache])
+  }, [group?.key, props.profiles, counters, instants, rangeIndexCache])
   useEffect(() => {
     const element = scroller.current
     if (!element) return
@@ -247,9 +290,12 @@ export function MultiTrackView(props: MultiTrackViewProps) {
       const next = new Map<number, TrackTiles>()
       const nextPlots = new Map<number, CounterPlot>()
       const counterCount = visible.filter(isCounter).length
+      const instantCount = visible.filter(isInstant).length
       const cap = Math.max(
         1,
-        Math.floor(MULTI_TRACK_MAX_TILES / Math.max(1, visible.length - counterCount)),
+        Math.floor(
+          MULTI_TRACK_MAX_TILES / Math.max(1, visible.length - counterCount - instantCount),
+        ),
       )
       const pointCap = Math.floor(MAX_VISIBLE_COUNTER_POINTS / Math.max(1, counterCount))
       for (const track of visible) {
@@ -261,7 +307,7 @@ export function MultiTrackView(props: MultiTrackViewProps) {
               maxPoints: pointCap,
             }),
           )
-        else {
+        else if (!isInstant(track)) {
           const localLeft = viewport.left - track.offset
           const rangeIndex =
             localLeft > 0 && localLeft < track.profile.getTotalWeight()
@@ -348,6 +394,30 @@ export function MultiTrackView(props: MultiTrackViewProps) {
       const top = index * ROW_HEIGHT - scrollTop
       ctx.fillStyle = theme.bgSecondaryColor
       ctx.fillRect(0, top, size.width, HEADER_HEIGHT)
+      if (isInstant(track)) {
+        const glyphs = instantGlyphData.get(track.instantIndex)
+        const y = top + HEADER_HEIGHT + 56
+        ctx.strokeStyle = theme.fgPrimaryColor
+        ctx.lineWidth = 1.5
+        ctx.beginPath()
+        glyphs?.indices.forEach((sourceIndex, glyph) => {
+          const x =
+            ((track.offset + track.instant.times[sourceIndex] - viewport.left) / viewport.width) *
+            size.width
+          ctx.moveTo(x, y - 10)
+          ctx.lineTo(x, y + 10)
+          if (glyphs.indices.length <= 12) {
+            ctx.fillStyle = theme.fgPrimaryColor
+            const label =
+              glyphs.counts[glyph] > 1
+                ? `${glyphs.counts[glyph]} points (inspect)`
+                : short(track.instant.events[sourceIndex].name)
+            ctx.fillText(label, x + 4, y + 24, Math.max(1, Math.min(160, size.width - x - 4)))
+          }
+        })
+        ctx.stroke()
+        continue
+      }
       if (isCounter(track)) {
         drawCounter(ctx, track, plots.get(track.counterIndex), viewport, size.width, top, theme)
         continue
@@ -384,18 +454,19 @@ export function MultiTrackView(props: MultiTrackViewProps) {
         }
       }
     }
-  }, [group, data, plots, first, last, scrollTop, size, viewport, theme])
+  }, [group, data, plots, instantGlyphData, first, last, scrollTop, size, viewport, theme])
 
   if (!group)
     return (
       <section className={css(style.section)} aria-label="Synchronized thread timelines">
         <p>
           No aligned thread timelines are available. Profiles need explicit origins in the same
-          clock and equal time units. Counters need a finite observed time domain.
+          clock and equal time units. Counters need a finite observed time domain. Instant lanes
+          need at least one finite observed timestamp.
         </p>
         <p>
           {layout.excluded.length} profiles excluded. {layout.excludedCounters.length} counter
-          series excluded.{' '}
+          series excluded. {layout.excludedInstants.length} instant lanes excluded.{' '}
           {layout.uninspectedCount
             ? `${layout.uninspectedCount} beyond the 10,000-profile inspection limit.`
             : ''}
@@ -404,6 +475,13 @@ export function MultiTrackView(props: MultiTrackViewProps) {
           {layout.excluded.slice(0, 20).map(item => (
             <li key={item.profileIndex}>
               {short(props.profiles[item.profileIndex].getName())}: {item.reason}
+            </li>
+          ))}
+        </ul>
+        <ul>
+          {layout.excludedInstants.slice(0, 20).map(item => (
+            <li key={item.instantIndex}>
+              {short(instants[item.instantIndex].name)}: {item.reason}
             </li>
           ))}
         </ul>
@@ -417,11 +495,18 @@ export function MultiTrackView(props: MultiTrackViewProps) {
       </section>
     )
 
-  const choices = layout.groups.slice(0, 64)
-  if (!choices.includes(group)) choices[choices.length - 1] = group
+  const choices = layout.groups.slice(clockPage * 64, (clockPage + 1) * 64)
   const omitted = [...data.values()].reduce((sum, track) => sum + track.omitted, 0)
   const deeper = [...data.values()].some(track => track.deeper)
   const counterOverviews = [...plots.values()].filter(plot => plot.decimated).length
+  const instantSummary = [...instantGlyphData.values()].reduce(
+    (sum, item) => ({
+      points: sum.points + item.total,
+      glyphs: sum.glyphs + item.indices.length,
+      omitted: sum.omitted + item.omitted,
+    }),
+    {points: 0, glyphs: 0, omitted: 0},
+  )
   const {interval, positions: ticks} = axis
   const other = compatibleCount - group.rows.length
   const pointer = (event: MouseEvent, trackUnderPointer = true) => {
@@ -444,6 +529,7 @@ export function MultiTrackView(props: MultiTrackViewProps) {
     const tile =
       track &&
       !isCounter(track) &&
+      !isInstant(track) &&
       data
         .get(track.profileIndex)
         ?.tiles.find(
@@ -459,6 +545,12 @@ export function MultiTrackView(props: MultiTrackViewProps) {
   }
   const activity = (track: TrackRow): string => {
     if (crosshair === null) {
+      if (isInstant(track)) {
+        const glyphs = instantGlyphData.get(track.instantIndex)
+        return `${glyphs?.total || 0} points; ${glyphs?.indices.length || 0} ticks; ${
+          glyphs?.omitted || 0
+        } not individually drawn`
+      }
       if (isCounter(track)) {
         const plot = plots.get(track.counterIndex)
         return plot?.observations
@@ -469,6 +561,18 @@ export function MultiTrackView(props: MultiTrackViewProps) {
     }
     if (crosshair < viewport.left || crosshair >= viewport.left + viewport.width)
       return 'Marker outside viewport'
+    if (isInstant(track)) {
+      const near = instantEventsNear(track, crosshair, (viewport.width / size.width) * 5)
+      if (!near) return 'No event near marker'
+      const repeated = track.instant.times[near.first] === track.instant.times[near.end - 1]
+      return `${
+        near.end - near.first > 1
+          ? `${near.end - near.first} ${
+              repeated ? 'coincident points' : 'points at same displayed time'
+            }`
+          : 'Point'
+      }: ${short(track.instant.events[near.first].name)} at +${format.format(near.time)}`
+    }
     if (isCounter(track)) {
       const index = counterObservationAt(track, crosshair)
       if (index === null) return 'Outside observed range'
@@ -509,10 +613,38 @@ export function MultiTrackView(props: MultiTrackViewProps) {
               <option key={candidate.key} value={candidate.key}>
                 {short(candidate.clock)} · {candidate.unit} · {candidate.tracks.length} profiles
                 {candidate.counterRows.length ? `, ${candidate.counterRows.length} counters` : ''}
+                {candidate.instantRows.length
+                  ? `, ${candidate.instantRows.length} event lanes`
+                  : ''}
               </option>
             ))}
           </select>
         </label>
+        {layout.groups.length > 64 && (
+          <span>
+            <button
+              type="button"
+              disabled={clockPage === 0}
+              onClick={() => {
+                if (clockPage > 0) setGroupKey(layout.groups[(clockPage - 1) * 64].key)
+              }}
+            >
+              Previous clocks
+            </button>{' '}
+            Clock groups {clockPage * 64 + 1}–{Math.min((clockPage + 1) * 64, layout.groups.length)}{' '}
+            of {layout.groups.length}{' '}
+            <button
+              type="button"
+              disabled={(clockPage + 1) * 64 >= layout.groups.length}
+              onClick={() => {
+                if ((clockPage + 1) * 64 < layout.groups.length)
+                  setGroupKey(layout.groups[(clockPage + 1) * 64].key)
+              }}
+            >
+              Next clocks
+            </button>
+          </span>
+        )}
         <button type="button" onClick={() => zoom(0.5)}>
           Zoom in
         </button>
@@ -551,27 +683,54 @@ export function MultiTrackView(props: MultiTrackViewProps) {
             Show counters
           </button>
         )}
-        {group.counterRows.length > 0 && group.tracks.length > 0 && (
+        {group.instantRows.length > 0 && (
           <button
             type="button"
             onClick={() => {
               if (scroller.current) {
-                scroller.current.scrollTop = 0
-                setScrollTop(0)
+                scroller.current.scrollTop =
+                  (group.tracks.length + group.counterRows.length) * ROW_HEIGHT
+                setScrollTop(scroller.current.scrollTop)
               }
             }}
           >
-            Show profiles
+            Show events
           </button>
         )}
+        {(group.counterRows.length > 0 || group.instantRows.length > 0) &&
+          group.tracks.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                if (scroller.current) {
+                  scroller.current.scrollTop = 0
+                  setScrollTop(0)
+                }
+              }}
+            >
+              Show profiles
+            </button>
+          )}
       </div>
       <p className={css(style.description)}>
         {group.tracks.length} aligned profiles
-        {group.counterRows.length ? ` and ${group.counterRows.length} counter series` : ''}. Axis is
-        elapsed time after shared reference {group.referenceStart} {group.unit}. First{' '}
+        {group.counterRows.length ? ` and ${group.counterRows.length} counter series` : ''}
+        {group.instantRows.length ? ` and ${group.instantRows.length} instant event lanes` : ''}.
+        Axis is elapsed time after shared reference {group.referenceStart} {group.unit}. First{' '}
         {MULTI_TRACK_DEPTH} stack levels per row; open a profile for deeper stacks. Drag to pan;
         Ctrl/⌘+wheel zooms. Arrow keys pan, +/− zoom, Home resets.
       </p>
+      {group.instantRows.length > 0 && (
+        <p className={css(style.description)}>
+          Instant events are zero-duration points. At most{' '}
+          {MAX_VISIBLE_INSTANT_GLYPHS.toLocaleString()} ticks across visible event lanes represent
+          time buckets; not every point is drawn individually. Inspect events to read every original
+          point in the captured visible range, including coincidences and metadata.{' '}
+          {instantSummary.points.toLocaleString()} points in visible event lanes;{' '}
+          {instantSummary.glyphs.toLocaleString()} ticks; {instantSummary.omitted.toLocaleString()}{' '}
+          points not individually drawn.
+        </p>
+      )}
       {group.counterRows.length > 0 && (
         <p className={css(style.description)}>
           Counter rows have independent value axes and labeled units. Dense ranges show min/max
@@ -581,7 +740,12 @@ export function MultiTrackView(props: MultiTrackViewProps) {
       )}
       <p className={css(style.description)}>
         {layout.excluded.length} unanchored/unsupported profiles excluded; {other}{' '}
-        {counters.length ? 'profiles/counters' : 'profiles'} use other clocks or units.
+        {instants.length
+          ? 'profiles/counters/events'
+          : counters.length
+            ? 'profiles/counters'
+            : 'profiles'}{' '}
+        use other clocks or units.
         {layout.excludedCounters.length
           ? ` ${layout.excludedCounters.length} counter series have no supported observed domain.`
           : ''}
@@ -591,7 +755,13 @@ export function MultiTrackView(props: MultiTrackViewProps) {
         {layout.uninspectedCount
           ? ` ${layout.uninspectedCount} beyond the 10,000-profile inspection limit.`
           : ''}
-        {layout.groups.length > 64 ? ' First 64 clock groups are listed.' : ''}
+        {layout.excludedInstants.length
+          ? ` ${layout.excludedInstants.length} instant lanes have no supported observed domain.`
+          : ''}
+        {layout.uninspectedInstantCount
+          ? ` ${layout.uninspectedInstantCount} additional instant lanes exceed the inspection limit.`
+          : ''}
+        {layout.groups.length > 64 ? ' Clock groups are paged 64 at a time.' : ''}
       </p>
       {counterOverviews > 0 && (
         <p className={css(style.status)}>
@@ -659,6 +829,7 @@ export function MultiTrackView(props: MultiTrackViewProps) {
             className={css(style.canvas)}
             style={{height: size.height}}
             aria-label="Aligned thread activity"
+            data-instant-glyph-count={instantSummary.glyphs}
             onMouseMove={pointer}
             onMouseDown={event => {
               event.preventDefault()
@@ -687,8 +858,27 @@ export function MultiTrackView(props: MultiTrackViewProps) {
               />
             )}
           {visible.map((track: TrackRow, index: number) => (
-            <div key={isCounter(track) ? `c${track.counterIndex}` : `p${track.profileIndex}`}>
-              {isCounter(track) ? (
+            <div
+              key={
+                isInstant(track)
+                  ? `i${track.instantIndex}`
+                  : isCounter(track)
+                    ? `c${track.counterIndex}`
+                    : `p${track.profileIndex}`
+              }
+            >
+              {isInstant(track) ? (
+                <button
+                  type="button"
+                  className={css(style.trackLabel)}
+                  style={{top: (first + index) * ROW_HEIGHT + 4}}
+                  onClick={() =>
+                    setInspector({scope: rangeIndexCache, row: track, viewport: {...viewport}})
+                  }
+                >
+                  Inspect events: {instantName(track.instant)} [{track.instant.scope}]
+                </button>
+              ) : isCounter(track) ? (
                 <span
                   className={css(style.trackLabel)}
                   style={{top: (first + index) * ROW_HEIGHT + 4}}
@@ -743,6 +933,13 @@ export function MultiTrackView(props: MultiTrackViewProps) {
           </ul>
           {layout.excluded.length > 20 && <p>First 20 exclusions shown.</p>}
         </details>
+      )}
+      {inspector?.scope === rangeIndexCache && (
+        <InstantEventsDialog
+          row={inspector.row}
+          viewport={inspector.viewport}
+          onClose={() => setInspector(null)}
+        />
       )}
     </section>
   )

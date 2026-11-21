@@ -38,6 +38,7 @@ import {
   ImportOptions,
 } from '../import/profile-loader'
 import {ImportProgress} from '../import/trace-worker-protocol'
+import {groupTimelineTracks, hasTimelineData} from '../lib/timeline-tracks'
 
 const importModule = () => import('../import')
 
@@ -325,7 +326,7 @@ export class Application extends StatelessComponent<ApplicationProps> {
       if (profileGroup == null) {
         alert('Unrecognized format! See documentation about supported formats.')
         return
-      } else if (!profileGroup.profiles.length && !profileGroup.counterTracks?.length) {
+      } else if (!profileGroup.profiles.length && !hasTimelineData(profileGroup)) {
         alert("Successfully imported profile, but it's empty!")
         return
       }
@@ -338,7 +339,7 @@ export class Application extends StatelessComponent<ApplicationProps> {
       document.title = profileWindowTitle(profileGroup, this.currentHashParams.title)
       if (this.currentHashParams.viewMode !== undefined)
         this.props.setViewMode(this.currentHashParams.viewMode)
-      if (!profileGroup.profiles.length && profileGroup.counterTracks?.length)
+      if (!profileGroup.profiles.length && hasTimelineData(profileGroup))
         this.props.setViewMode(ViewMode.MULTI_TRACK)
       const selected = profileGroup.profiles[profileGroup.indexToView]
       if (
@@ -441,9 +442,7 @@ export class Application extends StatelessComponent<ApplicationProps> {
           return {
             name: this.props.profileGroup.name || 'profile',
             sourceName: this.props.profileGroup.sourceName,
-            ...(this.props.profileGroup.counterTracks === undefined
-              ? {}
-              : {counterTracks: this.props.profileGroup.counterTracks}),
+            ...groupTimelineTracks(this.props.profileGroup),
             indexToView: this.props.profileGroup.indexToView,
             profiles: this.props.profileGroup.profiles.map(profileState => {
               // We do a shallow clone here to invalidate certain caches keyed
@@ -522,7 +521,7 @@ export class Application extends StatelessComponent<ApplicationProps> {
       return
     if (
       !this.props.activeProfileState &&
-      this.props.profileGroup?.counterTracks?.length &&
+      hasTimelineData(this.props.profileGroup) &&
       /^[1-4]$/.test(ev.key)
     )
       return
@@ -559,12 +558,12 @@ export class Application extends StatelessComponent<ApplicationProps> {
   private saveFile = async () => {
     if (this.props.loading || this.exportController) return
     if (this.props.profileGroup) {
-      const {name, indexToView, profiles, counterTracks} = this.props.profileGroup
+      const {name, indexToView, profiles} = this.props.profileGroup
       const profileGroup: ProfileGroup = {
         name,
         indexToView,
         profiles: profiles.map(p => p.profile),
-        ...(counterTracks === undefined ? {} : {counterTracks}),
+        ...groupTimelineTracks(this.props.profileGroup),
       }
       const controller = new AbortController()
       this.exportController = controller
@@ -822,11 +821,12 @@ export class Application extends StatelessComponent<ApplicationProps> {
     const {activeProfileState, error, loading, glCanvas} = this.props
     const viewMode = this.effectiveViewMode()
     const counterTracks = this.props.profileGroup?.counterTracks
+    const instantTracks = this.props.profileGroup?.instantTracks
     if (
       viewMode !== ViewMode.MULTI_TRACK ||
       loading ||
       error ||
-      (!activeProfileState && !counterTracks?.length)
+      (!activeProfileState && !hasTimelineData(this.props.profileGroup))
     )
       this.trackProfiles = []
 
@@ -852,10 +852,16 @@ export class Application extends StatelessComponent<ApplicationProps> {
           }}
         >
           <p role="status">
-            Exporting {progress.eventsWritten.toLocaleString()} events ·{' '}
-            {progress.profilesCompleted}/{progress.profileCount} profiles ·{' '}
-            {progress.framesWritten.toLocaleString()}/{progress.frameCount.toLocaleString()} source
-            frames
+            Exporting{' '}
+            {progress.profileCount ? (
+              <span>
+                {progress.eventsWritten.toLocaleString()} call events · {progress.profilesCompleted}
+                /{progress.profileCount} profiles · {progress.framesWritten.toLocaleString()}/
+                {progress.frameCount.toLocaleString()} source frames
+              </span>
+            ) : (
+              'timeline data'
+            )}
             {progress.counterCount !== undefined && (
               <span>
                 {' '}
@@ -863,11 +869,18 @@ export class Application extends StatelessComponent<ApplicationProps> {
                 {progress.counterCount} counter series
               </span>
             )}
+            {progress.instantTrackCount !== undefined && (
+              <span>
+                {' '}
+                · {(progress.instantPointsWritten || 0).toLocaleString()} instant events ·{' '}
+                {progress.instantTrackCount} event tracks
+              </span>
+            )}
           </p>
           <progress
-            aria-label="Profiles exported"
-            value={progress.profilesCompleted}
-            max={Math.max(1, progress.profileCount)}
+            aria-label={progress.profileCount ? 'Profiles exported' : 'Timeline data export'}
+            value={progress.profileCount ? progress.profilesCompleted : undefined}
+            max={progress.profileCount || undefined}
           />
           <button type="button" onClick={() => this.exportController?.abort()}>
             Cancel export
@@ -879,11 +892,15 @@ export class Application extends StatelessComponent<ApplicationProps> {
     if (activeProfileState && viewMode === ViewMode.CALL_TREE) {
       return <CallTreeView profile={activeProfileState.profile} />
     }
-    if ((activeProfileState || counterTracks?.length) && viewMode === ViewMode.MULTI_TRACK) {
+    if (
+      (activeProfileState || hasTimelineData(this.props.profileGroup)) &&
+      viewMode === ViewMode.MULTI_TRACK
+    ) {
       return (
         <MultiTrackView
           profiles={this.getTrackProfiles()}
           counterTracks={counterTracks}
+          instantTracks={instantTracks}
           selectedProfileIndex={activeProfileState?.index ?? 0}
           onSelectProfile={this.openTrackProfile}
         />
@@ -910,7 +927,7 @@ export class Application extends StatelessComponent<ApplicationProps> {
   }
 
   private effectiveViewMode() {
-    if (!this.props.activeProfileState && this.props.profileGroup?.counterTracks?.length)
+    if (!this.props.activeProfileState && hasTimelineData(this.props.profileGroup))
       return ViewMode.MULTI_TRACK
     return this.props.viewMode === ViewMode.CHRONO_FLAME_CHART &&
       this.props.activeProfileState?.profile.isChronological() === false
@@ -940,6 +957,19 @@ export class Application extends StatelessComponent<ApplicationProps> {
           viewMode={this.effectiveViewMode()}
         />
         {this.functionLinkNotice && <p role="status">{this.functionLinkNotice}</p>}
+        {!this.props.loading &&
+          !this.props.error &&
+          this.props.profileGroup?.instantEventOmission && (
+            <p role="note" className={css(style.importNotice)}>
+              {this.props.profileGroup.instantEventOmission.count.toLocaleString()} instant{' '}
+              {this.props.profileGroup.instantEventOmission.count === 1
+                ? 'event was'
+                : 'events were'}{' '}
+              not imported because the data exceeds the instant event limits. Available stack
+              profiles and counters are retained. Load a smaller recording to inspect all instant
+              events. Exports preserve this omission notice.
+            </p>
+          )}
         <div className={css(style.contentContainer)}>{this.renderContent()}</div>
         {this.props.dragActive && <div className={css(style.dragTarget)} />}
       </div>
@@ -962,6 +992,16 @@ const getStyle = withTheme(theme =>
       alignItems: 'center',
       justifyContent: 'center',
       height: '100%',
+    },
+    importNotice: {
+      padding: '8px 12px',
+      margin: 0,
+      lineHeight: 1.5,
+      fontSize: FontSize.LABEL,
+      flexShrink: 0,
+      color: theme.fgPrimaryColor,
+      background: theme.bgPrimaryColor,
+      borderBottom: `1px solid ${theme.fgSecondaryColor}`,
     },
     loading: {
       height: 3,

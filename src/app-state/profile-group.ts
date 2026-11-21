@@ -5,6 +5,8 @@ import {objectsHaveShallowEquality} from '../lib/utils'
 import {ViewMode} from '../lib/view-mode'
 import {findFrameNode, nodeBelongsToTree} from '../lib/frame-selection'
 import type {CounterTrack} from '../lib/counter-track'
+import type {InstantTrack, InstantEventOmission} from '../lib/instant-track'
+import {groupTimelineTracks} from '../lib/timeline-tracks'
 
 export interface FlamechartViewState {
   hover: {
@@ -46,6 +48,8 @@ export type ProfileGroupState = {
 
   profiles: ProfileState[]
   counterTracks?: readonly CounterTrack[]
+  instantTracks?: readonly InstantTrack[]
+  instantEventOmission?: InstantEventOmission
 } | null
 
 export enum FlamechartID {
@@ -84,7 +88,7 @@ export class ProfileGroupAtom extends Atom<ProfileGroupState> {
     this.set({
       name: group.name,
       sourceName: group.sourceName,
-      ...(group.counterTracks === undefined ? {} : {counterTracks: group.counterTracks}),
+      ...groupTimelineTracks(group),
       indexToView: group.indexToView,
       profiles: group.profiles.map(p => ({
         profile: p,

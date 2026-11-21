@@ -15,6 +15,7 @@ import {ViewMode} from '../lib/view-mode'
 import {MultiTrackView} from './multi-track-view'
 import {CounterTrack} from '../lib/counter-track'
 import {ProfileGroupAtom} from '../app-state/profile-group'
+import {InstantTrack} from '../lib/instant-track'
 
 function counter(): CounterTrack {
   return {
@@ -28,6 +29,135 @@ function counter(): CounterTrack {
     values: new Float64Array([20, 40]),
   }
 }
+
+test('instant-only recordings load, retain independent observations and export without stack profiles', async () => {
+  const tracks: readonly InstantTrack[] = [
+    {
+      id: 'instant',
+      name: 'Thread events',
+      clock: 'wall',
+      timeUnit: 'microseconds',
+      start: 829,
+      scope: 'thread',
+      processId: '22630',
+      threadId: '22630',
+      times: new Float64Array([0]),
+      events: [{name: 'hi', category: 'none', details: '{"stack":["a","b","c"]}'}],
+    },
+  ]
+  const group: ProfileGroup = {
+    name: 'Points only',
+    indexToView: 0,
+    profiles: [],
+    instantTracks: tracks,
+  }
+  const setViewMode = jest.fn(),
+    setProfileGroup = jest.fn()
+  const alert = jest.spyOn(window, 'alert')
+  alert.mockImplementation(() => {})
+  const save = jest.spyOn(fileFormat, 'saveToFile')
+  save.mockResolvedValue(undefined)
+  const app = new Application({
+    hashParams: {viewMode: ViewMode.CHRONO_FLAME_CHART},
+    setProfileGroup,
+    setViewMode,
+    setError: jest.fn(),
+    setLoading: jest.fn(),
+    viewMode: ViewMode.SANDWICH_VIEW,
+  } as any)
+  app.forceUpdate = jest.fn()
+  try {
+    await (app as any).loadProfile(async () => group)
+    expect(alert).not.toHaveBeenCalled()
+    expect(setViewMode).toHaveBeenLastCalledWith(ViewMode.MULTI_TRACK)
+    expect(setProfileGroup).toHaveBeenCalledWith(group)
+    const state = new ProfileGroupAtom(null, 'instant-only-test')
+    state.setProfileGroup(group)
+    expect(state.get()!.instantTracks).toBe(tracks)
+    state.setProfileIndexToView(9)
+    expect(state.get()!.indexToView).toBe(0)
+    ;(app as any).props = {...app.props, profileGroup: state.get(), activeProfileState: null}
+    const content = app.renderContent() as any
+    expect(content.type).toBe(MultiTrackView)
+    expect(content.props.profiles).toEqual([])
+    expect(content.props.instantTracks).toBe(tracks)
+    await app.onWindowKeyPress({key: '4'} as KeyboardEvent)
+    expect(setViewMode).toHaveBeenLastCalledWith(ViewMode.MULTI_TRACK)
+    await (app as any).saveFile()
+    expect(save.mock.calls[0][0].instantTracks).toBe(tracks)
+    expect(save.mock.calls[0][0].profiles).toEqual([])
+  } finally {
+    save.mockRestore()
+    alert.mockRestore()
+  }
+})
+
+test('mixed imports retain and export the marker omission notice without inventing marker data', async () => {
+  const omission = {count: 309230, reason: 'point-limit' as const}
+  const group: ProfileGroup = {
+    name: 'Large mixed recording',
+    indexToView: 0,
+    profiles: [new CallTreeProfileBuilder().build()],
+    instantEventOmission: omission,
+  }
+  const state = new ProfileGroupAtom(null, 'omitted-instant-test')
+  state.setProfileGroup(group)
+  expect(state.get()!.instantEventOmission).toBe(omission)
+  expect(state.get()!.instantTracks).toBeUndefined()
+  const save = jest.spyOn(fileFormat, 'saveToFile')
+  save.mockResolvedValue(undefined)
+  const app = new Application({profileGroup: state.get(), loading: false} as any)
+  app.forceUpdate = jest.fn()
+  try {
+    await (app as any).saveFile()
+    expect(save.mock.calls[0][0].instantEventOmission).toBe(omission)
+    expect(save.mock.calls[0][0].instantTracks).toBeUndefined()
+    expect(save.mock.calls[0][0].profiles[0]).toBe(group.profiles[0])
+  } finally {
+    save.mockRestore()
+  }
+})
+
+test('a native omission-only recording remains readable and exportable as timeline metadata', async () => {
+  const group = fileFormat.importSpeedscopeProfiles({
+    $schema: 'https://www.speedscope.app/file-format-schema.json',
+    name: 'Omitted event metadata',
+    shared: {frames: []},
+    profiles: [],
+    instantEventOmission: {count: 1, reason: 'point-limit'},
+  })
+  const setViewMode = jest.fn(),
+    setProfileGroup = jest.fn()
+  const alert = jest.spyOn(window, 'alert')
+  alert.mockImplementation(() => {})
+  const save = jest.spyOn(fileFormat, 'saveToFile')
+  save.mockResolvedValue(undefined)
+  const state = new ProfileGroupAtom(null, 'omission-only-native')
+  const app = new Application({
+    hashParams: {},
+    setViewMode,
+    setProfileGroup,
+    setError: jest.fn(),
+    setLoading: jest.fn(),
+    viewMode: ViewMode.SANDWICH_VIEW,
+  } as any)
+  app.forceUpdate = jest.fn()
+  try {
+    await (app as any).loadProfile(async () => group)
+    expect(alert).not.toHaveBeenCalled()
+    expect(setProfileGroup).toHaveBeenCalledWith(group)
+    expect(setViewMode).toHaveBeenLastCalledWith(ViewMode.MULTI_TRACK)
+    state.setProfileGroup(group)
+    ;(app as any).props = {...app.props, profileGroup: state.get(), activeProfileState: null}
+    expect((app.renderContent() as any).type).toBe(MultiTrackView)
+    await (app as any).saveFile()
+    expect(save.mock.calls[0][0].instantEventOmission).toEqual({count: 1, reason: 'point-limit'})
+    expect(save.mock.calls[0][0].profiles).toEqual([])
+  } finally {
+    save.mockRestore()
+    alert.mockRestore()
+  }
+})
 
 test('counter-only captures load into Tracks without fabricated profiles and remain exportable', async () => {
   const counters = [counter()]
