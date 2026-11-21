@@ -234,7 +234,36 @@ errors. A PLC streaming smoke retained four profiles, 17,510 frames and
 2.4 seconds in that Node run. These UI changes add no per-frame context index or
 profile copy. Source-name metadata is one bounded string per group.
 
-## Upstream review
+## Share a selected function
+
+Select a function in Time Order, Left Heavy or Sandwich, then choose **Profile
+actions → Link to selected function…**. Review and copy the generated URL in the
+dialog. When opened with the same recording, it selects the matching profile and
+function in Sandwich. Local files are not uploaded or embedded: the recipient
+must import the same recording after opening the link. For an HTTP recording,
+the link retains its URL and Accept setting only when associated with the actual
+loaded profile. Opening another local file does not reuse an old remote URL.
+
+The link stores a versioned profile index/name/unit/total and function
+name/file/line/column identity. Importer-assigned frame keys can change without
+breaking it. Multiple identical source identities are rejected rather than
+silently selecting another frame. Selection JSON is limited to 8,192 characters
+and complete links to 65,536; existing data/file profile URLs and local paths are
+not copied. Function/source names and an HTTP URL's credentials can appear in the
+reviewable link. It cannot grant access to a remote recording.
+
+Matching scans the chosen profile's frames once, without a retained frame index.
+Only the first successful restoration is applied; later imports do not jump back
+to the link's selection. Missing or ambiguous matches show a status message.
+Derived profiles must be exported and reopened first. Symbol-remapped copies
+conservatively generate links requiring local reimport.
+
+This partially addresses [#506](https://github.com/jlfwong/speedscope/issues/506).
+Exact call instances, graph view/zoom/time range and profile transformations are
+not restored. Paste a link into a new tab or reload it; same-tab hash changes do
+not trigger another import/restoration.
+
+## Upstream review history
 
 The 2026-11-21 shared-selection, Java text-dump, hosted-offline and numerical
 test follow-up passed all 393 Jest tests across 68 suites (307 snapshots), five
