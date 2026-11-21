@@ -2,6 +2,7 @@ import {Profile, ProfileGroup} from '../lib/profile'
 import {decodeBase64} from '../lib/utils'
 import workerSource from './trace-worker-source'
 import {ImportProgress, TraceWorkerResponse} from './trace-worker-protocol'
+import {textProfileKind, tryImportTextProfile} from './streaming-text-profile'
 
 const importer = () => import('./index')
 const preparedGroups = new WeakSet<ProfileGroup>()
@@ -18,11 +19,13 @@ function checkAbort(signal?: AbortSignal) {
   if (signal?.aborted) throw new DOMException('Import cancelled', 'AbortError')
 }
 
-export function shouldUseTraceWorker(_name: string, size: number): boolean {
+export function shouldUseTraceWorker(name: string, size: number): boolean {
   // Detection belongs in the worker's existing generic importer. Extension
   // allowlists leave large perf/folded/JFR/pprof files (and renamed captures)
   // blocking the UI, even though those importers are already worker-safe.
-  return size >= 1024 * 1024
+  // A tiny compressed stack file can expand into hundreds of MiB. Prefer the
+  // faster externally cancellable worker before looking at compressed size.
+  return size >= 1024 * 1024 || (/\.gz$/i.test(name) && textProfileKind(name) !== null)
 }
 
 async function loadWithWorker(
@@ -114,6 +117,12 @@ export async function importProfileFile(
     if (result instanceof ArrayBuffer) return importProfileBuffer(file.name, result, options, false)
   }
   checkAbort(options.signal)
+  const streamed = await tryImportTextProfile(file, file.name, {
+    signal: options.signal,
+    onProgress: () => options.onProgress?.({phase: 'Streaming profile', canCancel: true}),
+  })
+  if (streamed) return streamed
+  checkAbort(options.signal)
   options.onProgress?.({phase: 'Reading profile', canCancel: false})
   const module = await importer()
   checkAbort(options.signal)
@@ -134,6 +143,12 @@ export async function importProfileBuffer(
     if (result && !(result instanceof ArrayBuffer)) return result
     if (result instanceof ArrayBuffer) buffer = result
   }
+  checkAbort(options.signal)
+  const streamed = await tryImportTextProfile(buffer, name, {
+    signal: options.signal,
+    onProgress: () => options.onProgress?.({phase: 'Streaming profile', canCancel: true}),
+  })
+  if (streamed) return streamed
   checkAbort(options.signal)
   options.onProgress?.({phase: 'Reading profile', canCancel: false})
   const module = await importer()

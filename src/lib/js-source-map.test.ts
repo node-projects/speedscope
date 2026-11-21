@@ -4,6 +4,7 @@ import {importProfilesFromArrayBuffer} from '../import'
 import {importJavaScriptSourceMapSymbolRemapper} from './js-source-map'
 import {Frame} from './profile'
 import {importFromV8ProfLog} from '../import/v8proflog'
+import {KeyedSet} from './utils'
 
 test('a valid source map with no mappings is ignored', async () => {
   expect(
@@ -12,6 +13,45 @@ test('a valid source map with no mappings is ignored', async () => {
       'empty.js.map',
     ),
   ).toBeNull()
+})
+
+test('unnamed mappings infer symbols without splitting the whole embedded source for each frame', async () => {
+  const content = 'originalName = 1;\n' + '// more source\n'.repeat(10000)
+  const remapper = await importJavaScriptSourceMapSymbolRemapper(
+    JSON.stringify({
+      version: 3,
+      sources: ['original.ts'],
+      sourcesContent: [content],
+      names: [],
+      mappings: 'AAAA',
+    }),
+    'app.js.map',
+  )
+  expect(remapper).not.toBeNull()
+  const frame = Frame.getOrInsert(new KeyedSet<Frame>(), {
+    key: 1,
+    name: 'minified',
+    file: 'app.js',
+    line: 1,
+    col: 1,
+  })
+  const split = String.prototype.split
+  const guard = jest.spyOn(String.prototype, 'split')
+  guard.mockImplementation(function (this: string, separator: any, limit?: number) {
+    if (String(this) === content) throw new Error('Do not split the whole embedded source')
+    return split.call(this, separator, limit)
+  })
+  try {
+    expect(remapper!(frame)).toMatchObject({
+      name: 'originalName',
+      file: 'original.ts',
+      line: 1,
+      col: 1,
+    })
+    expect(remapper!(frame)).toMatchObject({name: 'originalName'})
+  } finally {
+    guard.mockRestore()
+  }
 })
 
 test('V8 Windows paths remap with a local map at an exact first generated position', async () => {

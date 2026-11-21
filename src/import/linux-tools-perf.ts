@@ -32,24 +32,6 @@ function normalizeEventType(eventType: string): string {
   )
 }
 
-function* parseEvents(contents: TextFileContent): Generator<PerfEvent | null> {
-  let buffer: string[] = []
-  for (let line of contents.splitLines()) {
-    line = line.replace(/\r$/, '')
-    // Without callchains, perf prints consecutive sample headers without blank
-    // separators. Retain at most one event instead of buffering the recording.
-    if (/^\s*(\S.*?)\s+(\d+)(?:\/(\d+))?\s+/.test(line) && /\s+\d+\.\d+:\s+/.test(line)) {
-      if (buffer.length) yield parseEvent(buffer)
-      buffer = [line]
-    } else if (line.trim() === '') {
-      yield parseEvent(buffer)
-      buffer = []
-    } else buffer.push(line)
-  }
-
-  if (buffer.length > 0) yield parseEvent(buffer)
-}
-
 // rawEvent is splitted into lines
 function parseEvent(rawEvent: string[]): PerfEvent | null {
   const lines = rawEvent.filter(l => !/^\s*#/.exec(l))
@@ -124,21 +106,37 @@ function parseEvent(rawEvent: string[]): PerfEvent | null {
   return event
 }
 
-export function importFromLinuxPerf(contents: TextFileContent): ProfileGroup | null {
+export interface LinuxPerfParserOptions {
+  maxPendingChars?: number
+  maxStackDepth?: number
+  maxSamples?: number
+}
+
+// Sync and streaming callers share sample identity and weight semantics. Only
+// the current event's lines are retained in addition to the output builders.
+export function createLinuxPerfParser(options: LinuxPerfParserOptions = {}) {
   const profiles = new Map<
     string,
     {builder: StackListProfileBuilder; name: string; type: string; counter: boolean}
   >()
   const eventTypes = new Set<string>()
   let missingStacks = false
+  let pending: string[] = []
+  let pendingChars = 0
+  let samples = 0
 
-  for (let event of parseEvents(contents)) {
-    if (event == null) continue
-    if (event.time == null) continue
+  const accept = (event: PerfEvent | null) => {
+    if (event == null || event.time == null) return
+    if (!Number.isFinite(event.time) || (event.period !== null && !Number.isFinite(event.period)))
+      throw new Error('perf timestamps and event periods must be finite numbers')
     if (event.stack.length === 0) {
       missingStacks = true
-      continue
+      return
     }
+    if (event.stack.length > (options.maxStackDepth ?? Infinity))
+      throw new Error('Streaming text import limit exceeded (stack depth)')
+    if (++samples > (options.maxSamples ?? Infinity))
+      throw new Error('Streaming text import limit exceeded (sample count)')
     eventTypes.add(event.eventType)
 
     let profileNameParts = []
@@ -170,21 +168,48 @@ export function importFromLinuxPerf(contents: TextFileContent): ProfileGroup | n
     else builder.appendSampleWithTimestamp(stack, event.time)
   }
 
-  if (profiles.size === 0) {
-    if (missingStacks)
-      throw new Error(
-        'perf output contains no call stacks or sampled symbols. Record with -g and use perf script without --hide-call-graph, or include ip,sym,dso fields for leaf-only samples.',
-      )
-    return null
+  const flush = () => {
+    if (pending.length) accept(parseEvent(pending))
+    pending = []
+    pendingChars = 0
   }
+  const pushLine = (inputLine: string) => {
+    const line = inputLine.replace(/\r$/, '')
+    // --hide-call-graph samples have consecutive headers without blank lines.
+    if (/^\s*(\S.*?)\s+(\d+)(?:\/(\d+))?\s+/.test(line) && /\s+\d+\.\d+:\s+/.test(line)) flush()
+    else if (!line.trim()) {
+      flush()
+      return
+    }
+    pendingChars += line.length + 1
+    if (pendingChars > (options.maxPendingChars ?? Infinity))
+      throw new Error('Streaming text import limit exceeded (perf event size)')
+    pending.push(line)
+  }
+  const build = (): ProfileGroup | null => {
+    flush()
+    if (profiles.size === 0) {
+      if (missingStacks)
+        throw new Error(
+          'perf output contains no call stacks or sampled symbols. Record with -g and use perf script without --hide-call-graph, or include ip,sym,dso fields for leaf-only samples.',
+        )
+      return null
+    }
+    for (const state of profiles.values()) {
+      if (eventTypes.size > 1 || state.counter)
+        state.builder.setName(`${state.name} [${state.type}]`)
+    }
+    return {
+      name: profiles.size === 1 ? Array.from(profiles.values())[0].builder.getName() : '',
+      indexToView: 0,
+      profiles: Array.from(itMap(profiles.values(), state => state.builder.build())),
+    }
+  }
+  return {pushLine, build}
+}
 
-  for (const state of profiles.values()) {
-    if (eventTypes.size > 1 || state.counter) state.builder.setName(`${state.name} [${state.type}]`)
-  }
-
-  return {
-    name: profiles.size === 1 ? Array.from(profiles.values())[0].builder.getName() : '',
-    indexToView: 0,
-    profiles: Array.from(itMap(profiles.values(), state => state.builder.build())),
-  }
+export function importFromLinuxPerf(contents: TextFileContent): ProfileGroup | null {
+  const parser = createLinuxPerfParser()
+  for (const line of contents.splitLines()) parser.pushLine(line)
+  return parser.build()
 }

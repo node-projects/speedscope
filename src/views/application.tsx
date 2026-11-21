@@ -17,10 +17,14 @@ import {Toolbar} from './toolbar'
 import {importJavaScriptSourceMapSymbolRemapper} from '../lib/js-source-map'
 import {Theme, withTheme} from './themes/theme'
 import {ViewMode} from '../lib/view-mode'
-import {canUseXHR, profileGroupAtom} from '../app-state'
-import {resolveFunctionSelection, rememberFunctionLinkSource} from '../lib/function-link'
+import {canUseXHR, profileGroupAtom, hashParamsAtom} from '../app-state'
+import {
+  resolveFunctionSelection,
+  rememberFunctionLinkSource,
+  matchesFunctionLinkSource,
+} from '../lib/function-link'
 import {ProfileGroupState} from '../app-state/profile-group'
-import {HashParams} from '../lib/hash-params'
+import {getHashParams, HashParams} from '../lib/hash-params'
 import {StatelessComponent} from '../lib/preact-helpers'
 import {HelpButton} from './help'
 import {SandwichViewContainer} from './sandwich-view'
@@ -197,15 +201,82 @@ export class Application extends StatelessComponent<ApplicationProps> {
   private exportController: AbortController | null = null
   private exportProgress: ExportProgress | null = null
   private importController: AbortController | null = null
+  private importSource: {url: string; accepts?: string} | null = null
   private importProgress: ImportProgress | null = null
   private importSequence = 0
   private restoredFunctionLink = false
   private functionLinkNotice = ''
+  private liveHashParams: HashParams | null = null
 
-  private async loadProfile(loader: (options: ImportOptions) => Promise<ProfileGroup | null>) {
+  private get currentHashParams() {
+    return this.liveHashParams || this.props.hashParams
+  }
+
+  private onHashChange = () => {
+    const previous = this.currentHashParams
+    const next = getHashParams()
+    this.liveHashParams = next
+    hashParamsAtom.set(next)
+    this.restoredFunctionLink = false
+    this.functionLinkNotice = ''
+    const loaded = profileGroupAtom.get()
+    const sourceMatches = loaded?.profiles.some(p =>
+      matchesFunctionLinkSource(p.profile, next.profileURL || '', next.profileAccepts),
+    )
+    if (
+      next.profileURL &&
+      (next.profileURL !== previous.profileURL ||
+        next.profileAccepts !== previous.profileAccepts ||
+        (!this.importController && !sourceMatches) ||
+        (this.importController &&
+          (this.importSource?.url !== next.profileURL ||
+            this.importSource?.accepts !== next.profileAccepts)))
+    ) {
+      this.maybeLoadHashParamProfile()
+      return
+    }
+    // Do not start another import for a selection-only link or replace the
+    // previous recording while an explicit import is still in progress.
+    if (!this.importController) {
+      const group = profileGroupAtom.get()
+      const selection = next.selection
+      if (group && !selection && next.viewMode !== undefined) {
+        const active = group.profiles[group.indexToView]?.profile
+        this.props.setViewMode(
+          next.viewMode === ViewMode.CHRONO_FLAME_CHART && !active?.isChronological()
+            ? ViewMode.LEFT_HEAVY_FLAME_GRAPH
+            : next.viewMode,
+        )
+      }
+      if (selection && group) {
+        const frame = resolveFunctionSelection(
+          group.profiles.map(p => p.profile),
+          selection,
+        )
+        if (frame) {
+          profileGroupAtom.setProfileIndexToView(selection.profileIndex)
+          this.props.setViewMode(ViewMode.SANDWICH_VIEW)
+          profileGroupAtom.setSelectedFrame(frame)
+          this.restoredFunctionLink = true
+        } else {
+          this.functionLinkNotice =
+            'The linked function was not found uniquely in this recording. Open the original recording to restore the selection.'
+        }
+      } else if (selection) {
+        this.functionLinkNotice = 'Import the linked recording to restore the function selection.'
+      }
+    }
+    this.forceUpdate()
+  }
+
+  private async loadProfile(
+    loader: (options: ImportOptions) => Promise<ProfileGroup | null>,
+    source?: {url: string; accepts?: string},
+  ) {
     this.importController?.abort()
     const controller = new AbortController()
     this.importController = controller
+    this.importSource = source || null
     this.importProgress = null
     this.exportController?.abort()
     this.exportController = null
@@ -239,20 +310,20 @@ export class Application extends StatelessComponent<ApplicationProps> {
         for (const profile of profileGroup.profiles) await profile.demangle()
       }
       if (controller.signal.aborted || this.importController !== controller) return
-      if (this.props.hashParams.title)
-        profileGroup = {...profileGroup, name: this.props.hashParams.title}
-      document.title = profileWindowTitle(profileGroup, this.props.hashParams.title)
-      if (this.props.hashParams.viewMode !== undefined)
-        this.props.setViewMode(this.props.hashParams.viewMode)
+      if (this.currentHashParams.title)
+        profileGroup = {...profileGroup, name: this.currentHashParams.title}
+      document.title = profileWindowTitle(profileGroup, this.currentHashParams.title)
+      if (this.currentHashParams.viewMode !== undefined)
+        this.props.setViewMode(this.currentHashParams.viewMode)
       const selected = profileGroup.profiles[profileGroup.indexToView]
       if (
         selected &&
         !selected.isChronological() &&
-        (this.props.hashParams.viewMode ?? this.props.viewMode) === ViewMode.CHRONO_FLAME_CHART
+        (this.currentHashParams.viewMode ?? this.props.viewMode) === ViewMode.CHRONO_FLAME_CHART
       ) {
         this.props.setViewMode(ViewMode.LEFT_HEAVY_FLAME_GRAPH)
       }
-      const selection = this.restoredFunctionLink ? undefined : this.props.hashParams.selection
+      const selection = this.restoredFunctionLink ? undefined : this.currentHashParams.selection
       const linkedFrame = selection
         ? resolveFunctionSelection(profileGroup.profiles, selection)
         : null
@@ -283,6 +354,7 @@ export class Application extends StatelessComponent<ApplicationProps> {
       console.timeEnd(timer)
       if (this.importController === controller) {
         this.importController = null
+        this.importSource = null
         this.importProgress = null
         this.props.setLoading(false)
       }
@@ -507,6 +579,7 @@ export class Application extends StatelessComponent<ApplicationProps> {
   }
 
   componentDidMount() {
+    window.addEventListener('hashchange', this.onHashChange)
     window.addEventListener('keydown', this.onWindowKeyDown)
     window.addEventListener('keypress', this.onWindowKeyPress)
     document.addEventListener('paste', this.onDocumentPaste)
@@ -514,9 +587,11 @@ export class Application extends StatelessComponent<ApplicationProps> {
   }
 
   componentWillUnmount() {
+    window.removeEventListener('hashchange', this.onHashChange)
     window.removeEventListener('keydown', this.onWindowKeyDown)
     this.importController?.abort()
     this.importController = null
+    this.importSource = null
     this.exportController?.abort()
     this.exportController = null
     window.removeEventListener('keypress', this.onWindowKeyPress)
@@ -524,7 +599,7 @@ export class Application extends StatelessComponent<ApplicationProps> {
   }
 
   async maybeLoadHashParamProfile() {
-    const {profileURL, profileAccepts} = this.props.hashParams
+    const {profileURL, profileAccepts} = this.currentHashParams
     if (profileURL) {
       if (!canUseXHR) {
         alert(
@@ -532,37 +607,40 @@ export class Application extends StatelessComponent<ApplicationProps> {
         )
         return
       }
-      this.loadProfile(async options => {
-        options.onProgress?.({phase: 'Reading profile', canCancel: true})
-        const fetchOpts: RequestInit = {signal: options.signal}
-        if (profileAccepts) {
-          fetchOpts['headers'] = {
-            Accept: profileAccepts,
+      this.loadProfile(
+        async options => {
+          options.onProgress?.({phase: 'Reading profile', canCancel: true})
+          const fetchOpts: RequestInit = {signal: options.signal}
+          if (profileAccepts) {
+            fetchOpts['headers'] = {
+              Accept: profileAccepts,
+            }
           }
-        }
 
-        const response: Response = await fetch(profileURL, fetchOpts)
-        if (!response.ok) throw new Error(`Could not load profile: HTTP ${response.status}`)
-        let filename = profileURL.startsWith('data:')
-          ? 'profile'
-          : new URL(profileURL, window.location.href).pathname
-        if (filename.includes('/')) {
-          filename = filename.slice(filename.lastIndexOf('/') + 1)
-        }
-        const group = await importProfilesFromArrayBuffer(
-          filename,
-          await response.arrayBuffer(),
-          options,
-        )
-        if (group)
-          rememberFunctionLinkSource(
-            group.profiles,
-            new URL(profileURL, window.location.href).href,
-            profileAccepts,
+          const response: Response = await fetch(profileURL, fetchOpts)
+          if (!response.ok) throw new Error(`Could not load profile: HTTP ${response.status}`)
+          let filename = profileURL.startsWith('data:')
+            ? 'profile'
+            : new URL(profileURL, window.location.href).pathname
+          if (filename.includes('/')) {
+            filename = filename.slice(filename.lastIndexOf('/') + 1)
+          }
+          const group = await importProfilesFromArrayBuffer(
+            filename,
+            await response.arrayBuffer(),
+            options,
           )
-        return group
-      })
-    } else if (this.props.hashParams.localProfilePath) {
+          if (group)
+            rememberFunctionLinkSource(
+              group.profiles,
+              new URL(profileURL, window.location.href).href,
+              profileAccepts,
+            )
+          return group
+        },
+        {url: profileURL, accepts: profileAccepts},
+      )
+    } else if (this.currentHashParams.localProfilePath) {
       // There isn't good cross-browser support for XHR of local files, even from
       // other local files. To work around this restriction, we load the local profile
       // as a JavaScript file which will invoke a global function.
@@ -573,7 +651,7 @@ export class Application extends StatelessComponent<ApplicationProps> {
       }
 
       const script = document.createElement('script')
-      const profilePath = this.props.hashParams.localProfilePath
+      const profilePath = this.currentHashParams.localProfilePath
       script.src =
         profilePath.startsWith('file:') || profilePath.startsWith('/')
           ? profilePath

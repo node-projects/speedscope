@@ -3,6 +3,7 @@ import path from 'path'
 import {Readable} from 'stream'
 import {importProfilesFromArrayBuffer} from '../src/import'
 import {importDurationTraceStream} from '../src/import/streaming-trace'
+import {importTextProfileStream, textProfileKind} from '../src/import/streaming-text-profile'
 import {
   combineProfiles,
   invertProfile,
@@ -16,12 +17,25 @@ import {ProfileSearchResults, FlamechartSearchResults} from '../src/lib/profile-
 async function main() {
   const [filename, action = 'all', query = ' '] = process.argv.slice(2)
   if (
-    !['all', 'import', 'stream-import', 'stream-search', 'export', 'legacy-export'].includes(action)
+    ![
+      'all',
+      'import',
+      'stream-import',
+      'text-stream-import',
+      'text-stream-main-import',
+      'stream-search',
+      'export',
+      'legacy-export',
+    ].includes(action)
   )
     throw new Error(`Unknown action: ${action}`)
   const start = Date.now()
   let group
-  if (action === 'stream-import' || action === 'stream-search') {
+  if (
+    action === 'stream-import' ||
+    action === 'stream-search' ||
+    action.startsWith('text-stream-')
+  ) {
     const header = new Uint8Array(2)
     const fd = fs.openSync(filename, 'r')
     try {
@@ -34,7 +48,13 @@ async function main() {
     )
     if (header[0] === 0x1f && header[1] === 0x8b)
       stream = stream.pipeThrough(new DecompressionStream('gzip'))
-    group = await importDurationTraceStream(stream, path.basename(filename))
+    if (action.startsWith('text-stream-')) {
+      const kind = textProfileKind(path.basename(filename))
+      if (!kind) throw new Error('Use a supported folded/perf text filename for text-stream-import')
+      group = await importTextProfileStream(stream, path.basename(filename), kind, {
+        yieldToMainThread: action === 'text-stream-main-import',
+      })
+    } else group = await importDurationTraceStream(stream, path.basename(filename))
   } else {
     const input = fs.readFileSync(filename)
     group = await importProfilesFromArrayBuffer(
@@ -45,7 +65,11 @@ async function main() {
   if (!group) throw new Error('Unrecognized profile')
   console.log(
     JSON.stringify({
-      action: action === 'stream-import' || action === 'stream-search' ? 'stream-import' : 'import',
+      action: action.startsWith('text-stream-')
+        ? action
+        : action === 'stream-import' || action === 'stream-search'
+          ? 'stream-import'
+          : 'import',
       ms: Date.now() - start,
       profiles: group.profiles.length,
       totals: group.profiles.map(p => p.getTotalWeight()),
@@ -53,7 +77,7 @@ async function main() {
       maxRssMB: Math.round(process.resourceUsage().maxRSS / 1024),
     }),
   )
-  if (action === 'import' || action === 'stream-import') return
+  if (action === 'import' || action === 'stream-import' || action.startsWith('text-stream-')) return
   ;(globalThis as any).gc?.()
   if (action === 'stream-search') {
     const profile = group.profiles[0]

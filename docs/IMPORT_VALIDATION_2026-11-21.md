@@ -18,7 +18,7 @@ The capture and benchmark artifacts remain uncommitted.
 Browser checks used the built single-HTML app served over loopback HTTP with
 external connections blocked by CSP. The PLC imported successfully, exposed
 four profiles and rendered its call tree without console errors. The synthetic
-Android dual-clock capture exposed CPU/wall totals of 20/40 microseconds for
+Android dual-clock capture exposed non-idle CPU/wall totals of 20/40 microseconds for
 the main thread and 7/20 microseconds for its worker. The two-snapshot Java ZIP
 produced two raw samples and correctly disabled chronological Time Order.
 These checks do not validate file:// loading or a real Android device capture.
@@ -31,6 +31,31 @@ passed all five CLI/release-helper Node tests. Previous native crashes of full
 Jest on this system's Node 24 ARM64 remain a local runtime limitation; no tests
 were weakened to hide them. The CI matrix covers Node 22 and 24 on Windows and
 Linux x64.
+
+## Streaming and chooser follow-up
+
+The next batch adds real plain/native-gzip perf/folded streaming, a click-open
+thread chooser with bounded list rendering, same-tab function-link navigation,
+and explicit linked-source-map preview/apply. The full clean-cache Node 22 ARM64
+run passed **506 tests across 80 suites, with 307 snapshots**. All five Node
+tests, type checking, lint, schema/backlog checks and the three builds passed.
+See [text-stream measurements](IMPORT_FORMATS.md#text-stream-measurements) for
+the memory improvement and throughput tradeoffs, including cooperative timer costs.
+
+The private PLC recheck imported in 2,444 ms in one Node run and retained the
+same four profiles, 17,510 exported frames, 1,039,656 events and baseline hash.
+This is a regression observation rather than a controlled speed comparison.
+
+Browser checks verified click-open/pointer thread selection, filtering, paging
+205 profiles with at most 100 options rendered, End/Enter navigation and Escape
+focus restoration. A sub-1-MiB gzip expanded to one million folded samples;
+cancelling another such import preserved a different previously loaded recording.
+Compressed-text worker preference is also covered by actual processor/snapshot
+regressions; the cooperative browser cancellation check covers the fallback path.
+The linked-map fixture changed a minified frame into `originalTask` at its
+original source position without changing its 5 ms weight. Same-tab links and
+Back restored two different function selections without reimport. The PLC also
+loaded and its thread chooser stayed usable; no console errors were observed.
 
 Type checking, linting, schema/backlog checks and Pages/standalone/single-HTML builds
 passed. npm dry-pack includes the new format and ZIP resource-policy guides.

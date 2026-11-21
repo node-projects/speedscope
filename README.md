@@ -80,8 +80,12 @@ Repository builds can also produce a self-contained HTML document with
 
 Recordings of at least 1 MiB use a background importer when workers are available,
 including perf, folded stacks, pprof, JFR, Android traces and renamed captures.
-Progress and **Cancel import** keep the app responsive; generic formats still
-materialize their input and profile model. Very large captures can
+Recognized gzip perf/folded/text files prefer a worker even when compressed
+below 1 MiB.
+Progress and **Cancel import** keep the app responsive. Supported perf/folded text
+and duration traces stream plain/gzip input; generic fallback formats still
+materialize their input. Final profile models remain proportional to recording
+size. Very large captures can
 still exceed browser memory limits. Search offers Contains, Whole word and Exact
 matching for function names and source paths.
 Graph-search navigation retains at most 10,000 results and clearly marks larger
@@ -97,6 +101,9 @@ panes can now be resized with draggable or keyboard-operated dividers. See
 [search and layout controls](docs/SEARCH_AND_LAYOUT.md).
 Use **Profile actions → Link to selected function…** to share a function selection.
 For local recordings, the recipient opens the link and imports the same file.
+Same-tab links and browser Back/Forward update the function selection without
+reimporting the recording. Click the thread/profile selector to keep its chooser
+open while selecting; it supports keyboard navigation, filtering and paging.
 Selected-stack scope names are clickable; deep stacks page through at most 100
 ancestors at a time to keep details responsive.
 Window titles identify the loaded file. Sandwich shows the selected function's
@@ -105,6 +112,9 @@ full name and source, and selected-stack details explain the statistics through
 **Profile actions** also offers configurable source-code links for VS Code or web
 repositories, and compact path labels in graphs. Full names remain searchable
 and available in details. See [source links and graph labels](docs/SOURCE_AND_LABELS.md).
+Choose **Profile actions → Load linked source map…** to load a generated HTTP(S)
+script's source map, review the preview and apply its original names and locations.
+Local `.map` files can still be opened with Import after loading a recording.
 Duration traces stream plain/gzip input and discard unused events. Oversized
 captures stop with a clear limit error; see [import limits and measurements](docs/LARGE_TRACE_PERFORMANCE.md#streaming-duration-traces).
 

@@ -3,6 +3,7 @@ import {TraceWorkerRequest, TraceWorkerResponse, ImportPhase} from './trace-work
 import {snapshotTransferables} from '../lib/profile-snapshot'
 import {tryImportDurationTrace} from './streaming-trace'
 import {checkJavaThreadDumpZipFileSize} from './java-thread-dump-zip'
+import {tryImportTextProfile} from './streaming-text-profile'
 
 export async function processTraceInWorker(
   request: TraceWorkerRequest,
@@ -13,6 +14,11 @@ export async function processTraceInWorker(
   let group = await tryImportDurationTrace(request.input, request.name, {
     onProgress: () => progress('Streaming profile'),
   })
+  if (!group)
+    group = await tryImportTextProfile(request.input, request.name, {
+      onProgress: () => progress('Streaming profile'),
+      yieldToMainThread: false,
+    })
   let buffer: ArrayBuffer | undefined
   try {
     if (!group) {

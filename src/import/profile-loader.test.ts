@@ -17,6 +17,7 @@ import {Profile} from '../lib/profile'
 import {perftools} from './profile.proto.js'
 import {JAVA_DUMP_ZIP_LIMITS} from './java-thread-dump-zip'
 import JSZip from 'jszip'
+import {TEXT_STREAM_LIMITS} from './streaming-text-profile'
 
 const json = JSON.stringify([
   {ph: 'X', name: 'outer', pid: 'process', tid: 'thread', ts: 10, dur: 10},
@@ -138,6 +139,117 @@ test('small ZIP main-thread imports retain cancellable Parsing progress and hono
   expect(input.byteLength).toBeGreaterThan(0)
 })
 
+test('small compressed folded Files and buffers retain bounded main-thread fallback when workers are blocked', async () => {
+  const text = 'main;work 1\n'.repeat(100_000)
+  const input = new Uint8Array(pako.gzip(text)).buffer as ArrayBuffer
+  expect(input.byteLength).toBeLessThan(1024 * 1024)
+  const workerFactory = jest.fn(() => {
+    throw new Error('Host CSP blocks workers')
+  })
+  const generic = jest.spyOn(importerModule, 'importProfilesFromArrayBuffer')
+  const file = new File([input], 'small.folded.gz')
+  const fullRead = jest.spyOn(file, 'arrayBuffer')
+  try {
+    const fromFile = await importProfileFile(file, {workerFactory})
+    const fromBuffer = await importProfileBuffer(file.name, input, {workerFactory})
+    expect(fromFile!.profiles[0].getTotalWeight()).toBe(100_000)
+    expect(exportProfileGroup(fromBuffer!)).toEqual(exportProfileGroup(fromFile!))
+    expect(wereSymbolsLoaded(fromFile!)).toBe(false)
+    expect(fullRead).not.toHaveBeenCalled()
+    expect(generic).not.toHaveBeenCalled()
+    expect(workerFactory).toHaveBeenCalledTimes(2)
+    expect(input.byteLength).toBeGreaterThan(0)
+  } finally {
+    generic.mockRestore()
+  }
+})
+
+test('small compressed folded inputs prefer real worker processing and transferable snapshots', async () => {
+  const input = new Uint8Array(pako.gzip('main;work 1\n'.repeat(100_000))).buffer as ArrayBuffer
+  expect(input.byteLength).toBeLessThan(1024 * 1024)
+  const workers: FakeWorker[] = []
+  const workerFactory = jest.fn(() => {
+    const worker = new FakeWorker()
+    workers.push(worker)
+    return worker as unknown as Worker
+  })
+  const progress = jest.fn()
+  const generic = jest.spyOn(importerModule, 'importProfilesFromArrayBuffer')
+  try {
+    const fromFile = await importProfileFile(new File([input], 'small.folded.gz'), {
+      workerFactory,
+      onProgress: progress,
+    })
+    const fromBuffer = await importProfileBuffer('small.folded.gz', input, {
+      workerFactory,
+      onProgress: progress,
+    })
+    expect(fromBuffer!.profiles[0].getTotalWeight()).toBe(100_000)
+    expect(exportProfileGroup(fromBuffer!)).toEqual(exportProfileGroup(fromFile!))
+    expect(input.byteLength).toBe(0)
+    expect(wereSymbolsLoaded(fromFile!)).toBe(true)
+    expect(wereSymbolsLoaded(fromBuffer!)).toBe(true)
+    expect(workerFactory).toHaveBeenCalledTimes(2)
+    expect(workers.every(worker => worker.terminate.mock.calls.length > 0)).toBe(true)
+    expect(progress.mock.calls.every(([update]) => update.canCancel)).toBe(true)
+    expect(generic).not.toHaveBeenCalled()
+  } finally {
+    generic.mockRestore()
+  }
+})
+
+test('main-thread compressed text yields so a scheduled cancellation can run', async () => {
+  const input = new Uint8Array(pako.gzip('main;work 1\n'.repeat(100_000))).buffer as ArrayBuffer
+  const controller = new AbortController()
+  const clock = jest.spyOn(performance, 'now')
+  let now = 0,
+    updates = 0
+  clock.mockImplementation(() => (now += 20))
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    await expect(
+      importProfileBuffer(
+        'small.folded.gz',
+        input,
+        {
+          signal: controller.signal,
+          onProgress: update => {
+            if (update.phase === 'Streaming profile' && ++updates === 2)
+              timer = setTimeout(() => controller.abort(), 0)
+          },
+        },
+        false,
+      ),
+    ).rejects.toMatchObject({name: 'AbortError'})
+    expect(controller.signal.aborted).toBe(true)
+    expect(updates).toBeGreaterThanOrEqual(2)
+  } finally {
+    if (timer) clearTimeout(timer)
+    clock.mockRestore()
+  }
+})
+
+test('main-thread text resource errors do not retry by fully materializing the input', async () => {
+  const input = new Uint8Array(pako.gzip(' '.repeat(TEXT_STREAM_LIMITS.maxLineChars + 1)))
+    .buffer as ArrayBuffer
+  const file = new File([input], 'space.folded.gz')
+  const fullRead = jest.spyOn(file, 'arrayBuffer')
+  const generic = jest.spyOn(importerModule, 'importProfilesFromArrayBuffer')
+  try {
+    await expect(
+      importProfileFile(file, {
+        workerFactory: () => {
+          throw new Error('CSP')
+        },
+      }),
+    ).rejects.toThrow('line size')
+    expect(fullRead).not.toHaveBeenCalled()
+    expect(generic).not.toHaveBeenCalled()
+  } finally {
+    generic.mockRestore()
+  }
+})
+
 test('unrecognized worker input returns its original buffer for normal detection', async () => {
   const response = await processTraceInWorker(
     {name: 'unknown.trace', input: new TextEncoder().encode('not a profile').buffer as ArrayBuffer},
@@ -188,6 +300,31 @@ test('all large inputs use worker detection regardless of extension', () => {
     expect(shouldUseTraceWorker(name, 1024 * 1024)).toBe(true)
     expect(shouldUseTraceWorker(name, 1024 * 1024 - 1)).toBe(false)
   }
+})
+
+test('gzip text formats use workers below the size threshold while small plain formats stay local', () => {
+  for (const name of [
+    'tiny.folded.gz',
+    'tiny.collapsed.gz',
+    'tiny.stacks.gz',
+    'tiny.collapsedstack.txt.gz',
+    'tiny.perf.gz',
+    'tiny.perf.txt.gz',
+    'tiny.linux-perf.txt.gz',
+    'tiny.txt.gz',
+    'TINY.FOLDED.GZ',
+  ])
+    expect(shouldUseTraceWorker(name, 32)).toBe(true)
+  for (const name of [
+    'tiny.folded',
+    'tiny.perf.txt',
+    'tiny.txt',
+    'tiny.json.gz',
+    'tiny.zip',
+    'tiny.jstack.gz',
+    'unknown.bin.gz',
+  ])
+    expect(shouldUseTraceWorker(name, 32)).toBe(false)
 })
 
 test('large renamed folded input transfers ownership and retains cancellable worker progress', async () => {
@@ -246,14 +383,14 @@ test('large binary pprof input uses the worker instead of extension-based main-t
   expect([...group!.profiles[0].getFrames()].map(frame => frame.name)).toEqual(['work'])
 })
 
-test('new generic File formats are read once without opening a streaming probe', async () => {
+test('large folded Files stream without materializing a whole input buffer', async () => {
   const file = new File(['main;work 1\n'.repeat(100_000)], 'large.collapsed')
   const read = jest.spyOn(file, 'arrayBuffer')
   const stream = jest.spyOn(file, 'stream')
   const response = await processTraceInWorker({name: file.name, input: file}, () => {})
   expect(response.type).toBe('result')
-  expect(read).toHaveBeenCalledTimes(1)
-  expect(stream).not.toHaveBeenCalled()
+  expect(read).not.toHaveBeenCalled()
+  expect(stream).toHaveBeenCalledTimes(1)
 })
 
 test('oversized renamed ZIP Files fail before worker streaming or full-buffer reads', async () => {
@@ -331,7 +468,7 @@ test('cancellation while a non-JSON worker begins parsing rejects and terminates
   const worker = new FakeWorker()
   const input = new TextEncoder().encode('main;work 1\n'.repeat(100_000)).buffer as ArrayBuffer
   await expect(
-    importProfileBuffer('large.collapsed', input, {
+    importProfileBuffer('renamed-recording', input, {
       workerFactory: factory(worker),
       signal: controller.signal,
       onProgress: progress => {

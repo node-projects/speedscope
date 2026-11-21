@@ -28,6 +28,7 @@ import {FrameInfo} from '../lib/profile'
 import {HelpButton} from './help'
 import {createFunctionLink} from '../lib/function-link'
 import {FunctionLinkDialog} from './function-link-dialog'
+import {LinkedSourceMapDialog} from './linked-source-map-dialog'
 
 interface ToolbarProps extends ApplicationProps {
   browseForFile(): void
@@ -165,14 +166,15 @@ function ToolbarCenterContent(props: ToolbarProps): JSX.Element {
       )
     } else {
       return (
-        <div className={css(style.toolbarCenter)} onMouseLeave={closeProfileSelect}>
+        <div className={css(style.toolbarCenter)}>
           <button
             type="button"
             className={css(style.profileButton)}
-            onMouseOver={openProfileSelect}
             onClick={openProfileSelect}
             aria-label={`Choose from ${profiles.length} profiles`}
             aria-expanded={profileSelectShown}
+            aria-haspopup="listbox"
+            aria-controls="profile-select-options"
           >
             {activeProfileState.profile.getName()}{' '}
             <span className={css(style.toolbarProfileIndex)}>
@@ -203,6 +205,22 @@ function ToolbarRightContent(props: ToolbarProps) {
   const [sourceLinksShown, setSourceLinksShown] = useState(false)
   const [functionLink, setFunctionLink] = useState<string | null>(null)
   const [searchProfiles, setSearchProfiles] = useState<Profile[] | null>(null)
+  const [linkedMapSource, setLinkedMapSource] = useState<{
+    profiles: Profile[]
+    initialURL: string
+  } | null>(null)
+  useEffect(() => {
+    if (
+      linkedMapSource &&
+      (props.loading ||
+        !props.profileGroup ||
+        props.profileGroup.profiles.length !== linkedMapSource.profiles.length ||
+        props.profileGroup.profiles.some(
+          (entry, index) => entry.profile !== linkedMapSource.profiles[index],
+        ))
+    )
+      setLinkedMapSource(null)
+  }, [props.profileGroup, props.loading, linkedMapSource])
   useEffect(() => {
     if (
       searchProfiles &&
@@ -251,6 +269,24 @@ function ToolbarRightContent(props: ToolbarProps) {
     }
     if (action === 'source-links') {
       setSourceLinksShown(true)
+      return
+    }
+    if (action === 'linked-source-map') {
+      let initialURL = '',
+        checked = 0
+      const selectedKey = profileGroup.profiles[activeProfileState.index].selectedFrameKey
+      const selected =
+        selectedKey == null ? undefined : activeProfileState.profile.getFrame(selectedKey)
+      if (selected?.file && /^https?:\/\//i.test(selected.file)) initialURL = selected.file
+      if (!initialURL)
+        for (const frame of activeProfileState.profile.getFrames()) {
+          if (frame.file && /^https?:\/\//i.test(frame.file)) {
+            initialURL = frame.file
+            break
+          }
+          if (++checked >= 200) break
+        }
+      setLinkedMapSource({profiles: profileGroup.profiles.map(entry => entry.profile), initialURL})
       return
     }
     if (action === 'compact-labels') {
@@ -357,6 +393,7 @@ function ToolbarRightContent(props: ToolbarProps) {
           <option value="filter">Filter frames…</option>
           <option value="search-all">Search all profiles…</option>
           <option value="source-links">Source-code links…</option>
+          <option value="linked-source-map">Load linked source map…</option>
           <option value="function-link">Link to selected function…</option>
           <option value="compact-labels">
             {compactLabels ? 'Show full graph labels' : 'Compact graph path labels'}
@@ -381,6 +418,37 @@ function ToolbarRightContent(props: ToolbarProps) {
             return null
           })()}
           onClose={() => setSourceLinksShown(false)}
+        />
+      )}
+      {linkedMapSource && (
+        <LinkedSourceMapDialog
+          profiles={linkedMapSource.profiles}
+          initialURL={linkedMapSource.initialURL}
+          onClose={() => setLinkedMapSource(null)}
+          onApply={remapper => {
+            const current = latestProps.current,
+              group = current.profileGroup
+            if (
+              current.loading ||
+              !group ||
+              group.profiles.length !== linkedMapSource.profiles.length ||
+              group.profiles.some(
+                (entry, index) => entry.profile !== linkedMapSource.profiles[index],
+              )
+            )
+              throw new Error('The source profiles changed. Close this dialog and try again.')
+            const profiles = linkedMapSource.profiles.map(original => {
+              const clone = original.shallowClone()
+              clone.remapSymbols(remapper)
+              return clone
+            })
+            current.setProfileGroup({
+              name: group.name,
+              sourceName: group.sourceName,
+              indexToView: group.indexToView,
+              profiles,
+            })
+          }}
         />
       )}
       {searchProfiles && (
