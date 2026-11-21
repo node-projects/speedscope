@@ -107,7 +107,8 @@ test('narrow comparison tiles retain their envelope width without padding or bor
   const computed = getComputedStyle(tile)
   expect(computed.paddingLeft).toBe('0px')
   expect(computed.paddingRight).toBe('0px')
-  expect(computed.borderTopStyle).toBe('none')
+  // jsdom serializes border:none as an empty side style.
+  expect(['', 'none']).toContain(computed.borderTopStyle)
   expect(tile.children.length).toBe(0)
   expect(tile.getAttribute('aria-label')).toContain('Baseline total: 2')
 })
