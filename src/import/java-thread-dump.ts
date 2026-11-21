@@ -57,6 +57,14 @@ export function importFromJavaThreadDump(
   contents: TextFileContent,
   name: string,
 ): ProfileGroup | null {
+  const parser = createJavaThreadDumpParser(name)
+  for (const line of contents.splitLines()) parser.pushLine(line)
+  return parser.build()
+}
+
+// ZIP imports feed decoded lines directly, preserving one shared output model
+// without concatenating every entry into a second full text recording.
+export function createJavaThreadDumpParser(name: string) {
   const builders = new Map<string, StackListProfileBuilder>()
   let current: ThreadObservation | null = null
   let inDump = false
@@ -77,21 +85,21 @@ export function importFromJavaThreadDump(
     }
     current = null
   }
-  for (const raw of contents.splitLines()) {
+  const pushLine = (raw: string) => {
     const line = raw.replace(/\r$/, '').replace(/^\uFEFF/, '')
     if (/^Full thread dump [^\r\n]+/.test(line)) {
       flush()
       inDump = true
       seen.clear()
-      continue
+      return
     }
-    if (!inDump) continue
+    if (!inDump) return
     // jstack repeats stacks in deadlock summaries. They are diagnostic text,
     // not another observation; only a new Full thread dump opens a snapshot.
     if (/^Found (?:one|\d+) Java-level deadlocks?:/.test(line)) {
       flush()
       inDump = false
-      continue
+      return
     }
     const header = parseThreadHeader(line)
     if (header) {
@@ -102,7 +110,7 @@ export function importFromJavaThreadDump(
         )
       seen.add(header.identity)
       current = header
-      continue
+      return
     }
     if (line.startsWith('"')) throw new Error('Invalid thread header in Java thread dump')
     if (!line.trim()) {
@@ -110,7 +118,7 @@ export function importFromJavaThreadDump(
       // it closes the observation; later orphan frames must not be silently
       // attached to the previous thread or discarded from a partial import.
       if (current?.frames.length) flush()
-      continue
+      return
     }
     if (/^\s+at(?:\s|$)/.test(line)) {
       if (!current) throw new Error('Java stack frame has no thread header')
@@ -119,8 +127,18 @@ export function importFromJavaThreadDump(
       current.frames.push(frame)
     }
   }
-  flush()
-  return sawFrame
-    ? {name, indexToView: 0, profiles: [...builders.values()].map(b => b.build())}
-    : null
+  return {
+    pushLine,
+    endEntry() {
+      flush()
+      inDump = false
+      seen.clear()
+    },
+    build(): ProfileGroup | null {
+      flush()
+      return sawFrame
+        ? {name, indexToView: 0, profiles: [...builders.values()].map(b => b.build())}
+        : null
+    },
+  }
 }

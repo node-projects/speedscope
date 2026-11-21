@@ -28,6 +28,22 @@ import {importFromPMCStatCallGraph} from './pmcstat-callgraph'
 import {importFromJfr, isJfrRecording} from './java-flight-recorder'
 import {importFromJSSelfProfiling, isJSSelfProfiling} from './js-self-profiling'
 import {importFromJavaThreadDump, isJavaThreadDump} from './java-thread-dump'
+import type {ImportProgress} from './trace-worker-protocol'
+import {importFromAndroidMethodTrace, isAndroidMethodTrace} from './android-method-trace'
+import {
+  checkJavaThreadDumpZipFileSize,
+  importFromJavaThreadDumpZip,
+  isJavaThreadDumpZip,
+} from './java-thread-dump-zip'
+
+export interface ImportReadOptions {
+  signal?: AbortSignal
+  onProgress?: (progress: ImportProgress) => void
+}
+
+function checkImportAbort(options: ImportReadOptions) {
+  if (options.signal?.aborted) throw new DOMException('Import cancelled', 'AbortError')
+}
 
 export async function importProfileGroupFromText(
   fileName: string,
@@ -48,21 +64,34 @@ export async function importProfileGroupFromBase64(
   )
 }
 
-export async function importProfilesFromFile(file: File): Promise<ProfileGroup | null> {
-  return importProfileGroup(MaybeCompressedDataReader.fromFile(file))
+export async function importProfilesFromFile(
+  file: File,
+  options: ImportReadOptions = {},
+): Promise<ProfileGroup | null> {
+  checkImportAbort(options)
+  await checkJavaThreadDumpZipFileSize(file, options.signal)
+  return importProfileGroup(MaybeCompressedDataReader.fromFile(file), options)
 }
 
 export async function importProfilesFromArrayBuffer(
   fileName: string,
   buffer: ArrayBuffer,
+  options: ImportReadOptions = {},
 ): Promise<ProfileGroup | null> {
-  return importProfileGroup(MaybeCompressedDataReader.fromArrayBuffer(fileName, buffer))
+  checkImportAbort(options)
+  return importProfileGroup(MaybeCompressedDataReader.fromArrayBuffer(fileName, buffer), options)
 }
 
-async function importProfileGroup(dataSource: ProfileDataSource): Promise<ProfileGroup | null> {
+async function importProfileGroup(
+  dataSource: ProfileDataSource,
+  options: ImportReadOptions = {},
+): Promise<ProfileGroup | null> {
+  checkImportAbort(options)
   const fileName = await dataSource.name()
 
-  const profileGroup = await _importProfileGroup(dataSource)
+  checkImportAbort(options)
+  const profileGroup = await _importProfileGroup(dataSource, options)
+  checkImportAbort(options)
   if (profileGroup) {
     profileGroup.sourceName = sourceFileName(fileName)
     if (!profileGroup.name) {
@@ -83,10 +112,27 @@ function toGroup(profile: Profile | null): ProfileGroup | null {
   return {name: profile.getName(), indexToView: 0, profiles: [profile]}
 }
 
-async function _importProfileGroup(dataSource: ProfileDataSource): Promise<ProfileGroup | null> {
+async function _importProfileGroup(
+  dataSource: ProfileDataSource,
+  options: ImportReadOptions,
+): Promise<ProfileGroup | null> {
   const fileName = await dataSource.name()
 
   const buffer = await dataSource.readAsArrayBuffer()
+  checkImportAbort(options)
+
+  // Container and binary signatures take precedence over text/protobuf sniffing.
+  if (isJavaThreadDumpZip(new Uint8Array(buffer))) {
+    console.log('Importing Java thread dump ZIP')
+    return importFromJavaThreadDumpZip(buffer, fileName, {
+      signal: options.signal,
+      onProgress: options.onProgress,
+    })
+  }
+  if (isAndroidMethodTrace(buffer)) {
+    console.log('Importing Android method trace')
+    return importFromAndroidMethodTrace(fileName, buffer)
+  }
 
   {
     const profile = importAsPprofProfile(buffer)
