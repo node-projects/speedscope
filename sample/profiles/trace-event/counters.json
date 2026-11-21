@@ -1,0 +1,8 @@
+[
+  {"ph":"M","pid":1,"tid":2,"name":"thread_name","args":{"name":"Worker"}},
+  {"ph":"C","pid":1,"tid":2,"cat":"memory","name":"Heap","ts":110,"args":{"used":8,"free":12}},
+  {"ph":"X","pid":1,"tid":2,"name":"work","ts":100,"dur":20},
+  {"ph":"C","pid":1,"tid":2,"cat":"memory","name":"Heap","ts":100,"args":{"used":4,"free":16}},
+  {"ph":"C","pid":1,"tid":2,"cat":"memory","name":"Heap","ts":110,"args":{"used":7}},
+  {"ph":"C","pid":1,"tid":2,"cat":"memory","name":"Heap","ts":120,"args":{"used":9,"free":11}}
+]

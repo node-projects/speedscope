@@ -7,14 +7,16 @@ import {
   StackListProfileBuilder,
 } from '../lib/profile'
 import {TimeFormatter} from '../lib/value-formatters'
+import {importTraceCounterTracks} from './trace-event-counters'
 
 // This file concerns import from the "Trace Event Format", authored by Google
 // and used for Google's own chrome://trace.
 //
 // The file format is extremely general, and we only support the parts of it
 // that logically map onto speedscope's visualization capabilities.
-// Specifically, we only support the "B", "E", and "X" event types. Everything
-// else is ignored. We do, however, support import of profiles that are
+// Stack profiles support the "B", "E", and "X" event types. Numeric "C" events
+// are imported separately as counter time series, never stack weights. Other
+// event types are ignored. We do, however, support import of profiles that are
 // multi-process/multi-threaded. Each process is split into a separate profile.
 //
 // Note that Chrome Developer Tools uses this format as well, but all the
@@ -842,7 +844,7 @@ export function isTraceEventFormatted(rawProfile: any): rawProfile is Trace {
   return isTraceEventObject(rawProfile) || isTraceEventList(rawProfile)
 }
 
-export function importTraceEvents(rawProfile: Trace): ProfileGroup {
+function importTraceEventProfiles(rawProfile: Trace): ProfileGroup {
   if (isTraceEventWithSamples(rawProfile)) {
     return sampleListToProfileGroup(rawProfile)
   } else if (isTraceEventObject(rawProfile)) {
@@ -855,4 +857,12 @@ export function importTraceEvents(rawProfile: Trace): ProfileGroup {
     const _exhaustiveCheck: never = rawProfile
     return _exhaustiveCheck
   }
+}
+
+export function importTraceEvents(rawProfile: Trace): ProfileGroup {
+  const events = Array.isArray(rawProfile) ? rawProfile : rawProfile.traceEvents
+  const counterTracks = importTraceCounterTracks(events)
+  const group = importTraceEventProfiles(rawProfile)
+  if (counterTracks.length) group.counterTracks = counterTracks
+  return group
 }
