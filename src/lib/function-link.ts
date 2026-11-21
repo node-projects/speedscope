@@ -1,6 +1,10 @@
 import {Frame, FrameInfo, Profile} from './profile'
 
 const remoteSources = new WeakMap<Profile, {url: string; accepts?: string}>()
+export function matchesFunctionLinkSource(profile: Profile, url: string, accepts?: string) {
+  const source = remoteSources.get(profile)
+  return source?.url === url && source.accepts === accepts
+}
 export function rememberFunctionLinkSource(
   profiles: readonly Profile[],
   url: string,
