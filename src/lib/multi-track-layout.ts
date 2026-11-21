@@ -2,6 +2,8 @@ import {CallTreeNode, Profile} from './profile'
 import {FileFormat} from './file-format-spec'
 import {axisTicks, niceTickInterval} from './axis-ticks'
 import {TimeFormatter} from './value-formatters'
+import {CounterTrack, COUNTER_LIMITS} from './counter-track'
+import {CounterTimelineRow} from './counter-track-layout'
 
 export type TimelineUnit = Exclude<FileFormat.ValueUnit, 'none' | 'bytes'>
 export interface TimelineTrack {
@@ -16,11 +18,15 @@ export interface MultiTrackGroup {
   referenceStart: number
   span: number
   tracks: TimelineTrack[]
+  counterRows: CounterTimelineRow[]
+  rows: (TimelineTrack | CounterTimelineRow)[]
 }
 export interface MultiTrackLayout {
   groups: MultiTrackGroup[]
   excluded: {profileIndex: number; reason: string}[]
   uninspectedCount: number
+  excludedCounters: {counterIndex: number; reason: string}[]
+  uninspectedCounterCount: number
 }
 export interface MultiTrackViewport {
   left: number
@@ -53,11 +59,16 @@ export function multiTrackAxisTicks(
   return {interval, positions}
 }
 
-export function buildMultiTrackLayout(profiles: readonly Profile[]): MultiTrackLayout {
+export function buildMultiTrackLayout(
+  profiles: readonly Profile[],
+  counterTracks: readonly CounterTrack[] = [],
+): MultiTrackLayout {
   const layout: MultiTrackLayout = {
     groups: [],
     excluded: [],
     uninspectedCount: Math.max(0, profiles.length - 10000),
+    excludedCounters: [],
+    uninspectedCounterCount: Math.max(0, counterTracks.length - COUNTER_LIMITS.tracks),
   }
   const pending = new Map<
     string,
@@ -65,6 +76,7 @@ export function buildMultiTrackLayout(profiles: readonly Profile[]): MultiTrackL
       clock: string
       unit: TimelineUnit
       tracks: {profile: Profile; profileIndex: number; start: number}[]
+      counters: {counter: CounterTrack; counterIndex: number; start: number}[]
     }
   >()
   for (let profileIndex = 0; profileIndex < Math.min(profiles.length, 10000); profileIndex++) {
@@ -88,14 +100,40 @@ export function buildMultiTrackLayout(profiles: readonly Profile[]): MultiTrackL
     const key = JSON.stringify([origin.clock, unit])
     let group = pending.get(key)
     if (!group) {
-      group = {clock: origin.clock, unit, tracks: []}
+      group = {clock: origin.clock, unit, tracks: [], counters: []}
       pending.set(key, group)
     }
     group.tracks.push({profile, profileIndex, start: origin.start})
   }
+  for (
+    let counterIndex = 0;
+    counterIndex < Math.min(counterTracks.length, COUNTER_LIMITS.tracks);
+    counterIndex++
+  ) {
+    const counter = counterTracks[counterIndex]
+    if (
+      !counter.times.length ||
+      !Number.isFinite(counter.start) ||
+      !Number.isFinite(counter.times[counter.times.length - 1])
+    ) {
+      layout.excludedCounters.push({
+        counterIndex,
+        reason: 'Counter has no finite observed time domain',
+      })
+      continue
+    }
+    const key = JSON.stringify([counter.clock, counter.timeUnit])
+    let group = pending.get(key)
+    if (!group) {
+      group = {clock: counter.clock, unit: counter.timeUnit, tracks: [], counters: []}
+      pending.set(key, group)
+    }
+    group.counters.push({counter, counterIndex, start: counter.start})
+  }
   for (const [key, group] of pending) {
     let referenceStart = Infinity
     for (const track of group.tracks) referenceStart = Math.min(referenceStart, track.start)
+    for (const counter of group.counters) referenceStart = Math.min(referenceStart, counter.start)
     const tracks: TimelineTrack[] = []
     let span = 0
     for (const {profile, profileIndex, start} of group.tracks) {
@@ -108,8 +146,31 @@ export function buildMultiTrackLayout(profiles: readonly Profile[]): MultiTrackL
       tracks.push({profile, profileIndex, offset})
       span = Math.max(span, end)
     }
-    if (tracks.length)
-      layout.groups.push({key, clock: group.clock, unit: group.unit, referenceStart, span, tracks})
+    const counterRows: CounterTimelineRow[] = []
+    for (const {counter, counterIndex, start} of group.counters) {
+      const offset = start - referenceStart
+      const end = offset + counter.times[counter.times.length - 1]
+      if (!Number.isFinite(end)) {
+        layout.excludedCounters.push({
+          counterIndex,
+          reason: 'Shared-clock counter span exceeds numeric range',
+        })
+        continue
+      }
+      counterRows.push({kind: 'counter', counter, counterIndex, offset})
+      span = Math.max(span, end)
+    }
+    if (tracks.length || counterRows.length)
+      layout.groups.push({
+        key,
+        clock: group.clock,
+        unit: group.unit,
+        referenceStart,
+        span,
+        tracks,
+        counterRows,
+        rows: [...tracks, ...counterRows],
+      })
   }
   return layout
 }

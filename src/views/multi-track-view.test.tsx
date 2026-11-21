@@ -4,6 +4,7 @@ import {StyleSheetTestUtils} from 'aphrodite'
 import {CallTreeProfileBuilder} from '../lib/profile'
 import {TimeFormatter} from '../lib/value-formatters'
 import {MultiTrackView} from './multi-track-view'
+import {CounterTrack} from '../lib/counter-track'
 
 let host: HTMLDivElement
 const context = {
@@ -15,6 +16,9 @@ const context = {
   beginPath: jest.fn(),
   rect: jest.fn(),
   clip: jest.fn(),
+  moveTo: jest.fn(),
+  lineTo: jest.fn(),
+  stroke: jest.fn(),
 }
 beforeEach(() => {
   StyleSheetTestUtils.suppressStyleInjection()
@@ -24,6 +28,8 @@ beforeEach(() => {
     .spyOn(HTMLCanvasElement.prototype, 'getContext')
     .mockImplementation(() => context as unknown as CanvasRenderingContext2D)
   context.fillRect.mockClear()
+  context.moveTo.mockClear()
+  context.lineTo.mockClear()
 })
 afterEach(() => {
   act(() => render(null, host))
@@ -45,6 +51,7 @@ async function mount(
   profiles: ReturnType<typeof profile>[],
   selectedProfileIndex = 0,
   onSelectProfile = jest.fn(),
+  counterTracks?: readonly CounterTrack[],
 ) {
   await act(async () => {
     render(
@@ -52,6 +59,7 @@ async function mount(
         profiles={profiles}
         selectedProfileIndex={selectedProfileIndex}
         onSelectProfile={onSelectProfile}
+        counterTracks={counterTracks}
       />,
       host,
     )
@@ -209,4 +217,76 @@ test('missing or failed canvas contexts report an error while individual profile
     act(() => button(`Open profile: source-${throws} (selected)`).click())
     expect(select).toHaveBeenCalledWith(0)
   }
+})
+
+function counter(times = [0, 1, 2], values = [0, 100, 0]): CounterTrack {
+  return {
+    id: 'heap',
+    name: 'Heap',
+    clock: 'recording',
+    start: 100,
+    timeUnit: 'microseconds',
+    valueUnit: 'bytes',
+    times: Float64Array.from(times),
+    values: Float64Array.from(values),
+  }
+}
+
+test('counter-only captures draw independent value axes and report original observations at the marker', async () => {
+  await mount([], 0, jest.fn(), [counter()])
+  expect(host.textContent).toContain('0 aligned profiles and 1 counter series')
+  expect(host.textContent).toContain('Counter: Heap [bytes]')
+  expect(host.textContent).toContain('independent value axes')
+  expect(host.querySelector('canvas')).not.toBeNull()
+  const canvas = host.querySelector('canvas')!
+  act(() => {
+    canvas.dispatchEvent(new MouseEvent('mousemove', {bubbles: true, clientX: 600, clientY: 60}))
+  })
+  expect(host.textContent).toContain('100 bytes · observed +1.00µs')
+})
+
+test('counter steps stay aligned with stack time and never extend the final value through the recording', async () => {
+  await mount([profile('thread', 100)], 0, jest.fn(), [counter()])
+  // Stack extent is20us; source counter observations stop at2us (x=80/800).
+  expect(Math.max(...context.lineTo.mock.calls.map(call => Number(call[0])))).toBe(80)
+  const canvas = host.querySelector('canvas')!
+  act(() => {
+    canvas.dispatchEvent(new MouseEvent('mousemove', {bubbles: true, clientX: 60, clientY: 200}))
+  })
+  expect(host.textContent).toContain('100 bytes · observed +1.00µs')
+  act(() => {
+    canvas.dispatchEvent(new MouseEvent('mousemove', {bubbles: true, clientX: 120, clientY: 200}))
+  })
+  expect(host.textContent).toContain('Outside observed range')
+})
+
+test('counter steps retain a short spike and stop exactly at the last observation in a longer capture', async () => {
+  await mount([profile('thread', 100)], 0, jest.fn(), [counter()])
+  // A 20us shared range maps observations0,1,2us to x0,40,80px.
+  // Counter rows begin at158px, so their observed maximum is y200px.
+  expect(context.lineTo.mock.calls.some(call => call[0] === 80 && call[1] === 200)).toBe(true)
+  expect(context.lineTo.mock.calls.every(call => call[0] <= 80)).toBe(true)
+  const canvas = host.querySelector('canvas')!
+  act(() => {
+    canvas.dispatchEvent(new MouseEvent('mousemove', {bubbles: true, clientX: 120, clientY: 220}))
+  })
+  expect(host.textContent).toContain('Outside observed range')
+  expect(host.textContent).not.toContain('100 bytes · observed')
+})
+
+test('dense counters disclose min/max decimation and counter navigation stays virtualized', async () => {
+  const times = Array.from({length: 20000}, (_, index) => index)
+  const values = times.map(() => 2)
+  values[1234] = 90000
+  const series = counter(times, values)
+  await mount([profile('thread', 100)], 0, jest.fn(), [series])
+  expect(host.textContent).toContain('Min/max overview')
+  expect(host.textContent).toContain(`${(16384).toLocaleString()} observations`)
+  expect(context.fillText.mock.calls.some(call => call[0] === '90000')).toBe(true)
+  act(() => button('Show counters').click())
+  expect(host.querySelector<HTMLDivElement>('[aria-label^="Thread timelines;"]')!.scrollTop).toBe(
+    158,
+  )
+  act(() => button('Show profiles').click())
+  expect(host.querySelector<HTMLDivElement>('[aria-label^="Thread timelines;"]')!.scrollTop).toBe(0)
 })

@@ -2,6 +2,15 @@ import {h} from 'preact'
 import {useCallback, useEffect, useMemo, useRef, useState} from 'preact/hooks'
 import {css, StyleSheet} from 'aphrodite'
 import {Profile} from '../lib/profile'
+import {CounterTrack} from '../lib/counter-track'
+import {
+  CounterTimelineRow,
+  CounterPlot,
+  collectCounterPlot,
+  counterObservationAt,
+  counterValueFraction,
+  MAX_VISIBLE_COUNTER_POINTS,
+} from '../lib/counter-track-layout'
 import {
   buildMultiTrackLayout,
   clampMultiTrackViewport,
@@ -16,10 +25,11 @@ import {
 } from '../lib/multi-track-layout'
 import {TimeFormatter} from '../lib/value-formatters'
 import {frameColorForTheme} from '../lib/frame-color'
-import {useTheme, withTheme} from './themes/theme'
+import {Theme, useTheme, withTheme} from './themes/theme'
 
 export interface MultiTrackViewProps {
   profiles: readonly Profile[]
+  counterTracks?: readonly CounterTrack[]
   selectedProfileIndex: number
   onSelectProfile(index: number): void
 }
@@ -29,14 +39,93 @@ const HEADER_HEIGHT = 30
 const FRAME_HEIGHT = 15
 const MAX_VISIBLE_ROWS = 24
 const NO_TILES = new Map<number, TrackTiles>()
+const NO_PLOTS = new Map<number, CounterPlot>()
+const NO_COUNTERS: readonly CounterTrack[] = []
+type TrackRow = TimelineTrack | CounterTimelineRow
+const isCounter = (row: TrackRow): row is CounterTimelineRow => 'counter' in row
 const short = (name: string) => (name.length > 240 ? name.slice(0, 239) + '…' : name)
+const counterName = (counter: CounterTrack) =>
+  short(
+    `${counter.name}${counter.processId ? ` · pid ${counter.processId}` : ''}${
+      counter.threadId ? ` · tid ${counter.threadId}` : ''
+    }`,
+  )
+
+function drawCounter(
+  ctx: CanvasRenderingContext2D,
+  row: CounterTimelineRow,
+  plot: CounterPlot | undefined,
+  viewport: MultiTrackViewport,
+  width: number,
+  top: number,
+  theme: Theme,
+) {
+  if (!plot?.observations) return
+  const chartTop = top + HEADER_HEIGHT + 12,
+    chartBottom = top + ROW_HEIGHT - 10
+  const x = (time: number) => ((time - viewport.left) / viewport.width) * width
+  const y = (value: number) =>
+    chartBottom - counterValueFraction(value, plot.min, plot.max) * (chartBottom - chartTop)
+  const {times, values} = row.counter
+  const lastTime = row.offset + times[times.length - 1]
+  ctx.save()
+  ctx.beginPath()
+  ctx.rect(0, chartTop - 2, width, chartBottom - chartTop + 4)
+  ctx.clip()
+  ctx.strokeStyle = theme.fgPrimaryColor
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  for (const envelope of plot.envelopes) {
+    const position = x(envelope.start + (envelope.end - envelope.start) / 2)
+    ctx.moveTo(position, y(values[envelope.minIndex]))
+    ctx.lineTo(position, y(values[envelope.maxIndex]))
+  }
+  ctx.stroke()
+  ctx.strokeStyle = theme.fgPrimaryColor
+  ctx.lineWidth = 1.5
+  ctx.beginPath()
+  for (const index of plot.indices) {
+    const time = row.offset + times[index]
+    const next = index + 1 < times.length ? row.offset + times[index + 1] : time
+    const start = Math.max(time, viewport.left),
+      end = Math.min(next, viewport.left + viewport.width, lastTime)
+    if (end > start) {
+      ctx.moveTo(x(start), y(values[index]))
+      ctx.lineTo(x(end), y(values[index]))
+    }
+    if (next > time && next <= viewport.left + viewport.width && next >= viewport.left) {
+      const atNext = counterObservationAt(row, next)
+      if (atNext !== null) {
+        ctx.moveTo(x(next), y(values[index]))
+        ctx.lineTo(x(next), y(values[atNext]))
+      }
+    }
+    if (
+      index === times.length - 1 &&
+      time >= viewport.left &&
+      time <= viewport.left + viewport.width
+    ) {
+      ctx.fillStyle = theme.fgPrimaryColor
+      ctx.fillRect(x(time) - 0.75, y(values[index]) - 0.75, 1.5, 1.5)
+    }
+  }
+  ctx.stroke()
+  ctx.restore()
+  ctx.fillStyle = theme.fgPrimaryColor
+  ctx.fillText(Number(plot.max.toPrecision(4)).toString(), 4, chartTop + 6)
+  ctx.fillText(Number(plot.min.toPrecision(4)).toString(), 4, chartBottom - 6)
+}
 
 export function MultiTrackView(props: MultiTrackViewProps) {
   const theme = useTheme(),
     style = getStyle(theme)
-  const layout = useMemo(() => buildMultiTrackLayout(props.profiles), [props.profiles])
+  const counters = props.counterTracks || NO_COUNTERS
+  const layout = useMemo(
+    () => buildMultiTrackLayout(props.profiles, counters),
+    [props.profiles, counters],
+  )
   const compatibleCount = useMemo(
-    () => layout.groups.reduce((sum, candidate) => sum + candidate.tracks.length, 0),
+    () => layout.groups.reduce((sum, candidate) => sum + candidate.rows.length, 0),
     [layout],
   )
   const defaultGroup = useMemo(
@@ -45,7 +134,7 @@ export function MultiTrackView(props: MultiTrackViewProps) {
         group.tracks.some(track => track.profileIndex === props.selectedProfileIndex),
       ) ||
       layout.groups.reduce<(typeof layout.groups)[number] | undefined>(
-        (best, group) => (!best || group.tracks.length > best.tracks.length ? group : best),
+        (best, group) => (!best || group.rows.length > best.rows.length ? group : best),
         undefined,
       ),
     [layout, props.selectedProfileIndex],
@@ -68,7 +157,8 @@ export function MultiTrackView(props: MultiTrackViewProps) {
     group?: MultiTrackGroup
     key: string
     rows: Map<number, TrackTiles>
-  }>({key: '', rows: NO_TILES})
+    plots: Map<number, CounterPlot>
+  }>({key: '', rows: NO_TILES, plots: NO_PLOTS})
   const [loading, setLoading] = useState(false),
     [error, setError] = useState('')
   const [crosshair, setCrosshair] = useState<number | null>(null)
@@ -76,12 +166,14 @@ export function MultiTrackView(props: MultiTrackViewProps) {
   const drag = useRef<{x: number; left: number} | null>(null)
   const first = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT))
   const last = Math.min(
-    group?.tracks.length || 0,
+    group?.rows.length || 0,
     first + Math.min(MAX_VISIBLE_ROWS, Math.ceil(size.height / ROW_HEIGHT) + 1),
   )
-  const visible = useMemo(() => group?.tracks.slice(first, last) || [], [group, first, last])
+  const visible = useMemo(() => group?.rows.slice(first, last) || [], [group, first, last])
   const requestKey = `${viewport.left},${viewport.width},${first},${last}`
   const data = rendered.group === group && rendered.key === requestKey ? rendered.rows : NO_TILES
+  const plots = rendered.group === group && rendered.key === requestKey ? rendered.plots : NO_PLOTS
+  const counterResolution = visible.some(isCounter) ? Math.min(1024, size.width) : 0
   const format = useMemo(() => new TimeFormatter(group?.unit || 'microseconds'), [group?.unit])
   const axis = useMemo(
     () =>
@@ -104,10 +196,10 @@ export function MultiTrackView(props: MultiTrackViewProps) {
   useEffect(() => {
     setRequested({left: 0, width: Infinity})
     setScrollTop(0)
-    setRendered({key: '', rows: NO_TILES})
+    setRendered({key: '', rows: NO_TILES, plots: NO_PLOTS})
     setCrosshair(null)
     if (scroller.current) scroller.current.scrollTop = 0
-  }, [group?.key, props.profiles])
+  }, [group?.key, props.profiles, counters])
   useEffect(() => {
     const element = scroller.current
     if (!element) return
@@ -131,17 +223,33 @@ export function MultiTrackView(props: MultiTrackViewProps) {
     setLoading(true)
     setError('')
     setHover('')
-    setRendered({key: '', rows: NO_TILES})
+    setRendered({key: '', rows: NO_TILES, plots: NO_PLOTS})
     ;(async () => {
       const next = new Map<number, TrackTiles>()
-      const cap = Math.max(1, Math.floor(MULTI_TRACK_MAX_TILES / Math.max(1, visible.length)))
-      for (const track of visible)
-        next.set(
-          track.profileIndex,
-          await collectTrackTiles(track, viewport, {signal: controller.signal, maxTiles: cap}),
-        )
+      const nextPlots = new Map<number, CounterPlot>()
+      const counterCount = visible.filter(isCounter).length
+      const cap = Math.max(
+        1,
+        Math.floor(MULTI_TRACK_MAX_TILES / Math.max(1, visible.length - counterCount)),
+      )
+      const pointCap = Math.floor(MAX_VISIBLE_COUNTER_POINTS / Math.max(1, counterCount))
+      for (const track of visible) {
+        if (isCounter(track))
+          nextPlots.set(
+            track.counterIndex,
+            await collectCounterPlot(track, viewport, counterResolution, {
+              signal: controller.signal,
+              maxPoints: pointCap,
+            }),
+          )
+        else
+          next.set(
+            track.profileIndex,
+            await collectTrackTiles(track, viewport, {signal: controller.signal, maxTiles: cap}),
+          )
+      }
       if (!controller.signal.aborted) {
-        setRendered({group, key: requestKey, rows: next})
+        setRendered({group, key: requestKey, rows: next, plots: nextPlots})
         setLoading(false)
       }
     })().catch(failure => {
@@ -151,7 +259,7 @@ export function MultiTrackView(props: MultiTrackViewProps) {
       }
     })
     return () => controller.abort()
-  }, [group, visible, viewport, requestKey])
+  }, [group, visible, viewport, requestKey, counterResolution])
   useEffect(() => {
     const element = scroller.current
     if (!element) return
@@ -207,10 +315,14 @@ export function MultiTrackView(props: MultiTrackViewProps) {
     ctx.textBaseline = 'middle'
     const colors = new Map<string, string>()
     for (let index = first; index < last; index++) {
-      const track = group!.tracks[index]
+      const track = group!.rows[index]
       const top = index * ROW_HEIGHT - scrollTop
       ctx.fillStyle = theme.bgSecondaryColor
       ctx.fillRect(0, top, size.width, HEADER_HEIGHT)
+      if (isCounter(track)) {
+        drawCounter(ctx, track, plots.get(track.counterIndex), viewport, size.width, top, theme)
+        continue
+      }
       const tiles = data.get(track.profileIndex)?.tiles || []
       for (const tile of tiles) {
         const left = ((tile.start - viewport.left) / viewport.width) * size.width
@@ -243,17 +355,18 @@ export function MultiTrackView(props: MultiTrackViewProps) {
         }
       }
     }
-  }, [group, data, first, last, scrollTop, size, viewport.left, viewport.width, theme])
+  }, [group, data, plots, first, last, scrollTop, size, viewport, theme])
 
   if (!group)
     return (
       <section className={css(style.section)} aria-label="Synchronized thread timelines">
         <p>
           No aligned thread timelines are available. Profiles need explicit origins in the same
-          clock and equal time units.
+          clock and equal time units. Counters need a finite observed time domain.
         </p>
         <p>
-          {layout.excluded.length} profiles excluded.{' '}
+          {layout.excluded.length} profiles excluded. {layout.excludedCounters.length} counter
+          series excluded.{' '}
           {layout.uninspectedCount
             ? `${layout.uninspectedCount} beyond the 10,000-profile inspection limit.`
             : ''}
@@ -265,6 +378,13 @@ export function MultiTrackView(props: MultiTrackViewProps) {
             </li>
           ))}
         </ul>
+        <ul>
+          {layout.excludedCounters.slice(0, 20).map(item => (
+            <li key={item.counterIndex}>
+              {short(counters[item.counterIndex].name)}: {item.reason}
+            </li>
+          ))}
+        </ul>
       </section>
     )
 
@@ -272,8 +392,9 @@ export function MultiTrackView(props: MultiTrackViewProps) {
   if (!choices.includes(group)) choices[choices.length - 1] = group
   const omitted = [...data.values()].reduce((sum, track) => sum + track.omitted, 0)
   const deeper = [...data.values()].some(track => track.deeper)
+  const counterOverviews = [...plots.values()].filter(plot => plot.decimated).length
   const {interval, positions: ticks} = axis
-  const other = compatibleCount - group.tracks.length
+  const other = compatibleCount - group.rows.length
   const pointer = (event: MouseEvent, trackUnderPointer = true) => {
     const bounds = canvas.current!.getBoundingClientRect()
     const x = Math.max(0, Math.min(size.width, event.clientX - bounds.left))
@@ -290,9 +411,10 @@ export function MultiTrackView(props: MultiTrackViewProps) {
     const y = event.clientY - bounds.top + scrollTop
     const row = Math.floor(y / ROW_HEIGHT)
     const depth = Math.floor(((y % ROW_HEIGHT) - HEADER_HEIGHT) / FRAME_HEIGHT)
-    const track = group.tracks[row]
+    const track = group.rows[row]
     const tile =
       track &&
+      !isCounter(track) &&
       data
         .get(track.profileIndex)
         ?.tiles.find(
@@ -306,10 +428,25 @@ export function MultiTrackView(props: MultiTrackViewProps) {
         : '',
     )
   }
-  const activity = (track: TimelineTrack): string => {
-    if (crosshair === null) return `Starts +${format.format(track.offset)}`
+  const activity = (track: TrackRow): string => {
+    if (crosshair === null) {
+      if (isCounter(track)) {
+        const plot = plots.get(track.counterIndex)
+        return plot?.observations
+          ? `Range: ${plot.min}–${plot.max} ${track.counter.valueUnit}`
+          : 'No visible observations'
+      }
+      return `Starts +${format.format(track.offset)}`
+    }
     if (crosshair < viewport.left || crosshair >= viewport.left + viewport.width)
       return 'Marker outside viewport'
+    if (isCounter(track)) {
+      const index = counterObservationAt(track, crosshair)
+      if (index === null) return 'Outside observed range'
+      return `${track.counter.values[index]} ${track.counter.valueUnit} · observed +${format.format(
+        track.offset + track.counter.times[index],
+      )}`
+    }
     if (crosshair < track.offset || crosshair >= track.offset + track.profile.getTotalWeight())
       return 'Outside recording'
     const displayed = data.get(track.profileIndex)
@@ -342,6 +479,7 @@ export function MultiTrackView(props: MultiTrackViewProps) {
             {choices.map(candidate => (
               <option key={candidate.key} value={candidate.key}>
                 {short(candidate.clock)} · {candidate.unit} · {candidate.tracks.length} profiles
+                {candidate.counterRows.length ? `, ${candidate.counterRows.length} counters` : ''}
               </option>
             ))}
           </select>
@@ -371,21 +509,68 @@ export function MultiTrackView(props: MultiTrackViewProps) {
         <button type="button" onClick={() => setRequested({left: 0, width: Infinity})}>
           Full range
         </button>
+        {group.counterRows.length > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              if (scroller.current) {
+                scroller.current.scrollTop = group.tracks.length * ROW_HEIGHT
+                setScrollTop(scroller.current.scrollTop)
+              }
+            }}
+          >
+            Show counters
+          </button>
+        )}
+        {group.counterRows.length > 0 && group.tracks.length > 0 && (
+          <button
+            type="button"
+            onClick={() => {
+              if (scroller.current) {
+                scroller.current.scrollTop = 0
+                setScrollTop(0)
+              }
+            }}
+          >
+            Show profiles
+          </button>
+        )}
       </div>
       <p className={css(style.description)}>
-        {group.tracks.length} aligned profiles. Axis is elapsed time after shared reference{' '}
-        {group.referenceStart} {group.unit}. First {MULTI_TRACK_DEPTH} stack levels per row; open a
-        profile for deeper stacks. Drag to pan; Ctrl/⌘+wheel zooms. Arrow keys pan, +/− zoom, Home
-        resets.
+        {group.tracks.length} aligned profiles
+        {group.counterRows.length ? ` and ${group.counterRows.length} counter series` : ''}. Axis is
+        elapsed time after shared reference {group.referenceStart} {group.unit}. First{' '}
+        {MULTI_TRACK_DEPTH} stack levels per row; open a profile for deeper stacks. Drag to pan;
+        Ctrl/⌘+wheel zooms. Arrow keys pan, +/− zoom, Home resets.
       </p>
+      {group.counterRows.length > 0 && (
+        <p className={css(style.description)}>
+          Counter rows have independent value axes and labeled units. Dense ranges show min/max
+          envelopes; retained steps use original observation intervals. Values are not extended
+          beyond the last observation.
+        </p>
+      )}
       <p className={css(style.description)}>
-        {layout.excluded.length} unanchored/unsupported profiles excluded; {other} profiles use
-        other clocks or units.
+        {layout.excluded.length} unanchored/unsupported profiles excluded; {other}{' '}
+        {counters.length ? 'profiles/counters' : 'profiles'} use other clocks or units.
+        {layout.excludedCounters.length
+          ? ` ${layout.excludedCounters.length} counter series have no supported observed domain.`
+          : ''}
+        {layout.uninspectedCounterCount
+          ? ` ${layout.uninspectedCounterCount} additional counter series exceed the inspection limit.`
+          : ''}
         {layout.uninspectedCount
           ? ` ${layout.uninspectedCount} beyond the 10,000-profile inspection limit.`
           : ''}
         {layout.groups.length > 64 ? ' First 64 clock groups are listed.' : ''}
       </p>
+      {counterOverviews > 0 && (
+        <p className={css(style.status)}>
+          Min/max overview for {counterOverviews} counter rows. At most{' '}
+          {MAX_VISIBLE_COUNTER_POINTS.toLocaleString()} observations are retained across visible
+          counters; zoom in for full steps. Markers use original observations.
+        </p>
+      )}
       <div className={css(style.axis)} aria-label="Shared timeline axis">
         {ticks.slice(0, 100).map(tick => (
           <span
@@ -438,7 +623,7 @@ export function MultiTrackView(props: MultiTrackViewProps) {
       >
         <div
           className={css(style.surface)}
-          style={{height: Math.max(size.height, group.tracks.length * ROW_HEIGHT)}}
+          style={{height: Math.max(size.height, group.rows.length * ROW_HEIGHT)}}
         >
           <canvas
             ref={canvas}
@@ -472,18 +657,28 @@ export function MultiTrackView(props: MultiTrackViewProps) {
                 }}
               />
             )}
-          {visible.map((track: TimelineTrack, index: number) => (
-            <div key={track.profileIndex}>
-              <button
-                type="button"
-                key={track.profileIndex}
-                className={css(style.trackLabel)}
-                style={{top: (first + index) * ROW_HEIGHT + 4}}
-                onClick={() => props.onSelectProfile(track.profileIndex)}
-              >
-                Open profile: {short(track.profile.getName())}
-                {track.profileIndex === props.selectedProfileIndex ? ' (selected)' : ''}
-              </button>
+          {visible.map((track: TrackRow, index: number) => (
+            <div key={isCounter(track) ? `c${track.counterIndex}` : `p${track.profileIndex}`}>
+              {isCounter(track) ? (
+                <span
+                  className={css(style.trackLabel)}
+                  style={{top: (first + index) * ROW_HEIGHT + 4}}
+                  title={counterName(track.counter)}
+                >
+                  Counter: {counterName(track.counter)} [{track.counter.valueUnit}]
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  key={track.profileIndex}
+                  className={css(style.trackLabel)}
+                  style={{top: (first + index) * ROW_HEIGHT + 4}}
+                  onClick={() => props.onSelectProfile(track.profileIndex)}
+                >
+                  Open profile: {short(track.profile.getName())}
+                  {track.profileIndex === props.selectedProfileIndex ? ' (selected)' : ''}
+                </button>
+              )}
               <span className={css(style.activity)} style={{top: (first + index) * ROW_HEIGHT + 8}}>
                 {activity(track)}
               </span>

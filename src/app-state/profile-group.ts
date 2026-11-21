@@ -4,6 +4,7 @@ import {CallTreeNode, Frame, Profile, ProfileGroup} from '../lib/profile'
 import {objectsHaveShallowEquality} from '../lib/utils'
 import {ViewMode} from '../lib/view-mode'
 import {findFrameNode, nodeBelongsToTree} from '../lib/frame-selection'
+import type {CounterTrack} from '../lib/counter-track'
 
 export interface FlamechartViewState {
   hover: {
@@ -44,6 +45,7 @@ export type ProfileGroupState = {
   indexToView: number
 
   profiles: ProfileState[]
+  counterTracks?: readonly CounterTrack[]
 } | null
 
 export enum FlamechartID {
@@ -82,6 +84,7 @@ export class ProfileGroupAtom extends Atom<ProfileGroupState> {
     this.set({
       name: group.name,
       sourceName: group.sourceName,
+      ...(group.counterTracks === undefined ? {} : {counterTracks: group.counterTracks}),
       indexToView: group.indexToView,
       profiles: group.profiles.map(p => ({
         profile: p,
@@ -94,7 +97,7 @@ export class ProfileGroupAtom extends Atom<ProfileGroupState> {
   }
 
   setProfileIndexToView = (indexToView: number) => {
-    if (this.state == null) return
+    if (this.state == null || !this.state.profiles.length) return
 
     indexToView = clamp(indexToView, 0, this.state.profiles.length - 1)
 
