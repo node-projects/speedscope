@@ -284,3 +284,27 @@ peak ArrayBuffer growth after coalescing output into owned slabs; transient code
 allocation and GC remain part of that observation. Generic decode/JSON still
 materializes input, and the 512 MiB expansion limit is not a process-memory cap.
 Private traces, diagnostic bundles and screenshots remain ignored.
+
+## Bounded late-range Tracks seeking
+
+The final local Node 22 suite passed 731 tests in 107 suites with 310 snapshots.
+Five Node tests, typecheck, lint, schema/backlog validation, standalone/Pages/
+single-file builds and npm dry-pack checks passed. New regressions compare
+original node identity, clipped coordinates, rectangle choices and depth notices
+across full and indexed iteration, including fractional clocks, zero weights,
+deep stacks, cancellation, stale builders and session cache eviction/replacement.
+The dense-counter UI test forces multiple yields and waits for rendered status.
+
+Three fresh alternating PLC pairs compared archived 899b138 against the new seek
+path. All four rows retained the same geometry hashes, 3,341 tiles and 11,673
+omitted intervals in the tested 94%–97% viewport. Event visits fell from
+1,009,743 to 30,119, with 91,260 bytes of numeric indices across the four rows.
+Warm main-profile median extraction was 299.70 ms versus 24.81 ms; observed
+ranges and the comparable retained heap are recorded in LARGE_TRACE_PERFORMANCE.
+This is a measured navigation improvement with bounded extra indexing, not a
+claim that profile models are out of core or that browser latency is guaranteed.
+The shared-frame/profile payload hash above is unchanged.
+
+Browser checks covered rapid late-range zoom/pan, original call markers, source
+replacement resetting range/marker, and the authored example at 505 ms showing
+application/compute/read on the expected rows without console errors.

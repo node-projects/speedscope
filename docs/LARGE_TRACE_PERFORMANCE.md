@@ -1,5 +1,66 @@
 # Large trace performance follow-up
 
+## Bounded late-range Tracks seeking (2026-11-21)
+
+Tracks can now seek into an existing sample sequence instead of replaying every
+call event before a late viewport. A lazy index records at most 4,096 sample
+ordinals and their exact sequential clocks, using at most 49,152 numeric bytes
+per profile. A session LRU caches at most 32 completed indices (1.5 MiB of
+checkpoint arrays), and releases them on recording/clock replacement or leaving
+Tracks. It does not retain a stack per checkpoint, add a full interval tree or
+change exported profiles. Existing profile models and temporary active stacks
+still scale with recording size and depth.
+
+Cold index construction scans weights once and yields cooperatively; later
+viewports binary-search a nearby checkpoint and reconstruct its existing stack.
+Clipping, original node identities, rectangle ranking and omission counts remain
+the same. Cancellation and stale-builder detection reject incomplete indices.
+Zero-duration deep samples also no longer trigger a false hidden-depth notice.
+
+The maintained `node scripts/benchmark-profile.mjs <capture> stream-tracks`
+command compares ten late ranges of the first aligned profile using both full
+and indexed extraction. It checks exact tile identity/order/coordinates, depth
+flags and omission counts, and reports cold build time, numeric index bytes,
+retained heap, event visits and raw per-range timings. Index arrays are reported
+separately from JS heap. This measures extraction after import, not browser
+frame rate, whole-app memory or out-of-core storage.
+
+Three alternating fresh-process Windows/Node runs compared archived `899b138`
+with this change on the private PLC trace. The viewport covered 94%–97% of the
+shared recording span, with four visible profiles and 3,000 rectangles per row.
+Cold indexed extraction includes index construction; warm extractions reuse it.
+
+| Metric | Full iteration | Bounded seek |
+| --- | ---: | ---: |
+| Main-profile events visited | 996,783 | 29,433 |
+| Four-profile events visited | 1,009,743 | 30,119 |
+| Warm main-profile median | 299.70 ms | 24.81 ms |
+| Warm main-profile observed range | 245.11–409.81 ms | 13.32–233.23 ms |
+| Cold main-profile observed range | 269.51–408.41 ms | 20.02–263.21 ms |
+| Four-profile retained JS heap, including extracted tiles | 0.429–0.498 MiB | 0.433–0.543 MiB |
+
+All runs retained the same 3,341 rectangles, omitted the same 11,673 intervals
+and preserved original nodes/coordinates, ordering and hidden-depth flags.
+The four numeric indices occupy 91,260 bytes, separately from the retained JS
+heap measurement. This is an extraction-speed improvement with a small explicit
+index allocation, not a claim of lower overall heap. Timing ranges include OS
+and runtime outliers and do not guarantee browser latency.
+
+The PLC still has four stack profiles, 17,510 frames and 1,039,656 call events.
+The shared-frame/profile payload SHA-256 remains
+`53b28f954a000a144a4b88d6806a8e20a79ee58b3ef748067d132232977bd75b`;
+that comparison excludes group-level counter metadata. Browser checks exercised
+rapid late-range zoom/pan and markers, then recording replacement and the
+authored shared-clock example without errors. Private input and ignored
+benchmark archives are excluded from Git.
+
+Validation passed 731 tests across 107 Jest suites with 310 snapshots, five Node
+tests, type checking, linting, schema/backlog checks, all three builds and npm
+contents checks. Regressions cover sequential floating clocks, zero weights,
+20,000-level stack reconstruction, checkpoint/cache limits, cancellation,
+stale-builder rejection and source/clock ownership. The dense counter UI test
+forces cooperative yields and waits for observable rendering completion.
+
 ## Counter charts and bounded generic decompression (2026-11-21)
 
 [Counter tracks](COUNTERS.md) preserve independent numeric observations instead

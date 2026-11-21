@@ -3,7 +3,7 @@ import {execFileSync} from 'node:child_process'
 
 if (!process.argv[2]) {
   console.error(
-    'Usage: node scripts/benchmark-profile.mjs <profile-path> [all|import|stream-import|text-stream-import|text-stream-main-import|stream-search|export|legacy-export] [search-query]',
+    'Usage: node scripts/benchmark-profile.mjs <profile-path> [all|import|stream-import|text-stream-import|text-stream-main-import|stream-search|stream-tracks|export|legacy-export] [search-query]',
   )
   process.exit(1)
 }
