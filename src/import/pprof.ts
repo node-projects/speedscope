@@ -1,5 +1,5 @@
 import {perftools} from './profile.proto.js'
-import {FrameInfo, StackListProfileBuilder, Profile} from '../lib/profile'
+import {FrameInfo, StackListProfileBuilder, Profile, ProfileGroup} from '../lib/profile'
 import {lastOf} from '../lib/utils'
 import {TimeFormatter, ByteFormatter} from '../lib/value-formatters'
 import Long from 'long'
@@ -29,6 +29,14 @@ function getSampleTypeIndex(profile: perftools.profiles.Profile): number {
 }
 
 export function importAsPprofProfile(rawProfile: ArrayBuffer): Profile | null {
+  const group = importAsPprofProfileGroup(rawProfile)
+  if (!group) return null
+  if (group.profiles.length !== 1)
+    throw new Error('Signed pprof samples require the contribution-pair importer')
+  return group.profiles[0]
+}
+
+export function importAsPprofProfileGroup(rawProfile: ArrayBuffer): ProfileGroup | null {
   if (rawProfile.byteLength === 0) return null
 
   let protoProfile: perftools.profiles.Profile
@@ -149,21 +157,37 @@ export function importAsPprofProfile(rawProfile: ArrayBuffer): Profile | null {
 
   const sampleType = sampleTypes[sampleTypeIndex]
 
-  const profileBuilder = new StackListProfileBuilder()
-  profileBuilder.setChronological(false)
-
-  switch (sampleType.unit) {
-    case 'nanoseconds':
-    case 'microseconds':
-    case 'milliseconds':
-    case 'seconds':
-      profileBuilder.setValueFormatter(new TimeFormatter(sampleType.unit))
-      break
-
-    case 'bytes':
-      profileBuilder.setValueFormatter(new ByteFormatter())
-      break
+  let signed = false
+  for (const sample of protoProfile.sample) {
+    if (!sample.value || sample.value.length <= sampleTypeIndex) return null
+    const value = Number(sample.value[sampleTypeIndex].toString())
+    if (!Number.isSafeInteger(value))
+      throw new Error('pprof sample weight exceeds exact integer range')
+    if (value < 0) signed = true
   }
+
+  function builder() {
+    const profileBuilder = new StackListProfileBuilder()
+    profileBuilder.setChronological(false)
+
+    switch (sampleType.unit) {
+      case 'nanoseconds':
+      case 'microseconds':
+      case 'milliseconds':
+      case 'seconds':
+        profileBuilder.setValueFormatter(new TimeFormatter(sampleType.unit))
+        break
+
+      case 'bytes':
+        profileBuilder.setValueFormatter(new ByteFormatter())
+        break
+    }
+    return profileBuilder
+  }
+  const positive = builder()
+  const negative = signed ? builder() : null
+  let positiveTotal = 0,
+    negativeTotal = 0
 
   for (let s of protoProfile.sample) {
     const stack = s.locationId ? s.locationId.map(l => frameByLocationID.get(idKey(l))) : []
@@ -173,9 +197,21 @@ export function importAsPprofProfile(rawProfile: ArrayBuffer): Profile | null {
       return null
     }
 
-    const value = s.value[sampleTypeIndex]
-    profileBuilder.appendSampleWithWeight(stack.filter(f => f != null) as FrameInfo[], +value)
+    const value = Number(s.value[sampleTypeIndex].toString())
+    if (value < 0) negativeTotal -= value
+    else positiveTotal += value
+    if (!Number.isSafeInteger(positiveTotal) || !Number.isSafeInteger(negativeTotal))
+      throw new Error('pprof total weight exceeds exact integer range')
+    const target = value < 0 ? negative! : positive
+    target.appendSampleWithWeight(stack.filter(f => f != null) as FrameInfo[], Math.abs(value))
   }
 
-  return profileBuilder.build()
+  if (!negative) return {name: '', indexToView: 0, profiles: [positive.build()]}
+  negative.setName(`${sampleType.type} — Negative contributions (magnitude; subtract)`)
+  positive.setName(`${sampleType.type} — Positive contributions`)
+  return {
+    name: `pprof ${sampleType.type} — signed contributions (positive minus negative)`,
+    indexToView: 0,
+    profiles: [negative.build(), positive.build()],
+  }
 }
