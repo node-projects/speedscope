@@ -5,6 +5,13 @@ import {ProfileSnapshot, HydrationOptions} from './profile-snapshot'
 import type {CounterTrack} from './counter-track'
 import type {InstantTrack, InstantEventOmission} from './instant-track'
 import {CallEventRangeIndexOptions, ProfileCallEventRangeIndex} from './profile-call-event-index'
+import {DemangleDiagnostics} from './demangle/demangle-diagnostics'
+
+export interface DemangleOptions {
+  onFailure?: (name: string) => void
+  signal?: AbortSignal
+  yieldControl?: () => Promise<void>
+}
 
 export interface FrameInfo {
   key: string | number
@@ -666,22 +673,40 @@ export class Profile {
   }
 
   // Demangle symbols for readability
-  async demangle() {
+  async demangle(options: DemangleOptions = {}) {
     let demangle: ((name: string) => string) | null = null
-
-    for (let frame of this.frames) {
-      // This function converts a mangled C++ and Rust name into a human-readable symbol.
-      if (
-        frame.name.startsWith('__Z') ||
-        frame.name.startsWith('_R') ||
-        frame.name.startsWith('_Z')
-      ) {
-        if (!demangle) {
-          const demangleModule = await import('./demangle')
-          demangle = await demangleModule.loadDemangling()
+    const diagnostics = options.onFailure ? null : new DemangleDiagnostics()
+    const onFailure = options.onFailure || ((name: string) => diagnostics!.warn(name))
+    const checkAbort = () => {
+      if (options.signal?.aborted) throw new DOMException('Demangling cancelled', 'AbortError')
+    }
+    let processed = 0
+    try {
+      checkAbort()
+      for (let frame of this.frames) {
+        if (processed > 0 && processed % 4096 === 0) {
+          await (options.yieldControl
+            ? options.yieldControl()
+            : new Promise<void>(resolve => setTimeout(resolve, 0)))
+          checkAbort()
         }
-        frame.name = demangle(frame.name)
+        processed++
+        // This function converts a mangled C++ and Rust name into a human-readable symbol.
+        if (
+          frame.name.startsWith('__Z') ||
+          frame.name.startsWith('_R') ||
+          frame.name.startsWith('_Z')
+        ) {
+          if (!demangle) {
+            const demangleModule = await import('./demangle')
+            demangle = await demangleModule.loadDemangling(onFailure)
+            checkAbort()
+          }
+          frame.name = demangle(frame.name)
+        }
       }
+    } finally {
+      diagnostics?.flush()
     }
   }
 

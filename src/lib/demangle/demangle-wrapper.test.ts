@@ -3,6 +3,7 @@ import {readFileSync} from 'fs'
 import {join} from 'path'
 import {runInNewContext} from 'vm'
 import createDemangler from './demangle.wasm'
+import {CachedDemangler, DEMANGLE_CACHE_LIMITS} from './demangle-cache'
 
 const wrapper = readFileSync(join(__dirname, 'demangle.post.js'), 'utf8')
 
@@ -70,4 +71,36 @@ test('embedded native demangler survives repeated uncached calls without consumi
   )
   expect(module.wasm_demangle('ordinary')).toBe('')
   expect(module.stackSave()).toBe(initialStack)
+})
+
+test('the reported large gRPC symbol leaves subsequent native calls usable', async () => {
+  const module = (await createDemangler()) as Awaited<ReturnType<typeof createDemangler>> & {
+    stackSave(): number
+  }
+  const initialStack = module.stackSave()
+  const grpcSymbol = readFileSync(
+    join(__dirname, '../../../sample/profiles/demangle/grpc-symbol.txt'),
+    'utf8',
+  ).trim()
+  // The pinned libiberty declines this valid 1,252-character symbol through its
+  // component-count guard. This checks wrapper lifetime, not full #508 support;
+  // that decoding limitation remains in the backlog and fixture provenance.
+  module.wasm_demangle(grpcSymbol)
+  expect(module.wasm_demangle('_ZN3foo3barEv')).toBe('foo::bar()')
+  expect(module.stackSave()).toBe(initialStack)
+})
+
+test('bounded cache eviction keeps real native decoding correct for later symbols', async () => {
+  const module = await createDemangler()
+  const cache = new CachedDemangler(module.wasm_demangle)
+  const failure = jest.fn()
+  for (let index = 0; index < 12000; index++) {
+    const name = `fn${index}`
+    const decoded = cache.demangle(`_Z${name.length}${name}v`, failure)
+    if (decoded !== `${name}()`) throw new Error(`Wrong decoded symbol at ${index}`)
+  }
+  expect(cache.size).toBe(DEMANGLE_CACHE_LIMITS.entries)
+  expect(cache.characterCount).toBeLessThanOrEqual(DEMANGLE_CACHE_LIMITS.characters)
+  expect(cache.demangle('_Z3fn0v', failure)).toBe('fn0()')
+  expect(failure).not.toHaveBeenCalled()
 })

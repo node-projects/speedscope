@@ -5,6 +5,7 @@ import {h} from 'preact'
 import {StyleSheet, css} from 'aphrodite'
 
 import {Profile, ProfileGroup, SymbolRemapper} from '../lib/profile'
+import {demangleProfiles} from '../lib/demangle-profiles'
 import {profileWindowTitle} from '../lib/profile-context'
 import {FontFamily, FontSize, Duration} from './style'
 import {importEmscriptenSymbolMap as importEmscriptenSymbolRemapper} from '../lib/emscripten'
@@ -331,7 +332,7 @@ export class Application extends StatelessComponent<ApplicationProps> {
         return
       }
       if (!wereSymbolsLoaded(profileGroup)) {
-        for (const profile of profileGroup.profiles) await profile.demangle()
+        await demangleProfiles(profileGroup.profiles, {signal: controller.signal})
       }
       if (controller.signal.aborted || this.importController !== controller) return
       if (this.currentHashParams.title)

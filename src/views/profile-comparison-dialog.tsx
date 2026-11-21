@@ -2,6 +2,7 @@ import {h} from 'preact'
 import {useMemo, useRef, useState} from 'preact/hooks'
 import {css, StyleSheet} from 'aphrodite'
 import {Profile} from '../lib/profile'
+import {demangleProfiles} from '../lib/demangle-profiles'
 import {
   compareProfiles,
   ComparisonFrame,
@@ -210,10 +211,7 @@ export function ProfileComparisonDialog(props: {
       if (!group?.profiles.length)
         throw new Error('The comparison recording has no supported profiles.')
       if (!wereSymbolsLoaded(group)) {
-        for (const profile of group.profiles) {
-          if (active.signal.aborted) return
-          await profile.demangle()
-        }
+        await demangleProfiles(group.profiles, {signal: active.signal})
       }
       if (active.signal.aborted || controller.current !== active) return
       setCandidate(old => ({
@@ -243,10 +241,7 @@ export function ProfileComparisonDialog(props: {
       if (!group || group.profiles.length !== 2)
         throw new Error('The differential file must contain baseline and candidate weight columns.')
       if (!wereSymbolsLoaded(group)) {
-        for (const profile of group.profiles) {
-          if (active.signal.aborted) return
-          await profile.demangle()
-        }
+        await demangleProfiles(group.profiles, {signal: active.signal})
       }
       if (active.signal.aborted || controller.current !== active) return
       group.profiles[0].setName(`${file.name} — Baseline`)

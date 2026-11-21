@@ -1,0 +1,103 @@
+import {CachedDemangler, DEMANGLE_CACHE_LIMITS} from './demangle-cache'
+
+test('successes and empty native fallbacks are cached without treating normal fallback as failure', () => {
+  const implementation = jest.fn((name: string) => (name === 'plain' ? '' : `decoded:${name}`))
+  const cache = new CachedDemangler(implementation)
+  const failure = jest.fn()
+  expect(cache.demangle('mangled', failure)).toBe('decoded:mangled')
+  expect(cache.demangle('mangled', failure)).toBe('decoded:mangled')
+  expect(cache.demangle('plain', failure)).toBe('plain')
+  expect(cache.demangle('plain', failure)).toBe('plain')
+  expect(implementation).toHaveBeenCalledTimes(2)
+  expect(failure).not.toHaveBeenCalled()
+  expect(cache.size).toBe(2)
+  expect(cache.characterCount).toBe('mangleddecoded:mangledplainplain'.length)
+})
+
+test('failed results are cached without exceptions or observers and report each caller observation', () => {
+  const implementation = jest.fn((_name: string): string => {
+    throw new Error('native failure with large context')
+  })
+  const cache = new CachedDemangler(implementation)
+  const firstRecording = jest.fn(),
+    secondRecording = jest.fn()
+  expect(cache.demangle('bad', firstRecording)).toBe('bad')
+  expect(cache.demangle('bad', firstRecording)).toBe('bad')
+  expect(cache.demangle('bad', secondRecording)).toBe('bad')
+  expect(implementation).toHaveBeenCalledTimes(1)
+  expect(firstRecording.mock.calls).toEqual([['bad'], ['bad']])
+  expect(secondRecording.mock.calls).toEqual([['bad']])
+  expect(cache.characterCount).toBe(6)
+  const independent = new CachedDemangler(name => `new:${name}`)
+  expect(independent.demangle('bad', secondRecording)).toBe('new:bad')
+  expect(secondRecording).toHaveBeenCalledTimes(1)
+})
+
+test('entry quota evicts least recently used symbols and a hit renews recency', () => {
+  const implementation = jest.fn((name: string) => `decoded:${name}`)
+  const cache = new CachedDemangler(implementation)
+  for (let index = 0; index < DEMANGLE_CACHE_LIMITS.entries; index++) cache.demangle(`s${index}`)
+  expect(cache.size).toBe(4096)
+  cache.demangle('s0')
+  cache.demangle('new')
+  expect(cache.size).toBe(4096)
+  expect(implementation).toHaveBeenCalledTimes(4097)
+  cache.demangle('s0')
+  expect(implementation).toHaveBeenCalledTimes(4097)
+  cache.demangle('s1')
+  expect(implementation).toHaveBeenCalledTimes(4098)
+  expect(cache.size).toBe(4096)
+  expect(cache.characterCount).toBeLessThanOrEqual(DEMANGLE_CACHE_LIMITS.characters)
+})
+
+test('combined input/result UTF16 characters impose a second LRU budget including surrogate pairs', () => {
+  const result = '😀'.repeat(7936) // 15,872 UTF16 code units.
+  const implementation = jest.fn((_name: string) => result)
+  const cache = new CachedDemangler(implementation)
+  const name = (index: number) => String(index).padStart(4, '0') + 'x'.repeat(508)
+  for (let index = 0; index < 64; index++) cache.demangle(name(index))
+  expect(cache.size).toBe(64)
+  expect(cache.characterCount).toBe(1048576)
+  cache.demangle(name(0))
+  cache.demangle(name(64))
+  expect(cache.size).toBe(64)
+  expect(cache.characterCount).toBe(1048576)
+  cache.demangle(name(0))
+  expect(implementation).toHaveBeenCalledTimes(65)
+  cache.demangle(name(1))
+  expect(implementation).toHaveBeenCalledTimes(66)
+  expect(cache.characterCount).toBe(1048576)
+})
+
+test('oversized pairs bypass caching without evicting useful small entries or losing returned text', () => {
+  const large = 'x'.repeat(16383)
+  const implementation = jest.fn((name: string) => (name === 'large' ? large : `ok:${name}`))
+  const cache = new CachedDemangler(implementation)
+  cache.demangle('small')
+  const characters = cache.characterCount
+  expect(cache.demangle('large')).toBe(large)
+  expect(cache.demangle('large')).toBe(large)
+  expect(cache.size).toBe(1)
+  expect(cache.characterCount).toBe(characters)
+  cache.demangle('small')
+  expect(implementation).toHaveBeenCalledTimes(3)
+  const exact = new CachedDemangler(() => 'x'.repeat(16382))
+  exact.demangle('ab')
+  expect(exact.characterCount).toBe(16384)
+  expect(exact.size).toBe(1)
+})
+
+test('oversized failed originals also bypass caching and retry without retaining thrown values', () => {
+  const implementation = jest.fn((_name: string): string => {
+    throw undefined
+  })
+  const cache = new CachedDemangler(implementation)
+  const failure = jest.fn()
+  const name = 'x'.repeat(8193)
+  expect(cache.demangle(name, failure)).toBe(name)
+  expect(cache.demangle(name, failure)).toBe(name)
+  expect(implementation).toHaveBeenCalledTimes(2)
+  expect(failure).toHaveBeenCalledTimes(2)
+  expect(cache.size).toBe(0)
+  expect(cache.characterCount).toBe(0)
+})
