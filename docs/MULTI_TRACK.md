@@ -69,6 +69,11 @@ positions and widths; the view does not invent occupancy bins or enlarge tiny
 calls. Omitted intervals are reported, so this remains an overview when detail
 exceeds the budget.
 
-Extraction reads existing call events, yields periodically and supports cancellation when the recording or viewport changes. Moving the crosshair reuses the current extraction. Panning to a late range can rescan earlier event prefixes; this is a deliberate bounded-memory tradeoff, not an out-of-core time index. Hidden depths and omitted rectangles remain accessible through an individual profile's detailed view.
+Extraction reads existing call events, yields periodically and supports cancellation when the recording or viewport changes. Moving the crosshair reuses the current extraction. Nonzero ranges lazily build a sparse sample-clock index, with at most 4,096 checkpoints per profile and 32 completed indices cached in the Tracks session. Checkpoints retain a sample ordinal and its exact sequential clock, without copying ancestor stacks; numeric checkpoint storage is at most 49,152 bytes per profile (1.5 MiB across the cache). The first build scans sample weights once; subsequent ranges seek to a nearby checkpoint and reconstruct the existing stack there. Recording or clock changes and leaving Tracks release the cache. This index is not exported and does not make model storage out of core. Hidden depths and omitted rectangles remain accessible through an individual profile's detailed view.
 
 This view is an aligned timeline overview. It does not reconstruct missing timestamps, synchronize unrelated captures, sum overlapping thread activity into wall time, or add cross-process causal annotations. Individual-profile selection and recursion-flattening behavior remain in the existing views.
+
+Seek indices refer to the completed profile's existing sample arrays. Completed
+profiles are immutable by convention; resuming a builder invalidates its index
+rather than silently serving stale checkpoints. This is a viewing optimization,
+not a new file-format field or a second profile model.

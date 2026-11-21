@@ -3,6 +3,7 @@ import {ValueFormatter, RawValueFormatter, TimeFormatter, ByteFormatter} from '.
 import {FileFormat} from './file-format-spec'
 import {ProfileSnapshot, HydrationOptions} from './profile-snapshot'
 import type {CounterTrack} from './counter-track'
+import {CallEventRangeIndexOptions, ProfileCallEventRangeIndex} from './profile-call-event-index'
 
 export interface FrameInfo {
   key: string | number
@@ -458,6 +459,31 @@ export class Profile {
       if (open) openFrame(node, value)
       else closeFrame(node, value)
     }
+  }
+
+  // Optional bounded seek acceleration for clipped views; never used by export.
+  createCallEventRangeIndex(
+    options: CallEventRangeIndexOptions = {},
+  ): Promise<ProfileCallEventRangeIndex> {
+    const samples = this.samples,
+      weights = this.weights,
+      count = samples.length,
+      total = this.totalWeight,
+      lastWeight = weights[count - 1],
+      lastSample = samples[count - 1]
+    return ProfileCallEventRangeIndex.create(
+      samples,
+      weights,
+      () =>
+        this.samples === samples &&
+        this.weights === weights &&
+        samples.length === count &&
+        weights.length === count &&
+        this.totalWeight === total &&
+        weights[count - 1] === lastWeight &&
+        samples[count - 1] === lastSample,
+      options,
+    )
   }
 
   // Lazy iteration lets large consumers pause without materializing all events.

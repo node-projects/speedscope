@@ -13,6 +13,7 @@ import {exportProfileGroup} from '../src/lib/file-format'
 import {exportProfileGroupToBlob} from '../src/lib/profile-export'
 import {Flamechart} from '../src/lib/flamechart'
 import {ProfileSearchResults, FlamechartSearchResults} from '../src/lib/profile-search'
+import {buildMultiTrackLayout, collectTrackTiles} from '../src/lib/multi-track-layout'
 
 async function main() {
   const [filename, action = 'all', query = ' '] = process.argv.slice(2)
@@ -24,6 +25,7 @@ async function main() {
       'text-stream-import',
       'text-stream-main-import',
       'stream-search',
+      'stream-tracks',
       'export',
       'legacy-export',
     ].includes(action)
@@ -34,6 +36,7 @@ async function main() {
   if (
     action === 'stream-import' ||
     action === 'stream-search' ||
+    action === 'stream-tracks' ||
     action.startsWith('text-stream-')
   ) {
     const header = new Uint8Array(2)
@@ -67,7 +70,7 @@ async function main() {
     JSON.stringify({
       action: action.startsWith('text-stream-')
         ? action
-        : action === 'stream-import' || action === 'stream-search'
+        : action === 'stream-import' || action === 'stream-search' || action === 'stream-tracks'
           ? 'stream-import'
           : 'import',
       ms: Date.now() - start,
@@ -79,6 +82,66 @@ async function main() {
   )
   if (action === 'import' || action === 'stream-import' || action.startsWith('text-stream-')) return
   ;(globalThis as any).gc?.()
+  if (action === 'stream-tracks') {
+    const track = buildMultiTrackLayout(group.profiles).groups[0]?.tracks[0]
+    if (!track || !(track.profile.getTotalWeight() > 0))
+      throw new Error('Tracks benchmark needs a chronological profile with an explicit clock')
+    const heapBefore = process.memoryUsage().heapUsed
+    const indexStart = performance.now()
+    const rangeIndex = await track.profile.createCallEventRangeIndex()
+    const indexMs = performance.now() - indexStart
+    ;(globalThis as any).gc?.()
+    const retainedIndexHeapMiB = (process.memoryUsage().heapUsed - heapBefore) / 1048576
+    const duration = track.profile.getTotalWeight()
+    let fullEvents = 0,
+      indexedEvents = 0
+    const fullMs: number[] = [],
+      indexedMs: number[] = []
+    for (let index = 0; index < 10; index++) {
+      const viewport = {
+        left: track.offset + duration * (0.9 + index * 0.001),
+        width: duration * 0.005,
+      }
+      const fullStart = performance.now()
+      const full = await collectTrackTiles(track, viewport)
+      fullMs.push(performance.now() - fullStart)
+      const indexedStart = performance.now()
+      const indexed = await collectTrackTiles(track, viewport, {rangeIndex})
+      indexedMs.push(performance.now() - indexedStart)
+      if (
+        full.omitted !== indexed.omitted ||
+        full.deeper !== indexed.deeper ||
+        full.tiles.length !== indexed.tiles.length ||
+        full.tiles.some((tile, position) => {
+          const other = indexed.tiles[position]
+          return (
+            tile.node !== other.node ||
+            tile.depth !== other.depth ||
+            tile.start !== other.start ||
+            tile.end !== other.end
+          )
+        })
+      )
+        throw new Error(`Indexed Tracks geometry differs in viewport ${index}`)
+      fullEvents += full.eventsVisited
+      indexedEvents += indexed.eventsVisited
+    }
+    console.log(
+      JSON.stringify({
+        action,
+        indexMs,
+        checkpointCount: rangeIndex.checkpointCount,
+        indexBytes: rangeIndex.byteLength,
+        retainedIndexHeapMiB,
+        fullMs,
+        indexedMs,
+        fullEvents,
+        indexedEvents,
+        geometryEqual: true,
+      }),
+    )
+    return
+  }
   if (action === 'stream-search') {
     const profile = group.profiles[0]
     const chart = new Flamechart({

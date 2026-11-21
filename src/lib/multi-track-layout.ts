@@ -4,6 +4,7 @@ import {axisTicks, niceTickInterval} from './axis-ticks'
 import {TimeFormatter} from './value-formatters'
 import {CounterTrack, COUNTER_LIMITS} from './counter-track'
 import {CounterTimelineRow} from './counter-track-layout'
+import {ProfileCallEventRangeIndex} from './profile-call-event-index'
 
 export type TimelineUnit = Exclude<FileFormat.ValueUnit, 'none' | 'bytes'>
 export interface TimelineTrack {
@@ -208,11 +209,17 @@ export interface TrackTiles {
 
 // Extract only a viewport's bounded geometry. Profile event iteration is reused;
 // no second full flamechart, interval tree, stack strings or GPU batches persist.
-// A late viewport still scans its prefix, yielding so pan/cancel stays usable.
+// Optional range indices seek to a preceding bounded checkpoint; the default
+// iterator scans its prefix. Both paths yield so pan/cancel stays usable.
 export async function collectTrackTiles(
   track: TimelineTrack,
   viewport: MultiTrackViewport,
-  options: {signal?: AbortSignal; maxTiles?: number; yieldControl?: () => Promise<void>} = {},
+  options: {
+    signal?: AbortSignal
+    maxTiles?: number
+    yieldControl?: () => Promise<void>
+    rangeIndex?: ProfileCallEventRangeIndex
+  } = {},
 ): Promise<TrackTiles> {
   const result: TrackTiles = {tiles: [], omitted: 0, deeper: false, eventsVisited: 0}
   const left = Math.max(0, viewport.left - track.offset)
@@ -244,6 +251,7 @@ export async function collectTrackTiles(
     return (hash ^ (hash >>> 16)) >>> 0
   }
   let depth = 0,
+    hiddenStart: number | null = null,
     lastYield = performance.now()
   const append = (node: CallTreeNode, level: number, start: number, end: number) => {
     if (end <= left || start >= right || !(end > start)) return
@@ -292,18 +300,25 @@ export async function collectTrackTiles(
       heap[index] = tile
     }
   }
-  for (const event of track.profile.getCallEvents()) {
+  const events =
+    options.rangeIndex && left > 0
+      ? options.rangeIndex.getCallEvents(left)
+      : track.profile.getCallEvents()
+  for (const event of events) {
     if (event.value >= right) break
     if (event.open) {
       if (depth < MULTI_TRACK_DEPTH) starts[depth] = {node: event.node, start: event.value}
-      else if (event.value >= left) result.deeper = true
+      else if (depth === MULTI_TRACK_DEPTH) hiddenStart = event.value
       depth++
     } else {
       depth--
       if (depth < MULTI_TRACK_DEPTH) {
         const start = starts.pop()
         if (start) append(start.node, depth, start.start, event.value)
-      } else if (event.value > left) result.deeper = true
+      } else if (depth === MULTI_TRACK_DEPTH && hiddenStart !== null) {
+        if (event.value > Math.max(left, hiddenStart)) result.deeper = true
+        hiddenStart = null
+      }
     }
     result.eventsVisited++
     if (result.eventsVisited % 1024 === 0) {
@@ -317,7 +332,8 @@ export async function collectTrackTiles(
       }
     }
   }
-  if (depth > MULTI_TRACK_DEPTH) result.deeper = true
+  if (depth > MULTI_TRACK_DEPTH && hiddenStart !== null && right > Math.max(left, hiddenStart))
+    result.deeper = true
   for (let level = 0; level < starts.length; level++) {
     const start = starts[level]
     append(start.node, level, start.start, right)
