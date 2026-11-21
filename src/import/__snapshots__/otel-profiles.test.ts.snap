@@ -1,0 +1,34 @@
+// Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
+
+exports[`detects current OTLP Profiles JSON and round-trips aggregate stacks 1`] = `
+{
+  "frames": [
+    Frame {
+      "col": undefined,
+      "file": "app.js",
+      "key": "["main","app.js",4,null]",
+      "line": 4,
+      "name": "main",
+      "selfWeight": 0,
+      "totalWeight": 14,
+    },
+    Frame {
+      "col": 3,
+      "file": "app.js",
+      "key": "["inline","app.js",8,3]",
+      "line": 8,
+      "name": "inline",
+      "selfWeight": 14,
+      "totalWeight": 14,
+    },
+  ],
+  "name": "example / synthetic-profiler / cpu #1 / worker / thread 9007199254740993",
+  "stacks": [
+    "main;inline 14.00ns",
+  ],
+}
+`;
+
+exports[`detects current OTLP Profiles JSON and round-trips aggregate stacks: indexToView 1`] = `0`;
+
+exports[`detects current OTLP Profiles JSON and round-trips aggregate stacks: profileGroup.name 1`] = `"synthetic.json"`;

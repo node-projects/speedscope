@@ -1,0 +1,30 @@
+{
+  "dictionary": {
+    "stringTable": ["", "cpu", "nanoseconds", "main", "inline", "app.js", "thread.id", "thread.name", "worker", "service.name", "example", "scope"],
+    "mappingTable": [{}],
+    "locationTable": [{}, {"lines": [{"functionIndex": 2, "line": "8", "column": "3"}, {"functionIndex": 1, "line": "4"}]}],
+    "functionTable": [{}, {"nameStrindex": 3, "filenameStrindex": 5}, {"nameStrindex": 4, "filenameStrindex": 5}],
+    "linkTable": [{"traceId": "00000000000000000000000000000000", "spanId": "0000000000000000"}],
+    "attributeTable": [{}, {"keyStrindex": 6, "value": {"intValue": "9007199254740993"}}, {"keyStrindex": 7, "value": {"stringValueStrindex": 8}}],
+    "stackTable": [{}, {"locationIndices": [1]}]
+  },
+  "resourceProfiles": [{
+    "resource": {"attributes": [{"keyStrindex": 9, "value": {"stringValueStrindex": 10}}]},
+    "scopeProfiles": [{
+      "scope": {"name": "synthetic-profiler"},
+      "profiles": [{
+        "sampleType": {"typeStrindex": 1, "unitStrindex": 2},
+        "timeUnixNano": "1795262400000000000",
+        "durationNano": "100",
+        "period": "10",
+        "periodType": {"typeStrindex": 1, "unitStrindex": 2},
+        "attributeIndices": [1, 2],
+        "samples": [
+          {"stackIndex": 1, "values": ["2", "3"], "timestampsUnixNano": ["1795262400000000001", "1795262400000000002"]},
+          {"stackIndex": 1, "timestampsUnixNano": ["1795262400000000003", "1795262400000000004"]},
+          {"stackIndex": 1, "values": ["7"], "attributeIndices": []}
+        ]
+      }]
+    }]
+  }]
+}
