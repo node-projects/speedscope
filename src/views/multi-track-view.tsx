@@ -26,6 +26,7 @@ import {
 import {TimeFormatter} from '../lib/value-formatters'
 import {frameColorForTheme} from '../lib/frame-color'
 import {Theme, useTheme, withTheme} from './themes/theme'
+import {TrackCallEventIndexCache} from '../lib/track-call-event-index-cache'
 
 export interface MultiTrackViewProps {
   profiles: readonly Profile[]
@@ -144,10 +145,26 @@ export function MultiTrackView(props: MultiTrackViewProps) {
     () => layout.groups.find(candidate => candidate.key === groupKey) || defaultGroup,
     [layout, groupKey, defaultGroup],
   )
+  const rangeIndexCache = useMemo(
+    () => new TrackCallEventIndexCache(),
+    // Ownership changes intentionally create a new cache, even though the
+    // factory needs no source data. Cleanup releases the previous session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [props.profiles, counters, group?.key],
+  )
+  useEffect(() => () => rangeIndexCache.clear(), [rangeIndexCache])
   const [requested, setRequested] = useState<MultiTrackViewport>({left: 0, width: Infinity})
+  const [viewportOwner, setViewportOwner] = useState(rangeIndexCache)
+  // A new source/clock begins at full range immediately, before reset effects.
+  // Otherwise its first render could build a late index for the old viewport.
+  const requestedLeft = viewportOwner === rangeIndexCache ? requested.left : 0
+  const requestedWidth = viewportOwner === rangeIndexCache ? requested.width : Infinity
   const viewport = useMemo(
-    () => (group ? clampMultiTrackViewport(group, requested) : {left: 0, width: 1}),
-    [group, requested],
+    () =>
+      group
+        ? clampMultiTrackViewport(group, {left: requestedLeft, width: requestedWidth})
+        : {left: 0, width: 1},
+    [group, requestedLeft, requestedWidth],
   )
   const scroller = useRef<HTMLDivElement>(null),
     canvas = useRef<HTMLCanvasElement>(null)
@@ -182,9 +199,10 @@ export function MultiTrackView(props: MultiTrackViewProps) {
   )
   const setViewport = useCallback(
     (next: MultiTrackViewport) => {
+      setViewportOwner(rangeIndexCache)
       if (group) setRequested(clampMultiTrackViewport(group, next))
     },
-    [group],
+    [group, rangeIndexCache],
   )
   const zoom = useCallback(
     (factor: number, anchor = viewport.left + viewport.width / 2) => {
@@ -194,12 +212,13 @@ export function MultiTrackView(props: MultiTrackViewProps) {
     [viewport, setViewport],
   )
   useEffect(() => {
+    setViewportOwner(rangeIndexCache)
     setRequested({left: 0, width: Infinity})
     setScrollTop(0)
     setRendered({key: '', rows: NO_TILES, plots: NO_PLOTS})
     setCrosshair(null)
     if (scroller.current) scroller.current.scrollTop = 0
-  }, [group?.key, props.profiles, counters])
+  }, [group?.key, props.profiles, counters, rangeIndexCache])
   useEffect(() => {
     const element = scroller.current
     if (!element) return
@@ -242,11 +261,21 @@ export function MultiTrackView(props: MultiTrackViewProps) {
               maxPoints: pointCap,
             }),
           )
-        else
+        else {
+          const localLeft = viewport.left - track.offset
+          const rangeIndex =
+            localLeft > 0 && localLeft < track.profile.getTotalWeight()
+              ? await rangeIndexCache.get(track.profile, {signal: controller.signal})
+              : undefined
           next.set(
             track.profileIndex,
-            await collectTrackTiles(track, viewport, {signal: controller.signal, maxTiles: cap}),
+            await collectTrackTiles(track, viewport, {
+              signal: controller.signal,
+              maxTiles: cap,
+              rangeIndex,
+            }),
           )
+        }
       }
       if (!controller.signal.aborted) {
         setRendered({group, key: requestKey, rows: next, plots: nextPlots})
@@ -259,7 +288,7 @@ export function MultiTrackView(props: MultiTrackViewProps) {
       }
     })
     return () => controller.abort()
-  }, [group, visible, viewport, requestKey, counterResolution])
+  }, [group, visible, viewport, requestKey, counterResolution, rangeIndexCache])
   useEffect(() => {
     const element = scroller.current
     if (!element) return

@@ -196,3 +196,53 @@ test('long scans yield and cancel before processing the remaining recording', as
     jest.restoreAllMocks()
   }
 })
+
+test('cold and warm range seeking preserve clipped node geometry, heap choices and zero-weight boundaries', async () => {
+  const builder = new StackListProfileBuilder()
+  const outer = {key: 'outer', name: 'outer'}
+  for (let i = 0; i < 12000; i++) {
+    builder.appendSampleWithWeight(
+      [outer, {key: i % 7, name: `branch ${i % 7}`}, {key: `leaf${i}`, name: `leaf ${i}`}],
+      i % 11 === 0 ? 0 : ((i % 5) + 1) / 10,
+    )
+  }
+  const input = builder.build()
+  const track = {profile: input, profileIndex: 0, offset: 123.25}
+  const rangeIndex = await input.createCallEventRangeIndex()
+  for (const start of [input.getTotalWeight() * 0.8, input.getTotalWeight() - 10, 0.1]) {
+    const viewport = {left: start + track.offset, width: 5}
+    const full = await collectTrackTiles(track, viewport, {maxTiles: 17})
+    const seek = await collectTrackTiles(track, viewport, {maxTiles: 17, rangeIndex})
+    const warm = await collectTrackTiles(track, viewport, {maxTiles: 17, rangeIndex})
+    expect(seek.tiles).toEqual(full.tiles)
+    expect(warm.tiles).toEqual(full.tiles)
+    expect(seek.omitted).toBe(full.omitted)
+    expect(seek.deeper).toBe(full.deeper)
+    if (start > input.getTotalWeight() / 2)
+      expect(seek.eventsVisited).toBeLessThan(full.eventsVisited / 10)
+    seek.tiles.forEach((tile, i) => expect(tile.node).toBe(full.tiles[i].node))
+  }
+})
+
+test('zero-duration deep samples at a seek boundary do not change real visible depth markers', async () => {
+  const builder = new StackListProfileBuilder()
+  builder.appendSampleWithWeight([{key: 'before', name: 'before'}], 1)
+  builder.appendSampleWithWeight(
+    Array.from({length: 20}, (_, key) => ({key, name: `zero ${key}`})),
+    1,
+  )
+  builder.appendSampleWithWeight([{key: 'after', name: 'after'}], 1)
+  const snapshot = builder.build().toSnapshot()
+  snapshot.weights[1] = 0
+  snapshot.totalWeight = 2
+  const input = await Profile.fromSnapshot(snapshot)
+  const track = {profile: input, profileIndex: 0, offset: 0}
+  const viewport = {left: 1, width: 0.5}
+  const full = await collectTrackTiles(track, viewport)
+  const seek = await collectTrackTiles(track, viewport, {
+    rangeIndex: await input.createCallEventRangeIndex(),
+  })
+  expect(seek.tiles).toEqual(full.tiles)
+  expect(seek.deeper).toBe(full.deeper)
+  expect(seek.deeper).toBe(false)
+})

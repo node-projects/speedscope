@@ -47,6 +47,21 @@ function profile(name: string, start?: number, clock = 'recording') {
   if (start !== undefined) result.setTimelineOrigin({clock, start})
   return result
 }
+async function waitForTimelineRender() {
+  const deadline = Date.now() + 3000
+  do {
+    // Advance cooperative rendering tasks until the UI reports completion,
+    // including terminal errors; no-profile fixtures have no status element.
+    await act(async () => {
+      await new Promise<void>(resolve => setTimeout(resolve, 0))
+    })
+    const status = host.querySelector('[role="status"]')?.textContent || ''
+    if (!status.includes('Rendering visible timelines')) return
+  } while (Date.now() < deadline)
+  throw new Error(
+    'Timeline did not finish rendering: ' + host.querySelector('[role="status"]')?.textContent,
+  )
+}
 async function mount(
   profiles: ReturnType<typeof profile>[],
   selectedProfileIndex = 0,
@@ -65,9 +80,7 @@ async function mount(
     )
     await Promise.resolve()
   })
-  await act(async () => {
-    await new Promise<void>(resolve => setTimeout(resolve, 0))
-  })
+  await waitForTimelineRender()
   return onSelectProfile
 }
 const button = (text: string) =>
@@ -96,6 +109,7 @@ test('thread rows share an axis, retain offsets and open the correct original pr
 test('crosshair hover reuses extraction and canvas geometry; keyboard pan/zoom/reset changes shared time', async () => {
   const input = profile('first', 100)
   const scan = jest.spyOn(input, 'getCallEvents')
+  const index = jest.spyOn(input, 'createCallEventRangeIndex')
   await mount([input])
   const scans = scan.mock.calls.length,
     paints = context.fillRect.mock.calls.length
@@ -111,11 +125,19 @@ test('crosshair hover reuses extraction and canvas geometry; keyboard pan/zoom/r
     viewport.dispatchEvent(new KeyboardEvent('keydown', {bubbles: true, key: '+'}))
     await Promise.resolve()
   })
-  expect(scan.mock.calls.length).toBeGreaterThan(scans)
+  await act(async () => {
+    await new Promise<void>(resolve => setTimeout(resolve, 0))
+  })
+  expect(index).toHaveBeenCalledTimes(1)
+  expect(scan.mock.calls.length).toBe(scans)
   await act(async () => {
     viewport.dispatchEvent(new KeyboardEvent('keydown', {bubbles: true, key: 'ArrowRight'}))
     await Promise.resolve()
   })
+  await act(async () => {
+    await new Promise<void>(resolve => setTimeout(resolve, 0))
+  })
+  expect(index).toHaveBeenCalledTimes(1)
   await act(async () => {
     viewport.dispatchEvent(new KeyboardEvent('keydown', {bubbles: true, key: 'Home'}))
     await Promise.resolve()
@@ -124,6 +146,7 @@ test('crosshair hover reuses extraction and canvas geometry; keyboard pan/zoom/r
     await new Promise<void>(resolve => setTimeout(resolve, 0))
   })
   expect(host.textContent).toContain('Visible timelines ready')
+  expect(scan.mock.calls.length).toBeGreaterThan(scans)
 })
 
 test('large thread groups virtualize row controls and bound canvas dimensions', async () => {
@@ -203,6 +226,48 @@ test('a replacement recording with the same clock resets marker, zoom and vertic
   expect(host.textContent).toContain('18.00µs')
 })
 
+test('recording replacement and clock-group changes release session indices', async () => {
+  const a = profile('A', 100, 'clock A'),
+    b = profile('B', 100, 'clock B')
+  const aBuild = jest.spyOn(a, 'createCallEventRangeIndex'),
+    bBuild = jest.spyOn(b, 'createCallEventRangeIndex')
+  const profiles = [a, b]
+  const zoom = async () => {
+    await act(async () => {
+      button('Zoom in').click()
+      await Promise.resolve()
+    })
+    await act(async () => {
+      await new Promise<void>(resolve => setTimeout(resolve, 0))
+    })
+  }
+  const clock = async (index: number) => {
+    const select = host.querySelector<HTMLSelectElement>('select')!
+    await act(async () => {
+      select.value = select.options[index].value
+      select.dispatchEvent(new Event('change', {bubbles: true}))
+      await Promise.resolve()
+    })
+    await act(async () => {
+      await new Promise<void>(resolve => setTimeout(resolve, 0))
+    })
+  }
+  await mount(profiles)
+  expect(aBuild).not.toHaveBeenCalled()
+  await zoom()
+  expect(aBuild).toHaveBeenCalledTimes(1)
+  await clock(1)
+  await zoom()
+  expect(bBuild).toHaveBeenCalledTimes(1)
+  await clock(0)
+  await zoom()
+  expect(aBuild).toHaveBeenCalledTimes(2)
+  await mount([profile('new recording', 1000)])
+  await mount(profiles)
+  await zoom()
+  expect(aBuild).toHaveBeenCalledTimes(3)
+})
+
 test('missing or failed canvas contexts report an error while individual profiles remain reachable', async () => {
   for (const throws of [false, true]) {
     jest.spyOn(HTMLCanvasElement.prototype, 'getContext').mockImplementation(() => {
@@ -275,11 +340,14 @@ test('counter steps retain a short spike and stop exactly at the last observatio
 })
 
 test('dense counters disclose min/max decimation and counter navigation stays virtualized', async () => {
+  let clock = 0
+  const now = jest.spyOn(performance, 'now').mockImplementation(() => (clock += 9))
   const times = Array.from({length: 20000}, (_, index) => index)
   const values = times.map(() => 2)
   values[1234] = 90000
   const series = counter(times, values)
   await mount([profile('thread', 100)], 0, jest.fn(), [series])
+  expect(now.mock.calls.length).toBeGreaterThan(6)
   expect(host.textContent).toContain('Min/max overview')
   expect(host.textContent).toContain(`${(16384).toLocaleString()} observations`)
   expect(context.fillText.mock.calls.some(call => call[0] === '90000')).toBe(true)
