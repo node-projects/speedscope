@@ -35,6 +35,14 @@ the original upstream capture remains unavailable for direct comparison. These
 buffer/matrix tests also extend [#125](https://github.com/jlfwong/speedscope/issues/125),
 but do not replace a browser/GPU pixel-regression harness.
 
+Final local verification passed all 418 Jest tests in 72 suites with 307
+snapshots on checksum-verified Node 22.23.5 ARM64 using a clean Jest cache.
+The five Node tests, type checking, lint, schema and backlog checks passed
+separately on the system Node runtime. Two full Jest runs on local Node 24.19.0
+ARM64 exited with native access violations without an assertion failure, so a
+green local Node 24 full-suite result is not claimed. GitHub's Windows/Linux
+Node 22/24 matrix validates the branch independently before merge.
+
 ## Fixed-height Sandwich list geometry (2026-11-21)
 
 Sandwich already rendered a viewport window. It now calculates that window and
