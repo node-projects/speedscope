@@ -29,6 +29,7 @@ import {HelpButton} from './help'
 import {createFunctionLink} from '../lib/function-link'
 import {FunctionLinkDialog} from './function-link-dialog'
 import {LinkedSourceMapDialog} from './linked-source-map-dialog'
+import {ProfileComparisonDialog} from './profile-comparison-dialog'
 
 interface ToolbarProps extends ApplicationProps {
   browseForFile(): void
@@ -205,6 +206,22 @@ function ToolbarRightContent(props: ToolbarProps) {
   const [sourceLinksShown, setSourceLinksShown] = useState(false)
   const [functionLink, setFunctionLink] = useState<string | null>(null)
   const [searchProfiles, setSearchProfiles] = useState<Profile[] | null>(null)
+  const [comparisonSource, setComparisonSource] = useState<{
+    profiles: Profile[]
+    initialIndex: number
+  } | null>(null)
+  useEffect(() => {
+    if (
+      comparisonSource &&
+      (props.loading ||
+        !props.profileGroup ||
+        props.profileGroup.profiles.length !== comparisonSource.profiles.length ||
+        props.profileGroup.profiles.some(
+          (entry, index) => entry.profile !== comparisonSource.profiles[index],
+        ))
+    )
+      setComparisonSource(null)
+  }, [props.profileGroup, props.loading, comparisonSource])
   const [linkedMapSource, setLinkedMapSource] = useState<{
     profiles: Profile[]
     initialURL: string
@@ -246,6 +263,13 @@ function ToolbarRightContent(props: ToolbarProps) {
     select.value = ''
     const {activeProfileState, profileGroup} = props
     if (!activeProfileState || !profileGroup || props.loading || !action) return
+    if (action === 'compare') {
+      setComparisonSource({
+        profiles: profileGroup.profiles.map(entry => entry.profile),
+        initialIndex: activeProfileState.index,
+      })
+      return
+    }
     if (action === 'function-link') {
       const selected = profileGroup.profiles[activeProfileState.index].selectedFrameKey
       const frame = selected == null ? undefined : activeProfileState.profile.getFrame(selected)
@@ -392,6 +416,7 @@ function ToolbarRightContent(props: ToolbarProps) {
           <option value="file">Group by file</option>
           <option value="filter">Filter frames…</option>
           <option value="search-all">Search all profiles…</option>
+          <option value="compare">Compare profiles…</option>
           <option value="source-links">Source-code links…</option>
           <option value="linked-source-map">Load linked source map…</option>
           <option value="function-link">Link to selected function…</option>
@@ -406,6 +431,13 @@ function ToolbarRightContent(props: ToolbarProps) {
       {help}
       {functionLink && (
         <FunctionLinkDialog url={functionLink} onClose={() => setFunctionLink(null)} />
+      )}
+      {comparisonSource && (
+        <ProfileComparisonDialog
+          profiles={comparisonSource.profiles}
+          initialIndex={comparisonSource.initialIndex}
+          onClose={() => setComparisonSource(null)}
+        />
       )}
       {sourceLinksShown && (
         <SourceLinksDialog
