@@ -120,6 +120,13 @@ function HelpDialog(props: {onClose(): void}) {
             the original recording separately for local files; the link does not include the
             recording or a particular call instance.
           </p>
+          <p>
+            Compare profiles opens a baseline/candidate comparison, optionally with another local
+            recording. Red shows increases and blue decreases; select a tile for total and self
+            changes, then zoom into its call path. Absolute mode requires matching units; normalized
+            mode compares shares of each recording. Both recordings stay in memory until you close
+            the comparison. The graph and paged table have explicit resource limits.
+          </p>
         </section>
         <section className={css(style.card)}>
           <h3 className={css(style.sectionTitle)}>Large files and offline use</h3>

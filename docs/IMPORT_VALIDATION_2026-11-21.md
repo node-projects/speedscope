@@ -95,3 +95,58 @@ Targeted regressions cover ZIP expansion ceilings, cancellation, corrupt archive
 source identities. Pprof's existing fixture totals were reviewed after separating
 source positions; frame cardinality can increase, while aggregate weights remain
 unchanged. Signed negative pprof weights still require separate model support.
+
+## A/B comparison and large OTLP worker throughput
+
+The comparison batch adds Profile actions → Compare profiles: select a baseline
+and candidate from the loaded recording or explicitly open a second recording.
+The separate comparison model aligns full caller paths by source identity and
+computes signed total/self deltas without changing either ordinary nonnegative
+profile. Absolute mode requires identical units; normalized mode compares each
+profile's composition, including idle weight, in percentage points. Positive
+deltas are increases and negative deltas are decreases.
+
+The graph uses a union envelope for width and signed red/blue differences for
+color; width is not elapsed time. Selection, source details and subtree zoom are
+available. The comparison model caps union nodes, visited input nodes and frame
+identity storage; the dialog renders at most 101 options per profile chooser,
+100 table rows per page and 100 search matches. Graph tiles are viewport-bounded.
+Cancellation and underlying-recording changes abort pending work and discard
+stale results. Both original recordings and the comparison model remain in
+memory while the dialog is open; this does not make the complete application
+memory usage independent of input size.
+
+The full clean-cache Node 22.23.5 ARM64 Jest run passed **592 tests across
+86 suites, with 310 snapshots**. All five Node CLI/release-helper tests passed.
+Dialog tests cover real comparison
+semantics, signed values, unit mismatch/normalization, bounded choices/results,
+external-candidate loading, cancellation and changed-model invalidation. Graph
+and model tests cover the separate layout and numeric semantics.
+
+Comparing the private PLC profile with itself produced **160,613 comparison
+nodes in 683 ms**, including the measured garbage collection, and retained
+**47.45 MiB** for the comparison in this local run. Every signed delta was zero.
+The original export hash remained
+`522de77afbfc4dd94f1f30c3a9551979d12db506305ffef999db9c910ae8eddb`.
+This is one regression observation rather than a browser timing or universal
+memory guarantee. The private capture and benchmark artifacts are uncommitted.
+Browser checks rendered the comparison with 481 graph tiles and 100 table rows;
+these are observed viewport counts, not claims that all PLC paths were drawn at
+once.
+
+Current-schema OTLP Profiles JSON also avoids unnecessary timer waits inside
+the dedicated import worker. The explicit worker option preserves main-thread
+fallback yielding even without an AbortSignal. Million-sample JSON processing,
+including parsing and snapshot construction, improved from 19.51–19.75 seconds
+to 1.396–1.399 seconds in two fresh processes per case (about **14×**). Weights
+and units stayed unchanged. This excludes browser worker startup and transfer;
+high-water RSS increased in these measurements while retained heap was
+comparable. It is a timing optimization, not a new memory reduction or a
+streaming OTLP parser. See [the method and limitations](OTEL_PROFILES.md#worker-import-performance-check).
+
+The reviewed A/B comparison scope resolves #511/#445 locally. Signed Go heap
+delta inputs (#370) and Brendan Gregg differential-folded input (#228) remain
+planned: displaying signed differences between two valid nonnegative recordings
+does not add signed-input semantics to the ordinary profile model.
+
+Type checking, lint, schema/backlog checks, all three release builds and npm dry-pack passed. The package includes the comparison guide. A final narrow-tile regression checks that CSS padding and borders cannot enlarge tiny calls beyond their layout widths.

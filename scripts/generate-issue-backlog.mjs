@@ -52,7 +52,7 @@ for (const kind of ['bug', 'feature', 'maintenance']) {
     .map(status => rows.filter(i => i.status === status).length)
     .join(' | ')} | ${rows.length} |\n`
 }
-output += `\n**Implemented** means the reviewed scope has an implementation. **Supported** means it already works or the established format is supported. **Partial** never means fully fixed. **Needs reproduction** means insufficient current evidence. A useful proposal can remain planned because it needs substantial design, fixtures or validation.\n\nP1: correctness/large-profile failures. P2: valuable product work. P3: lower-priority maintenance, integration or presentation. These priorities are engineering judgments, not upstream labels. Useful architectural work still includes broader worker coverage, streaming import, signed comparisons and synchronized tracks.\n\n`
+output += `\n**Implemented** means the reviewed scope has an implementation. **Supported** means it already works or the established format is supported. **Partial** never means fully fixed. **Needs reproduction** means insufficient current evidence. A useful proposal can remain planned because it needs substantial design, fixtures or validation.\n\nP1: correctness/large-profile failures. P2: valuable product work. P3: lower-priority maintenance, integration or presentation. These priorities are engineering judgments, not upstream labels. Useful architectural work still includes broader worker coverage, streaming import, signed-input imports and synchronized tracks.\n\n`
 const escape = value => String(value).replace(/\|/g, '\\|').replace(/\r?\n/g, ' ')
 const sections = [
   ['Remaining useful bugs', i => i.kind === 'bug' && ['partial', 'planned'].includes(i.status)],
