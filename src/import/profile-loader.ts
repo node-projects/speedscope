@@ -2,7 +2,7 @@ import {Profile, ProfileGroup} from '../lib/profile'
 import {decodeBase64} from '../lib/utils'
 import workerSource from './trace-worker-source'
 import {ImportProgress, TraceWorkerResponse} from './trace-worker-protocol'
-import {tryImportTextProfile} from './streaming-text-profile'
+import {textProfileKind, tryImportTextProfile} from './streaming-text-profile'
 
 const importer = () => import('./index')
 const preparedGroups = new WeakSet<ProfileGroup>()
@@ -19,11 +19,13 @@ function checkAbort(signal?: AbortSignal) {
   if (signal?.aborted) throw new DOMException('Import cancelled', 'AbortError')
 }
 
-export function shouldUseTraceWorker(_name: string, size: number): boolean {
+export function shouldUseTraceWorker(name: string, size: number): boolean {
   // Detection belongs in the worker's existing generic importer. Extension
   // allowlists leave large perf/folded/JFR/pprof files (and renamed captures)
   // blocking the UI, even though those importers are already worker-safe.
-  return size >= 1024 * 1024
+  // A tiny compressed stack file can expand into hundreds of MiB. Prefer the
+  // faster externally cancellable worker before looking at compressed size.
+  return size >= 1024 * 1024 || (/\.gz$/i.test(name) && textProfileKind(name) !== null)
 }
 
 async function loadWithWorker(
