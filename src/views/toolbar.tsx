@@ -165,14 +165,15 @@ function ToolbarCenterContent(props: ToolbarProps): JSX.Element {
       )
     } else {
       return (
-        <div className={css(style.toolbarCenter)} onMouseLeave={closeProfileSelect}>
+        <div className={css(style.toolbarCenter)}>
           <button
             type="button"
             className={css(style.profileButton)}
-            onMouseOver={openProfileSelect}
             onClick={openProfileSelect}
             aria-label={`Choose from ${profiles.length} profiles`}
             aria-expanded={profileSelectShown}
+            aria-haspopup="listbox"
+            aria-controls="profile-select-options"
           >
             {activeProfileState.profile.getName()}{' '}
             <span className={css(style.toolbarProfileIndex)}>
