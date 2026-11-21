@@ -9,8 +9,8 @@ Source: [upstream issues](https://github.com/jlfwong/speedscope/issues). [Machin
 | Kind | Implemented | Already supported | Partial | Planned | Needs reproduction | Declined | Obsolete | Total |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | bug | 20 | 9 | 13 | 7 | 6 | 0 | 1 | 56 |
-| feature | 27 | 9 | 6 | 24 | 0 | 4 | 0 | 70 |
-| maintenance | 3 | 1 | 0 | 3 | 0 | 1 | 0 | 8 |
+| feature | 27 | 9 | 7 | 23 | 0 | 4 | 0 | 70 |
+| maintenance | 4 | 1 | 1 | 1 | 0 | 1 | 0 | 8 |
 
 **Implemented** means the reviewed scope has an implementation. **Supported** means it already works or the established format is supported. **Partial** never means fully fixed. **Needs reproduction** means insufficient current evidence. A useful proposal can remain planned because it needs substantial design, fixtures or validation.
 
@@ -56,7 +56,7 @@ P1: correctness/large-profile failures. P2: valuable product work. P3: lower-pri
 | [#376](https://github.com/jlfwong/speedscope/issues/376) speedscope is 100% inaccessible for blind engineers like me. | feature | yes | partial | P2 | Native toolbar/search buttons and semantic expandable Call Tree provide keyboard and screen-reader access to profile data without WebGL. Canvas charts and remaining selectors are not claimed fully accessible. |
 | [#228](https://github.com/jlfwong/speedscope/issues/228) Support bg differential flamegraph | feature | yes | planned | P2 | Comparison/differential graphs require signed weights, baseline normalization and a new visual encoding. Existing nonnegative profile weights cannot represent negative deltas honestly. |
 | [#117](https://github.com/jlfwong/speedscope/issues/117) Support multitrack visualization | feature | yes | planned | P2 | Synchronized multitrack timelines need retained process time origins, shared zoom/selection, and multitrack rendering. Combining weights is implemented separately and does not resolve alignment. |
-| [#548](https://github.com/jlfwong/speedscope/issues/548) Feature request: Inflate the highlighted result to make it easier to find at a large scale. | feature | yes | planned | P3 | Search matches should support optional proportional emphasis/zoom, with visible indication that widths no longer represent measured weights. Ordinary match navigation already exists. |
+| [#548](https://github.com/jlfwong/speedscope/issues/548) Feature request: Inflate the highlighted result to make it easier to find at a large scale. | feature | yes | partial | P3 | Artificial overview tile inflation is not implemented. Magnification remains limited by existing chart precision limits; measured geometry is never distorted. |
 | [#539](https://github.com/jlfwong/speedscope/issues/539) Show additional information in hover/elsewhere | feature | yes | planned | P3 | Annotations and arbitrary per-block metadata require schema, serialization, selection and presentation design. Avoid putting metadata into frame identity because it can explode frame cardinality. |
 | [#518](https://github.com/jlfwong/speedscope/issues/518) Support annotations, like those in Chrome | feature | yes | planned | P3 | Annotations and arbitrary per-block metadata require schema, serialization, selection and presentation design. Avoid putting metadata into frame identity because it can explode frame cardinality. |
 | [#506](https://github.com/jlfwong/speedscope/issues/506) feature request: Possibility to link to a specific element in trace | feature | yes | partial | P3 | Exact call occurrence, original graph view/zoom/time range, derived transformations and live same-tab hash navigation are not serialized. Symbol-remapped clones conservatively require local reimport. This is function-level sharing, not full trace-element deep linking. |
@@ -71,18 +71,17 @@ P1: correctness/large-profile failures. P2: valuable product work. P3: lower-pri
 | [#173](https://github.com/jlfwong/speedscope/issues/173) Format Support: concatenated output from many calls to jstack | feature | yes | partial | P3 | Direct ZIP archive ingestion requested upstream remains unsupported; establish archive entry, decompression and total resource limits before implementing it. |
 | [#145](https://github.com/jlfwong/speedscope/issues/145) Import & display frame boundaries from Chrome | feature | yes | planned | P3 | Annotations and arbitrary per-block metadata require schema, serialization, selection and presentation design. Avoid putting metadata into frame identity because it can explode frame cardinality. |
 | [#118](https://github.com/jlfwong/speedscope/issues/118) Support non-call-stack event visualization | feature | yes | planned | P3 | Arbitrary asynchronous events need separate tracks/links because overlapping spans are not a synchronous stack. Coordinate this with OTEL and multitrack support. |
-| [#108](https://github.com/jlfwong/speedscope/issues/108) Add a single file (or single JS file at least) build option | feature | yes | partial | P3 | File-protocol build is a single IIFE with embedded WASM; assets remain local. A strict CSP embed still needs a documented policy for generated styles, scripts and WebAssembly. |
+| [#108](https://github.com/jlfwong/speedscope/issues/108) Add a single file (or single JS file at least) build option | feature | yes | partial | P3 | Strict policies forbidding dynamic/inline styles still need style-engine integration. File-protocol startup could not be tested by the browser tool (HTTP/S only). This is an optional CI artifact, not automatic npm/release inclusion or an embeddable instance API. |
 | [#97](https://github.com/jlfwong/speedscope/issues/97) Trace files from Instruments can only be dragged, not opened | feature | yes | planned | P3 | Instruments .trace is a directory package on macOS and cannot be read through a regular single-file input. Need directory/archive import UI and hierarchy-aware decoder support. |
 | [#40](https://github.com/jlfwong/speedscope/issues/40) Format Support: Android trace file | feature | yes | planned | P3 | Android method tracing binary format needs versioned parsing and thread-clock semantics, distinct from Chrome trace JSON. No fixture-backed implementation available in this pass. |
 | [#16](https://github.com/jlfwong/speedscope/issues/16) Allow speedscope to be used as a library instead of a standalone application | feature | yes | planned | P3 | A supported embeddable instance API requires isolating global atoms, lifecycle/disposal and multiple viewers. CLI --serve and profileURL cover launch integrations; publishing internal classes now would freeze an unsuitable API. |
 
-## Remaining maintenance (3)
+## Remaining maintenance (2)
 
 | Issue | Kind | Useful? | Status | Priority | Work / evidence |
 | --- | --- | --- | --- | --- | --- |
 | [#125](https://github.com/jlfwong/speedscope/issues/125) Add tests for GL rendering | maintenance | yes | planned | P2 | Deterministic WebGL pixel tests need browser/GPU harness, tolerances and supported backend policy. Import/unit tests and browser smoke checks do not replace graphics regression coverage. |
-| [#354](https://github.com/jlfwong/speedscope/issues/354) Rewrite property based tests using `fast-check` instead of `jsverify` | maintenance | yes | planned | P3 | fast-check migration should preserve full numeric domains, shrinking and existing counterexamples. PR #353 narrowed domains to avoid failures; it was not ported unchanged. |
-| [#141](https://github.com/jlfwong/speedscope/issues/141) Add linting for shadowed variables | maintenance | yes | planned | P3 | Enabling no-shadow across the legacy tree requires a dedicated rename-only pass to keep behavioral reviews readable. It is not a runtime defect. |
+| [#354](https://github.com/jlfwong/speedscope/issues/354) Rewrite property based tests using `fast-check` instead of `jsverify` | maintenance | yes | partial | P3 | Migrate the math suite only after a justified inverse/solve error oracle preserves generated domains, growing-filter behavior and shrinking. Runtime math and the existing math suite, including #138 composition counterexamples, remain unchanged. |
 
 ## Need a current reproduction (6)
 
@@ -95,7 +94,7 @@ P1: correctness/large-profile failures. P2: valuable product work. P3: lower-pri
 | [#269](https://github.com/jlfwong/speedscope/issues/269) Table view doesn't update at 60fps during scrolling | bug | conditional | needs-reproduction | P3 | Original slow scrolling report references a 2013 Mac. Iterative traversals and bounded Call Tree improve scale; no evidence that the exact older scrolling problem is fixed. |
 | [#42](https://github.com/jlfwong/speedscope/issues/42) Low framerate in Chrome 66 on MBP | bug | conditional | needs-reproduction | P3 | Report targets Chrome 66 compositor behavior. Current supported browsers differ; need a current profile and rendering trace before applying historical GPU workarounds. |
 
-## Implemented or already supported (69)
+## Implemented or already supported (70)
 
 | Issue | Kind | Useful? | Status | Priority | Work / evidence |
 | --- | --- | --- | --- | --- | --- |
@@ -146,6 +145,7 @@ P1: correctness/large-profile failures. P2: valuable product work. P3: lower-pri
 | [#157](https://github.com/jlfwong/speedscope/issues/157) Support trailing whitespace & floating point values with Brendan Gregg collapsed stack format | bug | yes | implemented | none | Folded weights accept decimals, exponents and trailing whitespace; reject negative/nonfinite values with a clear error. Regression preserves 21.75 total. |
 | [#148](https://github.com/jlfwong/speedscope/issues/148) Embed Source Code Pro font into repository for offline usage | feature | yes | supported | none | Source Code Pro assets are bundled locally; release ZIP includes the font and license, with no CDN dependency. |
 | [#146](https://github.com/jlfwong/speedscope/issues/146) Format support: Import from pyflame | feature | yes | supported | none | pyflame/DTrace collapsed stacks use the existing folded importer; comments and fractional values are now handled too. |
+| [#141](https://github.com/jlfwong/speedscope/issues/141) Add linting for shadowed variables | maintenance | yes | implemented | none | Enabled TypeScript-aware no-shadow lint and renamed 17 shadowed declarations across 12 source/test files without changing runtime expressions or control flow. Type/value namespace overlap and function-type parameter names are ignored. Targeted lint and 55 importer/graph/layout regressions pass. |
 | [#138](https://github.com/jlfwong/speedscope/issues/138) AffineTransform multiplication test failed once | bug | yes | implemented | none | Replaced the ill-conditioned inverse round-trip multiplication oracle with an independent 3x3 composition reference and magnitude-aware floating-point error bounds. Coverage includes the recorded counterexample, singular transforms, reversed order, perturbed coefficients and scales from 1e-150 to 1e150. All 46 math tests and eight additional fresh-process runs passed. Runtime affine math is unchanged. |
 | [#127](https://github.com/jlfwong/speedscope/issues/127) Format support: DTrace | feature | yes | supported | none | pyflame/DTrace collapsed stacks use the existing folded importer; comments and fractional values are now handled too. |
 | [#106](https://github.com/jlfwong/speedscope/issues/106) Make CI run `npm run prepack` to ensure it doesn't break | maintenance | yes | implemented | none | Portable prepack creates an offline standalone ZIP, and CI builds/uploads it. Existing upstream release assets cannot be repaired by a local commit. |

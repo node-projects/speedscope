@@ -71,6 +71,8 @@ Visit [the hosted app](https://node-projects.github.io/speedscope/), then browse
 profile file or drag it onto the page. Imported profiles stay in your browser.
 After a successful online visit, the hosted app can reopen offline and import a
 local recording. See [offline use and update behavior](docs/OFFLINE.md).
+Repository builds can also produce a self-contained HTML document with
+`npm run build:single-file`; see [single-file builds and CSP](docs/SINGLE_FILE.md).
 
 Large JSON and trace captures import in the background with progress and a
 **Cancel import** button. This improves responsiveness; very large captures can
@@ -78,6 +80,8 @@ still exceed browser memory limits. Search offers Contains, Whole word and Exact
 matching for function names and source paths.
 Graph-search navigation retains at most 10,000 results and clearly marks larger
 result sets; refine the query to narrow them. Symbol/highlight caches are bounded.
+Chart search's **Zoom to match** refocuses a selected result after panning or
+zooming out, while keeping measured frame widths unchanged.
 Use **Profile actions → Filter frames…** to include your code or exclude framework
 frames by file path or name. It creates a separate aggregate profile and keeps the
 original available. See [filter rules and weight semantics](docs/PROFILE_FILTERS.md).

@@ -57,11 +57,11 @@
       "url": "https://github.com/jlfwong/speedscope/issues/548",
       "kind": "feature",
       "usefulness": "yes",
-      "status": "planned",
+      "status": "partial",
       "priority": "P3",
       "workstream": "Search and navigation",
-      "evidence": "Search matches should support optional proportional emphasis/zoom, with visible indication that widths no longer represent measured weights. Ordinary match navigation already exists.",
-      "remaining": "Search matches should support optional proportional emphasis/zoom, with visible indication that widths no longer represent measured weights. Ordinary match navigation already exists."
+      "evidence": "Chart search now has an explicit Zoom to match action for the selected retained result, restoring useful magnification after panning/zooming out. It changes only the viewport, keeps measured widths intact and respects numerical zoom bounds and existing navigation caps. Targeted regressions and PLC browser refocus pass; optional controls wrap without changing ordinary Sandwich search.",
+      "remaining": "Artificial overview tile inflation is not implemented. Magnification remains limited by existing chart precision limits; measured geometry is never distorted."
     },
     {
       "id": 547,
@@ -861,11 +861,11 @@
       "url": "https://github.com/jlfwong/speedscope/issues/354",
       "kind": "maintenance",
       "usefulness": "yes",
-      "status": "planned",
+      "status": "partial",
       "priority": "P3",
       "workstream": "Packaging, integration and maintenance",
-      "evidence": "fast-check migration should preserve full numeric domains, shrinking and existing counterexamples. PR #353 narrowed domains to avoid failures; it was not ported unchanged.",
-      "remaining": "fast-check migration should preserve full numeric domains, shrinking and existing counterexamples. PR #353 narrowed domains to avoid failures; it was not ported unchanged."
+      "evidence": "Migrated utility and LRU properties to fast-check 4.10.3, retaining byte domains and the 1000-run slow-reference cache comparison while expanding array/history lengths. Math remains on jsverify: trial migration exposed inverse-conditioning/oracle issues, and tentative numerical-oracle changes were discarded rather than weakening tests. Deterministic cases and next steps are recorded in docs/PROPERTY_TESTS.md.",
+      "remaining": "Migrate the math suite only after a justified inverse/solve error oracle preserves generated domains, growing-filter behavior and shrinking. Runtime math and the existing math suite, including #138 composition counterexamples, remain unchanged."
     },
     {
       "id": 351,
@@ -1389,11 +1389,11 @@
       "url": "https://github.com/jlfwong/speedscope/issues/141",
       "kind": "maintenance",
       "usefulness": "yes",
-      "status": "planned",
-      "priority": "P3",
+      "status": "implemented",
+      "priority": "none",
       "workstream": "Packaging, integration and maintenance",
-      "evidence": "Enabling no-shadow across the legacy tree requires a dedicated rename-only pass to keep behavioral reviews readable. It is not a runtime defect.",
-      "remaining": "Enabling no-shadow across the legacy tree requires a dedicated rename-only pass to keep behavioral reviews readable. It is not a runtime defect."
+      "evidence": "Enabled TypeScript-aware no-shadow lint and renamed 17 shadowed declarations across 12 source/test files without changing runtime expressions or control flow. Type/value namespace overlap and function-type parameter names are ignored. Targeted lint and 55 importer/graph/layout regressions pass.",
+      "remaining": "No additional work selected for the reviewed linting request."
     },
     {
       "id": 138,
@@ -1464,8 +1464,8 @@
       "status": "partial",
       "priority": "P3",
       "workstream": "Packaging, integration and maintenance",
-      "evidence": "File-protocol build is a single IIFE with embedded WASM; assets remain local. A strict CSP embed still needs a documented policy for generated styles, scripts and WebAssembly.",
-      "remaining": "File-protocol build is a single IIFE with embedded WASM; assets remain local. A strict CSP embed still needs a documented policy for generated styles, scripts and WebAssembly."
+      "evidence": "Added npm run build:single-file producing self-contained HTML with JS/CSS, fonts, icons, example, worker and WASM. Static external imports and unsafe closing tags fail the build; license notices and a script CSP hash are included. CI builds/uploads the optional artifact. HTTP-only single-document browser QA passed embedded example, JFR and PLC imports without companion requests. See docs/SINGLE_FILE.md.",
+      "remaining": "Strict policies forbidding dynamic/inline styles still need style-engine integration. File-protocol startup could not be tested by the browser tool (HTTP/S only). This is an optional CI artifact, not automatic npm/release inclusion or an embeddable instance API."
     },
     {
       "id": 107,
