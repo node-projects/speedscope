@@ -1,0 +1,3 @@
+Full thread dump OpenJDK VM:
+"main" #1 prio=5 tid=0x1 nid=1 runnable
+    at app.Main.first(Main.java:20)

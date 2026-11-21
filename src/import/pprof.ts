@@ -21,7 +21,7 @@ function getSampleTypeIndex(profile: perftools.profiles.Profile): number {
     return fallback
   }
 
-  const idx = sampleTypes.findIndex(e => e.type === dflt)
+  const idx = sampleTypes.findIndex(e => e.type != null && e.type.toString() === dflt.toString())
   if (idx === -1) {
     return fallback
   }
@@ -38,24 +38,33 @@ export function importAsPprofProfile(rawProfile: ArrayBuffer): Profile | null {
     return null
   }
 
-  function i32(n: number | Long): number {
-    return typeof n === 'number' ? n : (n as Long).low
+  function idKey(n: number | Long): string {
+    return n.toString()
   }
 
   function stringVal(key: number | Long): string | null {
-    return protoProfile.stringTable[i32(key)] || null
+    const index = Number(key.toString())
+    return Number.isSafeInteger(index) && index >= 0
+      ? protoProfile.stringTable[index] || null
+      : null
   }
 
-  const frameInfoByFunctionID = new Map<number, FrameInfo>()
+  function sourceLine(value: number | Long | null | undefined): number | undefined {
+    if (value == null) return undefined
+    const line = Number(value.toString())
+    return Number.isSafeInteger(line) && line > 0 ? line : undefined
+  }
+
+  const frameInfoByFunctionID = new Map<string, FrameInfo>()
 
   function frameInfoForFunction(f: perftools.profiles.IFunction): FrameInfo | null {
     const {name, filename, startLine} = f
 
     const nameString = (name != null && stringVal(name)) || '(unknown)'
     const fileNameString = filename != null ? stringVal(filename) : null
-    const line = startLine != null ? +startLine : null
+    const line = sourceLine(startLine)
 
-    const key = `${nameString}:${fileNameString}:${line}`
+    const key = JSON.stringify([nameString, fileNameString, line])
 
     const frameInfo: FrameInfo = {
       key,
@@ -77,7 +86,7 @@ export function importAsPprofProfile(rawProfile: ArrayBuffer): Profile | null {
     if (f.id) {
       const frameInfo = frameInfoForFunction(f)
       if (frameInfo != null) {
-        frameInfoByFunctionID.set(i32(f.id), frameInfo)
+        frameInfoByFunctionID.set(idKey(f.id), frameInfo)
       }
     }
   }
@@ -101,24 +110,28 @@ export function importAsPprofProfile(rawProfile: ArrayBuffer): Profile | null {
     if (lastLine == null) return null
 
     if (lastLine.functionId) {
-      let funcFrame = frameInfoByFunctionID.get(i32(lastLine.functionId))
-      const sourceLine = lastLine.line instanceof Long ? lastLine.line.toNumber() : lastLine.line
-      if (sourceLine && sourceLine > 0 && funcFrame != null) {
-        funcFrame.line = sourceLine
+      const funcFrame = frameInfoByFunctionID.get(idKey(lastLine.functionId))
+      if (!funcFrame) return null
+      const locationLine = sourceLine(lastLine.line) ?? funcFrame.line
+      // Each location owns its source identity; shared function definitions
+      // must not be overwritten by another location's line number.
+      return {
+        ...funcFrame,
+        key: JSON.stringify([funcFrame.name, funcFrame.file, locationLine]),
+        line: locationLine,
       }
-      return funcFrame || null
     } else {
       return null
     }
   }
 
-  const frameByLocationID = new Map<number, FrameInfo>()
+  const frameByLocationID = new Map<string, FrameInfo>()
 
   for (let l of protoProfile.location) {
     if (l.id != null) {
       const frameInfo = frameInfoForLocation(l)
       if (frameInfo) {
-        frameByLocationID.set(i32(l.id), frameInfo)
+        frameByLocationID.set(idKey(l.id), frameInfo)
       }
     }
   }
@@ -153,7 +166,7 @@ export function importAsPprofProfile(rawProfile: ArrayBuffer): Profile | null {
   }
 
   for (let s of protoProfile.sample) {
-    const stack = s.locationId ? s.locationId.map(l => frameByLocationID.get(i32(l))) : []
+    const stack = s.locationId ? s.locationId.map(l => frameByLocationID.get(idKey(l))) : []
     stack.reverse()
 
     if (s.value == null || s.value.length <= sampleTypeIndex) {
