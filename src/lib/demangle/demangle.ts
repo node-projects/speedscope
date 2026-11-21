@@ -1,33 +1,20 @@
 import createWasmDemangleModule from './demangle.wasm'
+import {CachedDemangler} from './demangle-cache'
+import {DemangleDiagnostics} from './demangle-diagnostics'
 
-const wasmDemangleModulePromise = createWasmDemangleModule().then(module => module)
+// The loaded implementation owns exactly one bounded cache, shared by callers.
+const cachedDemanglerPromise = createWasmDemangleModule().then(
+  module => new CachedDemangler(module.wasm_demangle),
+)
 
-const cache = new Map<string, string>()
-
-export async function loadDemangling(): Promise<(name: string) => string> {
-  // This function converts a mangled C++ name such as "__ZNK7Support6ColorFeqERKS0_"
-  // into a human-readable symbol (in this case "Support::ColorF::==(Support::ColorF&)")
-  const wasmDemangleModule = await wasmDemangleModulePromise
-  return cached(wasmDemangleModule.wasm_demangle)
-}
-
-function cached(demangle: (name: string) => string): (name: string) => string {
-  return (name: string): string => {
-    let result = cache.get(name)
-    if (result !== undefined) {
-      name = result
-    } else {
-      try {
-        result = demangle(name)
-      } catch (error) {
-        // Symbol decoding is optional. A malformed symbol must not discard a profile.
-        console.warn('Could not demangle symbol; preserving its original name', name, error)
-        result = name
-      }
-      result = result === '' ? name : result
-      cache.set(name, result)
-      name = result
-    }
-    return name
-  }
+export async function loadDemangling(
+  onFailure?: (name: string) => void,
+): Promise<(name: string) => string> {
+  // Convert C++ and Rust symbols to readable names. Recording importers supply
+  // their own diagnostic observer; direct callers get bounded local examples.
+  const demangler = await cachedDemanglerPromise
+  if (onFailure) return name => demangler.demangle(name, onFailure)
+  const diagnostics = new DemangleDiagnostics()
+  const reportFailure = (name: string) => diagnostics.warn(name)
+  return name => demangler.demangle(name, reportFailure)
 }

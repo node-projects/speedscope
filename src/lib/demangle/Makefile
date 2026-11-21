@@ -1,7 +1,7 @@
 EMCC = emcc
 CFLAGS = -Os -Igcc/include -DHAVE_STDLIB_H -DHAVE_STRING_H
 LDFLAGS_COMMON = \
-    -s EXPORTED_RUNTIME_METHODS=stringToUTF8OnStack,UTF8ToString \
+    -s EXPORTED_RUNTIME_METHODS=stringToUTF8OnStack,UTF8ToString,stackSave,stackRestore \
     -s EXPORTED_FUNCTIONS=_demangle,_free \
     -s MODULARIZE=1 \
     -s WASM=1 \
@@ -30,7 +30,7 @@ OUTPUT = demangle.wasm.js
 
 all: $(OUTPUT)
 
-$(OUTPUT): $(SRC_FILES) $(POST_JS)
+$(OUTPUT): $(SRC_FILES) $(POST_JS) $(EXTERN_POST_JS) Makefile
 	$(EMCC) $(CFLAGS) $(SRC_FILES) $(LDFLAGS) --post-js $(POST_JS) --extern-post-js $(EXTERN_POST_JS) --no-entry -o $@
 
 clean:

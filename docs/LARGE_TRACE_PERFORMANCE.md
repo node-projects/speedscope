@@ -1,5 +1,60 @@
 # Large trace performance follow-up
 
+## Demangler lifetime and bounded shared cache (2026-11-21)
+
+The native demangler wrapper previously allocated UTF-8 input on the Emscripten
+stack without restoring it. A valid C++ symbol failed after about 4,056 direct
+calls. The rebuilt wrapper saves/restores the stack and frees native results in
+nested `finally` blocks; 20,000 uncached calls now leave the stack unchanged.
+A 12,000-distinct-symbol test also verifies real decoding after cache eviction.
+Pinned toolchain and artifact hashes are in the [demangler build guide](https://github.com/node-projects/speedscope/blob/main/src/lib/demangle/README.md).
+
+The module-wide memoization cache now retains at most **4,096 LRU entries** and
+**1,048,576 combined input/result UTF-16 code units**. Pairs over **16,384 code
+units** bypass caching. Failures retain only the original string and a boolean,
+with no Error objects, callbacks or profile history. These limits account for
+cache text, not exact heap usage: JavaScript engines may share string backing
+storage, and the module, decoder temporaries and profile model remain separate.
+Evicted/oversized symbols can require repeated native work; this is not a claim
+that every capture demangles faster.
+
+The main importer, worker and comparison loaders share two clipped failure
+examples and one summary across each recording. Counts describe symbol
+observations, including cached failures, not distinct symbols or native calls.
+Native initialization errors still propagate. Profile traversal yields after
+4,096 frames; between profiles it checks an eight-millisecond scheduling budget
+and a 256-profile fallback. Checks before/after yielding and after native module
+loading allow cancellation without publishing a partially processed recording.
+Individual native calls are synchronous and cannot be interrupted mid-call.
+
+The decoded [public #507 capture](https://github.com/jlfwong/speedscope/issues/507)
+retains one profile, 3,333 frames, 62,672 call events and identical structural
+and weight hashes. Decoded names increase from 320 to 2,397, while native
+failure warnings fall from 2,114 (1,980,405 stderr bytes) to zero. Its raw native
+export is unchanged; post-demangling exports intentionally contain improved
+names. Browser worker import showed decoded Rust names in Call Tree with no
+errors or warnings. The xz attachment was externally decompressed for testing;
+xz support is not added.
+
+The private PLC retains four profiles, four counter series, 17,510 shared frames
+and 1,039,656 call events. Its complete 52,623,405-byte native export is unchanged,
+SHA-256 `2a5b580376bfffb8dcccbf3081d30620a9c85047f047a2604e0dc1e0f712d0b3`.
+It contains no eligible mangled names, so this is a correctness regression check
+without a PLC demangling speed claim.
+
+Issue #507's reviewed native crash is fixed; #508 remains partial. Its valid
+1,252-character gRPC example exceeds the pinned libiberty component-count guard
+and stays unmangled. Guard removal is not substituted for a bounded native
+parser/stack design. Original #508 full captures remain unavailable. General
+OOM/out-of-core issues also remain partial. Captures, compiler checkouts,
+screenshots and validation bundles are not committed.
+
+Validation passed 805 tests across 116 suites with 310 snapshots, all five Node
+tests, type checking, lint, schema/backlog checks, standalone/single-file/Pages
+builds and dry-run npm contents checks. Browser checks used the built app's
+worker path for the public Rust capture. No claim of universally bounded total
+memory or universal native ABI support follows from those checks.
+
 ## Bounded Trace Event diagnostic logging (2026-11-21)
 
 Duration-event matching previously wrote every warning to the console. The

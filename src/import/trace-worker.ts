@@ -5,6 +5,7 @@ import {tryImportDurationTrace} from './streaming-trace'
 import {checkJavaThreadDumpZipFileSize} from './java-thread-dump-zip'
 import {tryImportTextProfile} from './streaming-text-profile'
 import {checkPythonCProfileFileSize} from './python-cprofile'
+import {demangleProfiles} from '../lib/demangle-profiles'
 
 export async function processTraceInWorker(
   request: TraceWorkerRequest,
@@ -41,7 +42,7 @@ export async function processTraceInWorker(
   }
   if (!group) return {type: 'fallback', buffer}
   progress('Building profile')
-  for (const profile of group.profiles) await profile.demangle()
+  await demangleProfiles(group.profiles)
   progress('Preparing view')
   return {type: 'result', group: {...group, profiles: group.profiles.map(p => p.toSnapshot())}}
 }
