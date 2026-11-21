@@ -2,6 +2,8 @@ import {Atom} from '../lib/atom'
 import {clamp, Rect, Vec2} from '../lib/math'
 import {CallTreeNode, Frame, Profile, ProfileGroup} from '../lib/profile'
 import {objectsHaveShallowEquality} from '../lib/utils'
+import {ViewMode} from '../lib/view-mode'
+import {findFrameNode, nodeBelongsToTree} from '../lib/frame-selection'
 
 export interface FlamechartViewState {
   hover: {
@@ -9,6 +11,8 @@ export interface FlamechartViewState {
     event: MouseEvent
   } | null
   selectedNode: CallTreeNode | null
+  selectionChecked?: boolean
+  selectionFrameKey?: string | number | null
   logicalSpaceViewportSize: Vec2
   configSpaceViewportRect: Rect
 }
@@ -25,6 +29,8 @@ export interface SandwichViewState {
 
 export interface ProfileState {
   profile: Profile
+  selectedFrameKey?: string | number | null
+  selectionModelId?: number
   chronoViewState: FlamechartViewState
   leftHeavyViewState: FlamechartViewState
   sandwichViewState: SandwichViewState
@@ -55,6 +61,10 @@ let initialFlameChartViewState: FlamechartViewState = {
 }
 
 export class ProfileGroupAtom extends Atom<ProfileGroupState> {
+  // Weak model identities invalidate node references without retaining flattened
+  // profile copies or building per-frame occurrence indexes.
+  private selectionModels = new WeakMap<Profile, number>()
+  private nextSelectionModelId = 1
   set(newState: ProfileGroupState) {
     const oldState = this.state
     if (oldState != null && newState != null && objectsHaveShallowEquality(oldState, newState)) {
@@ -75,6 +85,7 @@ export class ProfileGroupAtom extends Atom<ProfileGroupState> {
       indexToView: group.indexToView,
       profiles: group.profiles.map(p => ({
         profile: p,
+        selectedFrameKey: null,
         chronoViewState: initialFlameChartViewState,
         leftHeavyViewState: initialFlameChartViewState,
         sandwichViewState: {callerCallee: null},
@@ -96,11 +107,15 @@ export class ProfileGroupAtom extends Atom<ProfileGroupState> {
   private updateActiveProfileState(fn: (profileState: ProfileState) => ProfileState) {
     if (this.state == null) return
     const {indexToView, profiles} = this.state
+    const active = profiles[indexToView]
+    if (!active) return
+    const next = fn(active)
+    if (next === active) return
     this.set({
       ...this.state,
       profiles: profiles.map((p, i) => {
         if (i != indexToView) return p
-        return fn(p)
+        return next
       }),
     })
   }
@@ -122,15 +137,25 @@ export class ProfileGroupAtom extends Atom<ProfileGroupState> {
       return
     }
 
-    this.updateActiveSandwichViewState(sandwichViewState => {
+    this.updateActiveProfileState(p => {
+      if (!frame && p.selectedFrameKey === null && !p.sandwichViewState.callerCallee) return p
+      if (
+        p.selectedFrameKey === (frame?.key ?? null) &&
+        p.sandwichViewState.callerCallee?.selectedFrame === frame
+      )
+        return p
       if (frame == null) {
-        return {callerCallee: null}
+        return {...p, selectedFrameKey: null, sandwichViewState: {callerCallee: null}}
       }
       return {
-        callerCallee: {
-          invertedCallerFlamegraph: initialFlameChartViewState,
-          calleeFlamegraph: initialFlameChartViewState,
-          selectedFrame: frame,
+        ...p,
+        selectedFrameKey: frame.key,
+        sandwichViewState: {
+          callerCallee: {
+            invertedCallerFlamegraph: initialFlameChartViewState,
+            calleeFlamegraph: initialFlameChartViewState,
+            selectedFrame: frame,
+          },
         },
       }
     })
@@ -198,6 +223,15 @@ export class ProfileGroupAtom extends Atom<ProfileGroupState> {
   }
 
   setSelectedNode(id: FlamechartID, selectedNode: CallTreeNode | null) {
+    if (id === FlamechartID.CHRONO || id === FlamechartID.LEFT_HEAVY) {
+      const field = id === FlamechartID.CHRONO ? 'chronoViewState' : 'leftHeavyViewState'
+      this.updateActiveProfileState(p => ({
+        ...p,
+        selectedFrameKey: selectedNode?.frame.key ?? null,
+        [field]: {...p[field], selectedNode, selectionChecked: false},
+      }))
+      return
+    }
     this.updateFlamechartState(id, f => ({
       ...f,
       selectedNode,
@@ -219,11 +253,93 @@ export class ProfileGroupAtom extends Atom<ProfileGroupState> {
   }
 
   clearHoverNode() {
-    // TODO(jlfwong): This causes 4 separate observer events. This is probably
-    // fine, since I hope that Preact/React are smart about batching re-renders?
-    this.setFlamechartHoveredNode(FlamechartID.CHRONO, null)
-    this.setFlamechartHoveredNode(FlamechartID.LEFT_HEAVY, null)
-    this.setFlamechartHoveredNode(FlamechartID.SANDWICH_CALLEES, null)
-    this.setFlamechartHoveredNode(FlamechartID.SANDWICH_INVERTED_CALLERS, null)
+    const clear = (state: FlamechartViewState) => (state.hover ? {...state, hover: null} : state)
+    this.updateActiveProfileState(p => {
+      const chronoViewState = clear(p.chronoViewState),
+        leftHeavyViewState = clear(p.leftHeavyViewState)
+      const old = p.sandwichViewState.callerCallee
+      const callers = old && clear(old.invertedCallerFlamegraph),
+        callees = old && clear(old.calleeFlamegraph)
+      const sandwichViewState =
+        old && (callers !== old.invertedCallerFlamegraph || callees !== old.calleeFlamegraph)
+          ? {callerCallee: {...old, invertedCallerFlamegraph: callers!, calleeFlamegraph: callees!}}
+          : p.sandwichViewState
+      return chronoViewState === p.chronoViewState &&
+        leftHeavyViewState === p.leftHeavyViewState &&
+        sandwichViewState === p.sandwichViewState
+        ? p
+        : {...p, chronoViewState, leftHeavyViewState, sandwichViewState}
+    })
+  }
+
+  synchronizeSelection(mode: ViewMode, model: Profile) {
+    let modelId = this.selectionModels.get(model)
+    if (modelId === undefined) {
+      modelId = this.nextSelectionModelId++
+      this.selectionModels.set(model, modelId)
+    }
+    this.updateActiveProfileState(original => {
+      let p = original
+      if (p.selectionModelId !== modelId) {
+        const reset = (state: FlamechartViewState) => ({
+          ...state,
+          hover: null,
+          selectedNode: null,
+          selectionChecked: false,
+          selectionFrameKey: undefined,
+        })
+        p = {
+          ...p,
+          selectionModelId: modelId,
+          chronoViewState: reset(p.chronoViewState),
+          leftHeavyViewState: reset(p.leftHeavyViewState),
+          sandwichViewState: {callerCallee: null},
+        }
+      }
+      const frame = p.selectedFrameKey == null ? undefined : model.getFrame(p.selectedFrameKey)
+      if (p.selectedFrameKey != null && !frame) p = {...p, selectedFrameKey: null}
+      if (mode === ViewMode.SANDWICH_VIEW) {
+        const old = p.sandwichViewState.callerCallee
+        if (old?.selectedFrame === frame || (!old && !frame)) return p
+        return {
+          ...p,
+          sandwichViewState: {
+            callerCallee: frame
+              ? {
+                  selectedFrame: frame,
+                  invertedCallerFlamegraph: initialFlameChartViewState,
+                  calleeFlamegraph: initialFlameChartViewState,
+                }
+              : null,
+          },
+        }
+      }
+      if (mode !== ViewMode.CHRONO_FLAME_CHART && mode !== ViewMode.LEFT_HEAVY_FLAME_GRAPH) return p
+      const field = mode === ViewMode.CHRONO_FLAME_CHART ? 'chronoViewState' : 'leftHeavyViewState'
+      const state = p[field]
+      // Cache both a node and an absent occurrence for this model/key. Hover and
+      // viewport updates must not repeatedly walk a large tree.
+      if (state.selectionChecked && state.selectionFrameKey === p.selectedFrameKey) return p
+      let node: CallTreeNode | null = null
+      if (frame) {
+        const root =
+          mode === ViewMode.CHRONO_FLAME_CHART
+            ? model.getAppendOrderCalltreeRoot()
+            : model.getGroupedCalltreeRoot()
+        node =
+          state.selectedNode?.frame === frame && nodeBelongsToTree(state.selectedNode, root)
+            ? state.selectedNode
+            : findFrameNode(root, frame)
+      }
+      return {
+        ...p,
+        [field]: {
+          ...state,
+          selectedNode: node,
+          selectionChecked: true,
+          selectionFrameKey: p.selectedFrameKey,
+        },
+      }
+    })
   }
 }

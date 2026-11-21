@@ -49,6 +49,55 @@ const arbitraryRect = jsc.record({origin: arbitraryVec2, size: positiveVec2}).sm
   r => r,
 )
 
+function homogeneousMatrix(t: AffineTransform): number[][] {
+  return [
+    [t.m00, t.m01, t.m02],
+    [t.m10, t.m11, t.m12],
+    [0, 0, 1],
+  ]
+}
+
+// Test composition independently of the specialized affine formula and of
+// inverse cancellation. Both 3-term dot products incur rounding proportional
+// to sum(abs(a_ik * b_kj)), even if their result nearly cancels to zero.
+// Four gamma_3 terms conservatively cover the reference and implementation,
+// plus rounding in the scale/comparison; MIN_VALUE covers gradual underflow.
+// See Higham and Mary, Mixed Precision Algorithms in Numerical Linear Algebra,
+// sections 3–4 (standard componentwise matrix-product error bound):
+// https://eprints.maths.manchester.ac.uk/2841/1/paper_eprint.pdf
+function multiplicationWithinRoundoff(
+  product: AffineTransform,
+  left: AffineTransform,
+  right: AffineTransform,
+): boolean {
+  const actual = homogeneousMatrix(product)
+  const a = homogeneousMatrix(left),
+    b = homogeneousMatrix(right)
+  const unitRoundoff = Number.EPSILON / 2
+  const gamma3 = (3 * unitRoundoff) / (1 - 3 * unitRoundoff)
+  for (let row = 0; row < 2; row++) {
+    for (let column = 0; column < 3; column++) {
+      let expected = 0,
+        scale = 0
+      // Reverse the accumulation order used by AffineTransform.times.
+      for (let k = 2; k >= 0; k--) {
+        const term = a[row][k] * b[k][column]
+        expected += term
+        scale += Math.abs(term)
+      }
+      const tolerance = 4 * gamma3 * scale + 4 * Number.MIN_VALUE
+      if (
+        !Number.isFinite(actual[row][column]) ||
+        !Number.isFinite(expected) ||
+        !Number.isFinite(tolerance) ||
+        Math.abs(actual[row][column] - expected) > tolerance
+      )
+        return false
+    }
+  }
+  return true
+}
+
 describe('Vec2', () => {
   test('constructor', () => {
     jsc.assertForall(jsc.number, jsc.number, (a, b) => {
@@ -341,8 +390,79 @@ describe('AffineTransform', () => {
   })
 
   test('times', () => {
-    jsc.assertForall(invertibleTransform, invertibleTransform, (t1, t2) => {
-      return t1.times(t2).times(t2.inverted()!).approxEquals(t1)
+    // Singular transforms are valid multiplication inputs too. Do not discard
+    // poorly conditioned matrices or narrow their generator to hide #138.
+    jsc.assertForall(arbitraryTransform, arbitraryTransform, (t1, t2) => {
+      return multiplicationWithinRoundoff(t1.times(t2), t1, t2)
     })
+  })
+
+  test('times recorded #138 counterexample separates multiplication from inverse cancellation', () => {
+    const t1 = new AffineTransform(
+      0,
+      -5.367341258943892e-7,
+      0,
+      -5.637762076626807e-7,
+      22.105444583576173,
+      0,
+    )
+    const t2 = new AffineTransform(
+      -19.956948631443083,
+      41.27141907811165,
+      32.4375735828653,
+      -19.53049001749605,
+      40.38256627973169,
+      3.136250004172325,
+    )
+    const inverse = t2.inverted()!
+    const product = t1.times(t2)
+    const roundTrip = product.times(inverse)
+    // The old absolute 1e-9 oracle rejects this legitimate composition. Both
+    // multiplication stages still satisfy their scale-aware rounding bound.
+    expect(roundTrip.approxEquals(t1)).toBe(false)
+    expect(multiplicationWithinRoundoff(product, t1, t2)).toBe(true)
+    expect(multiplicationWithinRoundoff(roundTrip, product, inverse)).toBe(true)
+  })
+
+  test('times reference rejects order and coefficient mistakes', () => {
+    const left = new AffineTransform(2, 0, 5, 0, 3, 7)
+    const right = new AffineTransform(1, 4, 11, 2, 1, 13)
+    const product = left.times(right)
+    expect(product.equals(new AffineTransform(2, 8, 27, 6, 3, 46))).toBe(true)
+    expect(multiplicationWithinRoundoff(right.times(left), left, right)).toBe(false)
+    const wrong = product.withTranslation(product.getTranslation().plus(new Vec2(0, 1e-6)))
+    expect(multiplicationWithinRoundoff(wrong, left, right)).toBe(false)
+  })
+
+  test('times reference uses operand scale rather than a permissive absolute epsilon', () => {
+    for (const scale of [1e-150, 1e-75, 1, 1e75, 1e150]) {
+      const left = new AffineTransform(
+        scale,
+        -2 * scale,
+        3 * scale,
+        4 * scale,
+        5 * scale,
+        -6 * scale,
+      )
+      const right = new AffineTransform(
+        2 * scale,
+        3 * scale,
+        4 * scale,
+        -scale,
+        5 * scale,
+        6 * scale,
+      )
+      const product = left.times(right)
+      expect(multiplicationWithinRoundoff(product, left, right)).toBe(true)
+      const wrong = new AffineTransform(
+        product.m00 * 1.01,
+        product.m01,
+        product.m02,
+        product.m10,
+        product.m11,
+        product.m12,
+      )
+      expect(multiplicationWithinRoundoff(wrong, left, right)).toBe(false)
+    }
   })
 })

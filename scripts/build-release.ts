@@ -1,5 +1,14 @@
 import * as esbuild from 'esbuild'
 import {buildOptions, generateIndexHtml} from './esbuild-shared'
+import {createHash} from 'crypto'
+import {promises as fs} from 'fs'
+import * as path from 'path'
+import {
+  isOfflineShellAsset,
+  offlineWorkerSource,
+  offlineWorkerRuntime,
+  offlineRegistrationScript,
+} from '../src/lib/offline-shell'
 
 function parseArgs() {
   const args = process.argv.slice(2)
@@ -50,7 +59,24 @@ async function main() {
     buildResult,
     outdir,
     servingProtocol,
+    offline: servingProtocol === 'http',
   })
+
+  if (servingProtocol === 'http') {
+    const assets = (await fs.readdir(outdir)).filter(isOfflineShellAsset).sort()
+    const hash = createHash('sha256').update(offlineWorkerRuntime).update(offlineRegistrationScript)
+    let bytes = 0
+    for (const name of assets) {
+      const data = await fs.readFile(path.join(outdir, name))
+      bytes += data.byteLength
+      hash.update(name + '\0').update(data)
+    }
+    if (bytes > 16 * 1024 * 1024) throw new Error('Offline app shell exceeds 16 MiB')
+    await fs.writeFile(
+      path.join(outdir, 'service-worker.js'),
+      offlineWorkerSource(hash.digest('hex'), assets),
+    )
+  }
 
   console.log(`Successfully built to ${outdir}`)
 }

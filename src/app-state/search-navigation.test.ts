@@ -17,6 +17,22 @@ afterEach(() => {
   flattenRecursionAtom.set(false)
   searchIsActiveAtom.set(false)
   searchQueryAtom.set('')
+  viewModeAtom.set(ViewMode.CHRONO_FLAME_CHART)
+})
+
+test('opening a search result skips occurrence lookup in the outgoing graph view', async () => {
+  const builder = new StackListProfileBuilder()
+  builder.appendSampleWithWeight([{key: 0, name: 'target'}], 2)
+  const profile = builder.build()
+  profileGroupAtom.setProfileGroup({name: 'group', indexToView: 0, profiles: [profile]})
+  const match = (await searchProfiles([profile], 'target')).matches[0]
+  const readTree = jest.spyOn(profile, 'getAppendOrderCalltreeRoot')
+  openProfileSearchMatch(match, [profile], 'target', SearchMode.EXACT)
+  expect(readTree).not.toHaveBeenCalled()
+  readTree.mockRestore()
+  expect(profileGroupAtom.getActiveProfile()!.sandwichViewState.callerCallee!.selectedFrame).toBe(
+    profile.getFrame(0),
+  )
 })
 test('search navigation selects the correct original frame, including flattened recursion', async () => {
   const make = (name: string) => {

@@ -2,6 +2,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import * as esbuild from 'esbuild'
 import {profileWorkerPlugin} from './profile-worker-plugin'
+import {offlineRegistrationScript} from '../src/lib/offline-shell'
 
 const entryPoint = 'src/speedscope.tsx'
 
@@ -36,12 +37,14 @@ interface GenerateIndexHtmlOptions {
   buildResult: esbuild.BuildResult
   outdir: string
   servingProtocol: 'file' | 'http'
+  offline?: boolean
 }
 
 export const generateIndexHtml = ({
   buildResult,
   outdir,
   servingProtocol,
+  offline = false,
 }: GenerateIndexHtmlOptions) => {
   const outputs = buildResult.metafile!.outputs
 
@@ -107,6 +110,7 @@ export const generateIndexHtml = ({
         ? ''
         : `<link rel="preload" href="${fontName}" as="font" type="font/woff2" crossorigin>`
     }
+    ${offline && servingProtocol === 'http' ? `<script>${offlineRegistrationScript}</script>` : ''}
   </body>
 </html>
 `

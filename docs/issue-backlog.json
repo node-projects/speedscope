@@ -645,11 +645,11 @@
       "url": "https://github.com/jlfwong/speedscope/issues/398",
       "kind": "feature",
       "usefulness": "yes",
-      "status": "planned",
-      "priority": "P3",
+      "status": "implemented",
+      "priority": "none",
       "workstream": "Import formats and correctness",
-      "evidence": "jstack/Java thread dumps are snapshots, not elapsed durations. Need explicit sample ordering/weight policy and public format fixtures before adding another text parser.",
-      "remaining": "jstack/Java thread dumps are snapshots, not elapsed durations. Need explicit sample ordering/weight policy and public format fixtures before adding another text parser."
+      "evidence": "Traditional HotSpot jstack/Thread.print text imports single or concatenated snapshots into aggregate per-thread raw-sample profiles. Lazy line iteration retains only the current stack and snapshot identity set beyond output builders. Eight regression tests cover ordering, source locations, identity, malformed input and deadlock repeats; browser import verified. See docs/JAVA_THREAD_DUMPS.md.",
+      "remaining": "No additional work selected for traditional text thread dumps. Structured virtual-thread JSON and lock/state visualization remain outside this format."
     },
     {
       "id": 396,
@@ -1293,11 +1293,11 @@
       "url": "https://github.com/jlfwong/speedscope/issues/173",
       "kind": "feature",
       "usefulness": "yes",
-      "status": "planned",
+      "status": "partial",
       "priority": "P3",
       "workstream": "Import formats and correctness",
-      "evidence": "jstack/Java thread dumps are snapshots, not elapsed durations. Need explicit sample ordering/weight policy and public format fixtures before adding another text parser.",
-      "remaining": "jstack/Java thread dumps are snapshots, not elapsed durations. Need explicit sample ordering/weight policy and public format fixtures before adding another text parser."
+      "evidence": "Concatenated traditional jstack text is implemented with one raw sample per observed Java stack, aggregate per-thread profiles, source locations and malformed-input checks. ZIP archives must be extracted before import. See docs/JAVA_THREAD_DUMPS.md.",
+      "remaining": "Direct ZIP archive ingestion requested upstream remains unsupported; establish archive entry, decompression and total resource limits before implementing it."
     },
     {
       "id": 168,
@@ -1401,11 +1401,11 @@
       "url": "https://github.com/jlfwong/speedscope/issues/138",
       "kind": "bug",
       "usefulness": "yes",
-      "status": "planned",
-      "priority": "P3",
+      "status": "implemented",
+      "priority": "none",
       "workstream": "Import formats and correctness",
-      "evidence": "Recorded affine counterexample involves ill-conditioned near-singular matrices and inverse cancellation. Needs condition-aware error bounds and deterministic counterexample coverage, not simply narrowing property domains.",
-      "remaining": "Recorded affine counterexample involves ill-conditioned near-singular matrices and inverse cancellation. Needs condition-aware error bounds and deterministic counterexample coverage, not simply narrowing property domains."
+      "evidence": "Replaced the ill-conditioned inverse round-trip multiplication oracle with an independent 3x3 composition reference and magnitude-aware floating-point error bounds. Coverage includes the recorded counterexample, singular transforms, reversed order, perturbed coefficients and scales from 1e-150 to 1e150. All 46 math tests and eight additional fresh-process runs passed. Runtime affine math is unchanged.",
+      "remaining": "No demonstrated runtime multiplication bug remains in the reviewed report; inverse conditioning is not claimed fixed."
     },
     {
       "id": 127,
@@ -1473,11 +1473,11 @@
       "url": "https://github.com/jlfwong/speedscope/issues/107",
       "kind": "feature",
       "usefulness": "yes",
-      "status": "planned",
+      "status": "implemented",
       "priority": "P3",
       "workstream": "Search and navigation",
-      "evidence": "Sharing selected frame between views requires distinguishing a frame from a particular call-tree instance and handling transformed profiles. Do not retain invalid node identities across views.",
-      "remaining": "Sharing selected frame between views requires distinguishing a frame from a particular call-tree instance and handling transformed profiles. Do not retain invalid node identities across views."
+      "evidence": "A per-profile frame key synchronizes Time Order, Left Heavy and Sandwich while preserving each view's valid call instance and zoom. Changed recursion models invalidate stale node/hover references and preserve aggregate/derived flags. First-node lookup is iterative with O(depth) storage, cached for the current model/key without a full occurrence index. Hover clearing is atomic. See docs/SEARCH_AND_LAYOUT.md.",
+      "remaining": "No additional work selected for the reviewed scope."
     },
     {
       "id": 106,
@@ -1533,11 +1533,11 @@
       "url": "https://github.com/jlfwong/speedscope/issues/58",
       "kind": "feature",
       "usefulness": "yes",
-      "status": "partial",
-      "priority": "P3",
+      "status": "implemented",
+      "priority": "none",
       "workstream": "Packaging, integration and maintenance",
-      "evidence": "Portable standalone ZIP works offline without service-worker caching. A hosted PWA remains optional and needs cache/version/update policy; not introduced automatically.",
-      "remaining": "Portable standalone ZIP works offline without service-worker caching. A hosted PWA remains optional and needs cache/version/update policy; not introduced automatically."
+      "evidence": "Hosted HTTP builds precache an allowlisted app shell with bounded generations, safe waiting updates and no recording/runtime cache insertion. Six service-worker VM tests cover lifecycle, failure, scope and exclusions. Browser QA reopened the app with its server stopped, imported a local dump, and confirmed uncached profileURL fetch failure. Standalone and development builds do not register a worker. See docs/OFFLINE.md.",
+      "remaining": "No additional work selected for hosted offline shell use. Offline recordings must be opened again from local files."
     },
     {
       "id": 47,

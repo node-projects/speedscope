@@ -34,8 +34,10 @@ export function openProfileSearchMatch(
   const frame = visible.getFrame(match.frame.key)
   if (!frame) throw new Error('This frame is not available in the current view')
   profileGroupAtom.setProfileIndexToView(match.profileIndex)
-  profileGroupAtom.setSelectedFrame(frame)
+  // Resolve the picked function in the destination view, avoiding an unused
+  // occurrence scan in the view we're about to leave.
   viewModeAtom.set(ViewMode.SANDWICH_VIEW)
+  profileGroupAtom.setSelectedFrame(frame)
   searchModeAtom.set(mode)
   searchQueryAtom.set(query)
   searchIsActiveAtom.set(true)
