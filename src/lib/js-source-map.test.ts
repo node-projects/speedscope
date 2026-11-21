@@ -1,7 +1,11 @@
 import * as fs from 'fs'
 import * as path from 'path'
 import {importProfilesFromArrayBuffer} from '../import'
-import {importJavaScriptSourceMapSymbolRemapper} from './js-source-map'
+import {
+  importJavaScriptSourceMapSymbolRemapper,
+  SourceLineLookup,
+  SOURCE_LINE_CACHE_LIMITS,
+} from './js-source-map'
 import {Frame} from './profile'
 import {importFromV8ProfLog} from '../import/v8proflog'
 import {KeyedSet} from './utils'
@@ -52,6 +56,88 @@ test('unnamed mappings infer symbols without splitting the whole embedded source
   } finally {
     guard.mockRestore()
   }
+})
+
+test('many unique random-order original lines do not repeatedly scan embedded source prefixes', async () => {
+  const count = 20000
+  const content = Array.from({length: count}, (_, i) => `symbol_${i + 1} = ${i};`).join('\n')
+  const remapper = (await importJavaScriptSourceMapSymbolRemapper(
+    JSON.stringify({
+      version: 3,
+      file: 'app.js',
+      sources: ['original.ts'],
+      sourcesContent: [content],
+      names: [],
+      mappings: 'AAAA;' + 'AACA;'.repeat(count - 1),
+    }),
+    'app.js.map',
+  ))!
+  const original = String.prototype.indexOf
+  let newlineScans = 0
+  // Count work without retaining a Jest call record per scanned newline.
+  String.prototype.indexOf = function (this: string, needle: string, offset?: number) {
+    if (needle === '\n' && String(this) === content) newlineScans++
+    return original.call(this, needle, offset)
+  }
+  try {
+    // 7919 is coprime with20,000: visit every line once in nonmonotonic order.
+    for (let i = 0; i < count; i++) {
+      const line = ((i * 7919) % count) + 1
+      const result = remapper({name: 'minified', file: 'app.js', line, col: 2} as Frame)
+      expect(result?.name).toBe(`symbol_${line}`)
+      expect(result?.line).toBe(line)
+    }
+    // One indexing pass plus at most a64-line checkpoint walk per lookup.
+    // The old restart-at-source-start algorithm takes~200million scans here.
+    expect(newlineScans).toBeLessThan(count * (SOURCE_LINE_CACHE_LIMITS.stride + 2))
+  } finally {
+    String.prototype.indexOf = original
+  }
+})
+
+test('sparse indexes preserve CRLF, empty/final lines and replaced source contents', () => {
+  const lookup = new SourceLineLookup()
+  const first = 'alpha\r\n\nlast\r\n'
+  const line = (value: string, number: number) => {
+    const offsets = lookup.get('source', value, number)
+    return offsets && value.slice(offsets.start, offsets.end)
+  }
+  expect([1, 2, 3, 4, 5].map(number => line(first, number))).toEqual([
+    'alpha\r',
+    '',
+    'last\r',
+    '',
+    undefined,
+  ])
+  expect(line('replacement', 1)).toBe('replacement')
+  expect(line('replacement', 2)).toBeUndefined()
+  expect(lookup.get('source', first, 0)).toBeUndefined()
+})
+
+test('very many short lines compact checkpoints and LRU source indexes remain byte bounded', () => {
+  const lookup = new SourceLineLookup()
+  const content = '\n'.repeat(300000)
+  for (let source = 0; source < 32; source++) {
+    const number = 300001 - source * 1237
+    expect(lookup.get(`source-${source}`, content, number)).toEqual({
+      start: number - 1,
+      end: number - 1,
+    })
+    expect(lookup.retainedCheckpointBytes).toBeLessThanOrEqual(
+      SOURCE_LINE_CACHE_LIMITS.sources * SOURCE_LINE_CACHE_LIMITS.checkpoints * 4,
+    )
+  }
+  // Eviction/re-indexing preserves both late and early line identity.
+  expect(lookup.get('source-0', content, 300001)).toEqual({start: 300000, end: 300000})
+  expect(lookup.get('source-0', content, 2)).toEqual({start: 1, end: 1})
+})
+
+test('source-map creation respects an already aborted preview signal', async () => {
+  const controller = new AbortController()
+  controller.abort()
+  await expect(
+    importJavaScriptSourceMapSymbolRemapper('{}', 'app.js.map', {signal: controller.signal}),
+  ).rejects.toHaveProperty('name', 'AbortError')
 })
 
 test('V8 Windows paths remap with a local map at an exact first generated position', async () => {

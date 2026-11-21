@@ -55,6 +55,29 @@ discovery for Node/esbuild logs. Logs without usable source positions still
 cannot be mapped. The linking/header behavior follows
 [ECMA-426](https://tc39.es/ecma426/2024/#sec-retrieving-source-maps).
 
+## Embedded source-line lookup
+
+Unnamed source-map entries can infer a symbol from embedded original-source
+text. Lookup now uses sparse newline checkpoints instead of repeatedly scanning
+from the start or splitting the entire source into a line array. A per-remapper
+LRU retains at most 16 source indexes, each with at most 4,096 Uint32 checkpoints:
+**256 KiB maximum retained checkpoint storage**, excluding source strings and
+the mapping consumer. Checkpoints begin every 64 lines and become coarser for
+very long local sources. Arbitrary query order, CRLF, empty/final lines and
+replacement source contents preserve the same inferred names.
+
+Preview checks elapsed time as well as frame count, yielding after 8 ms or 128
+frames. SourceMapConsumer decoding remains synchronous under the existing linked
+map size/mapping limits; these changes do not make all map loading interruptible.
+
+Run `npx tsx scripts/benchmark-source-maps.ts` for the deterministic comparison.
+One Node 24.19.0 ARM64 run used 100,000 source lines (2,488,889 characters) and
+5,000 shuffled line queries: the old scan took 2,722 ms and indexed lookup 11 ms,
+with identical checksums and an 8 KiB index. Mapping 100,000 shuffled frames took
+169 ms with no mismatches. This is a local-source lookup/remapping measurement,
+excluding network and browser rendering. The synthetic embedded source is larger
+than the linked-map download cap; local-map imports do not use that download cap.
+
 ## Open a source location
 
 Choose **Profile actions → Source-code links…** after loading a recording.

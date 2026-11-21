@@ -173,12 +173,14 @@ export async function previewLinkedSourceMap(
       generatedFile: generated.href,
       maxMappings: MAX_MAPPINGS,
       sourceMapURL: map.href,
+      signal: activeSignal,
     })
     checkAbort(activeSignal)
     if (!remapper)
       throw new Error('The linked file is not a supported source map with usable mappings.')
     const changes = new Map<Frame, NonNullable<ReturnType<SymbolRemapper>>>()
     let checked = 0
+    let lastYield = performance.now()
     for (const profile of profiles)
       for (const frame of profile.getFrames()) {
         checkAbort(activeSignal)
@@ -197,7 +199,10 @@ export async function previewLinkedSourceMap(
             changes.set(frame, change)
           }
         }
-        if (++checked % 128 === 0) await new Promise(resolve => setTimeout(resolve, 0))
+        if (++checked % 128 === 0 || performance.now() - lastYield >= 8) {
+          await new Promise(resolve => setTimeout(resolve, 0))
+          lastYield = performance.now()
+        }
       }
     checkAbort(activeSignal)
     if (!changes.size)

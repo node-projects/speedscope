@@ -25,6 +25,87 @@ export interface SourceMapRemapOptions {
   generatedFile?: string
   maxMappings?: number
   sourceMapURL?: string
+  signal?: AbortSignal
+}
+
+export const SOURCE_LINE_CACHE_LIMITS = Object.freeze({sources: 16, checkpoints: 4096, stride: 64})
+interface LineOffsets {
+  start: number
+  end: number
+}
+interface SourceLines {
+  content: string
+  checkpoints: Uint32Array
+  used: number
+  stride: number
+  lines: number
+  last?: {number: number; offsets: LineOffsets}
+}
+
+// Sparse offsets only, never a split line array or copied source text. Indexes
+// compact to a coarser stride if a local source exceeds the checkpoint budget.
+// Sixteen bounded Uint32 arrays retain at most 256 KiB in total.
+export class SourceLineLookup {
+  private sources = new Map<string, SourceLines>()
+
+  get retainedCheckpointBytes() {
+    let bytes = 0
+    for (const source of this.sources.values()) bytes += source.checkpoints.byteLength
+    return bytes
+  }
+
+  get(source: string, content: string, number: number): LineOffsets | undefined {
+    if (!Number.isSafeInteger(number) || number < 1) return undefined
+    let index = this.sources.get(source)
+    if (!index || index.content !== content) {
+      if (index) this.sources.delete(source)
+      if (this.sources.size === SOURCE_LINE_CACHE_LIMITS.sources)
+        this.sources.delete(this.sources.keys().next().value!)
+      index = {
+        content,
+        checkpoints: new Uint32Array(64),
+        used: 1,
+        stride: SOURCE_LINE_CACHE_LIMITS.stride,
+        lines: 1,
+      }
+      let offset = 0,
+        newline: number
+      while ((newline = content.indexOf('\n', offset)) !== -1) {
+        offset = newline + 1
+        index.lines++
+        if ((index.lines - 1) % index.stride !== 0) continue
+        if (index.used === SOURCE_LINE_CACHE_LIMITS.checkpoints) {
+          for (let i = 0; i < index.used / 2; i++) index.checkpoints[i] = index.checkpoints[i * 2]
+          index.used /= 2
+          index.stride *= 2
+        }
+        if ((index.lines - 1) % index.stride !== 0) continue
+        if (index.used === index.checkpoints.length) {
+          const larger = new Uint32Array(
+            Math.min(index.checkpoints.length * 2, SOURCE_LINE_CACHE_LIMITS.checkpoints),
+          )
+          larger.set(index.checkpoints)
+          index.checkpoints = larger
+        }
+        index.checkpoints[index.used++] = offset
+      }
+      this.sources.set(source, index)
+    } else {
+      // Touch LRU without retaining a second content/string cache.
+      this.sources.delete(source)
+      this.sources.set(source, index)
+    }
+    if (number > index.lines) return undefined
+    if (index.last?.number === number) return index.last.offsets
+    const checkpoint = Math.floor((number - 1) / index.stride)
+    let start = index.checkpoints[checkpoint]
+    for (let line = checkpoint * index.stride + 1; line < number; line++)
+      start = content.indexOf('\n', start) + 1
+    const newline = content.indexOf('\n', start)
+    const offsets = {start, end: newline < 0 ? content.length : newline}
+    index.last = {number, offsets}
+    return offsets
+  }
 }
 
 function canonicalHTTPFile(file: string | undefined): string | null {
@@ -77,7 +158,12 @@ export async function importJavaScriptSourceMapSymbolRemapper(
   sourceMapFileName: string,
   options: SourceMapRemapOptions = {},
 ): Promise<SymbolRemapper | null> {
+  const checkAbort = () => {
+    if (options.signal?.aborted) throw new DOMException('Source-map load cancelled', 'AbortError')
+  }
+  checkAbort()
   const sourceMap = await sourceMapModule
+  checkAbort()
 
   let consumer: SourceMapConsumer | null = null
   let contents: RawSourceMap | null = null
@@ -93,6 +179,7 @@ export async function importJavaScriptSourceMapSymbolRemapper(
   )
     throw new Error('Invalid source-map mapping limit')
   if (options.maxMappings !== undefined) checkMappingBudget(contents, options.maxMappings)
+  checkAbort()
   try {
     // source-map 0.6.1 accepts this public second argument, although its old
     // bundled declarations omit it. It resolves relative sources against the
@@ -108,6 +195,7 @@ export async function importJavaScriptSourceMapSymbolRemapper(
   const mappingItems: MappingItem[] = []
   consumer.eachMapping(
     function (m: MappingItem) {
+      if (mappingItems.length % 512 === 0) checkAbort()
       if (options.maxMappings !== undefined && mappingItems.length >= options.maxMappings)
         throw new Error(
           `Source map exceeds ${options.maxMappings.toLocaleString('en-US')} mappings`,
@@ -130,25 +218,11 @@ export async function importJavaScriptSourceMapSymbolRemapper(
   )
 
   if (!mappingItems.length) return null
+  checkAbort()
 
   const sourceMapFileNameWithoutExt = sourceMapFileName.replace(/\\/g, '/').replace(/\.[^/]*$/, '')
   const explicitGeneratedFile = canonicalHTTPFile(options.generatedFile)
-  let cachedContent: string | null = null
-  let cachedLineNumber = -1
-  let cachedLine: string | undefined
-  const sourceLine = (content: string, lineNumber: number) => {
-    if (content === cachedContent && lineNumber === cachedLineNumber) return cachedLine
-    cachedContent = content
-    cachedLineNumber = lineNumber
-    let start = 0
-    for (let i = 1; i < lineNumber; i++) {
-      const newline = content.indexOf('\n', start)
-      if (newline < 0) return (cachedLine = undefined)
-      start = newline + 1
-    }
-    const end = content.indexOf('\n', start)
-    return (cachedLine = content.slice(start, end < 0 ? content.length : end))
-  }
+  const sourceLines = new SourceLineLookup()
 
   return (frame: Frame) => {
     const frameFile = frame.file?.replace(/\\/g, '/')
@@ -234,12 +308,14 @@ export async function importJavaScriptSourceMapSymbolRemapper(
       // throws instead of returning null.
       const content = consumer?.sourceContentFor(sourceMapItem.source, true)
       if (content) {
-        const line = sourceLine(content, sourceMapItem.originalLine)
-        if (line) {
+        const line = sourceLines.get(sourceMapItem.source, content, sourceMapItem.originalLine)
+        if (line && line.end > line.start) {
           // It's possible this source map entry will contain stuff other than
           // the name, so let's only consider word-ish characters that are part
           // of the prefix.
-          const identifierMatch = /\w+/.exec(line.substr(sourceMapItem.originalColumn - 1))
+          const identifierMatch = /\w+/.exec(
+            content.slice(line.start + sourceMapItem.originalColumn - 1, line.end),
+          )
           if (identifierMatch) {
             remappedFrameInfo.name = identifierMatch[0]
           }

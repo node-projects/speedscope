@@ -237,3 +237,42 @@ test('missing positions or unmatched URLs produce a clear no-change preview erro
     'No frames match',
   )
 })
+
+test('preview yields to cancellation on the time budget before reaching 128 frames', async () => {
+  const builder = new StackListProfileBuilder()
+  for (let i = 0; i < 300; i++)
+    builder.appendSampleWithWeight(
+      [{key: i, name: `minified-${i}`, file: sourceURL, line: 1, col: 1}],
+      1,
+    )
+  const input = builder.build()
+  let frameReads = 0
+  for (const frame of input.getFrames())
+    Object.defineProperty(frame, 'file', {
+      get: () => {
+        frameReads++
+        return sourceURL
+      },
+    })
+  mockFetch
+    .mockResolvedValueOnce(new Response('', {headers: {SourceMap: 'x.map'}}))
+    .mockResolvedValueOnce(new Response(mapText))
+  let now = 0
+  const clock = jest.spyOn(performance, 'now')
+  clock.mockImplementation(() => (now += 10))
+  const controller = new AbortController()
+  let cancellation: ReturnType<typeof setTimeout> | undefined
+  try {
+    await expect(
+      previewLinkedSourceMap([input], sourceURL, controller.signal, status => {
+        if (status === 'Checking source mappings…')
+          cancellation = setTimeout(() => controller.abort(), 0)
+      }),
+    ).rejects.toHaveProperty('name', 'AbortError')
+    expect(frameReads).toBeLessThanOrEqual(3)
+    expect(input.getFrame(0)!.name).toBe('minified-0')
+  } finally {
+    if (cancellation !== undefined) clearTimeout(cancellation)
+    clock.mockRestore()
+  }
+})
