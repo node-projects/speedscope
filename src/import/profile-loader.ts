@@ -18,8 +18,11 @@ function checkAbort(signal?: AbortSignal) {
   if (signal?.aborted) throw new DOMException('Import cancelled', 'AbortError')
 }
 
-export function shouldUseTraceWorker(name: string, size: number): boolean {
-  return size >= 1024 * 1024 && /\.(?:json|trace|cpuprofile|heapprofile)(?:\.gz)?$/i.test(name)
+export function shouldUseTraceWorker(_name: string, size: number): boolean {
+  // Detection belongs in the worker's existing generic importer. Extension
+  // allowlists leave large perf/folded/JFR/pprof files (and renamed captures)
+  // blocking the UI, even though those importers are already worker-safe.
+  return size >= 1024 * 1024
 }
 
 async function loadWithWorker(
@@ -72,8 +75,11 @@ async function loadWithWorker(
           const message = event.data
           if (message.type === 'progress')
             options.onProgress?.({phase: message.phase, canCancel: true})
-          else if (message.type === 'fallback') resolve(message.buffer || null)
-          else if (message.type === 'error') reject(new Error(message.message))
+          else if (message.type === 'fallback') {
+            if (!message.buffer && input instanceof ArrayBuffer && input.byteLength === 0)
+              throw new Error('The profile importer did not return ownership of the input buffer.')
+            resolve(message.buffer || null)
+          } else if (message.type === 'error') reject(new Error(message.message))
           else {
             // Release the worker's parsed input and trees before creating UI objects.
             worker.terminate()
@@ -111,7 +117,10 @@ export async function importProfileFile(
   options.onProgress?.({phase: 'Reading profile', canCancel: false})
   const module = await importer()
   checkAbort(options.signal)
-  return module.importProfilesFromFile(file)
+  return module.importProfilesFromFile(file, {
+    signal: options.signal,
+    onProgress: options.onProgress,
+  })
 }
 
 export async function importProfileBuffer(
@@ -129,7 +138,10 @@ export async function importProfileBuffer(
   options.onProgress?.({phase: 'Reading profile', canCancel: false})
   const module = await importer()
   checkAbort(options.signal)
-  return module.importProfilesFromArrayBuffer(name, buffer)
+  return module.importProfilesFromArrayBuffer(name, buffer, {
+    signal: options.signal,
+    onProgress: options.onProgress,
+  })
 }
 
 export async function importProfileBase64(

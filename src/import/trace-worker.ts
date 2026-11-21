@@ -2,13 +2,14 @@ import {importProfilesFromArrayBuffer} from './index'
 import {TraceWorkerRequest, TraceWorkerResponse, ImportPhase} from './trace-worker-protocol'
 import {snapshotTransferables} from '../lib/profile-snapshot'
 import {tryImportDurationTrace} from './streaming-trace'
+import {checkJavaThreadDumpZipFileSize} from './java-thread-dump-zip'
 
 export async function processTraceInWorker(
   request: TraceWorkerRequest,
   progress: (phase: ImportPhase) => void,
 ): Promise<TraceWorkerResponse> {
   progress('Reading profile')
-  progress('Streaming profile')
+  if (!(request.input instanceof ArrayBuffer)) await checkJavaThreadDumpZipFileSize(request.input)
   let group = await tryImportDurationTrace(request.input, request.name, {
     onProgress: () => progress('Streaming profile'),
   })
@@ -18,7 +19,9 @@ export async function processTraceInWorker(
       buffer =
         request.input instanceof ArrayBuffer ? request.input : await request.input.arrayBuffer()
       progress('Parsing profile')
-      group = await importProfilesFromArrayBuffer(request.name, buffer)
+      group = await importProfilesFromArrayBuffer(request.name, buffer, {
+        onProgress: update => progress(update.phase),
+      })
     }
   } catch (error) {
     // Some host-specific formats need DOM APIs unavailable in a worker. Return
