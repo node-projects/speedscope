@@ -32,8 +32,9 @@ function HelpDialog(props: {onClose(): void}) {
         <section className={css(style.card)}>
           <h3 className={css(style.sectionTitle)}>Open a recording</h3>
           <p>
-            Use Import or Browse, or drop a profile file onto the app. Choose a thread or profile
-            from the profile selector. Export saves a speedscope JSON file you can reopen later.
+            Use Import or Browse, or drop a profile file onto the app. Choose a thread or profile by
+            clicking the profile selector. Its chooser stays open while you filter, use arrow keys
+            or select a row. Export saves a speedscope JSON file you can reopen later.
           </p>
           <p>
             Supported formats include speedscope JSON, Chrome and Firefox profiles, duration traces

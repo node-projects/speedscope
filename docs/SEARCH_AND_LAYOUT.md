@@ -1,5 +1,36 @@
 # Search across profiles and arrange Sandwich panes
 
+## Choose a profile with the keyboard
+
+For a recording with several profiles, click the profile name in the toolbar or
+press **t** to open the chooser. The **Filter profiles** combobox receives focus.
+Type part of a thread/profile name to filter with the existing fuzzy matching.
+Queries are limited to 256 characters. The result list identifies the currently
+selected profile separately from the active keyboard result.
+
+Use **Up/Down** to move the active result, **Home/End** to reach either end and
+**Page Up/Page Down** to move by a results page. **Enter** selects the active
+profile. **Escape** or **Close** dismisses the chooser and returns focus to its
+trigger. Typing during an input-method composition does not activate results;
+modified editing shortcuts such as Ctrl/Command+A retain their normal behavior.
+Typing in the chooser does not trigger the viewer's global shortcuts.
+
+The result list exposes a listbox with selected state, an active descendant and
+each result's position in the full filtered set. Native buttons sort by index,
+name or total non-idle weight and report the active direction. Tab can reach the
+sort, page and Close controls; moving focus outside dismisses the chooser without
+pulling focus back from the next control. Clicking an option also selects it.
+
+At most **100 options** are mounted at a time. Keyboard navigation automatically
+switches result pages, and **Previous/Next** page buttons make other results
+available without rendering every profile row. The result range is displayed
+explicitly. Filtered/sorted results retain numeric profile indices; highlight
+ranges are calculated only for the displayed page. Filtering and sorting still
+scan or arrange the recording's profile list, so the DOM bound is not a total
+memory or processing-time guarantee. This improves the chooser's portion of
+[#376](https://github.com/jlfwong/speedscope/issues/376); it does not make the
+canvas charts or every viewer control fully accessible.
+
 ## Search all profiles
 
 Choose **Profile actions → Search all profiles…**, enter a function name or source
@@ -265,15 +296,21 @@ not copied. Function/source names and an HTTP URL's credentials can appear in th
 reviewable link. It cannot grant access to a remote recording.
 
 Matching scans the chosen profile's frames once, without a retained frame index.
-Only the first successful restoration is applied; later imports do not jump back
-to the link's selection. Missing or ambiguous matches show a status message.
+Only the first successful restoration for a link is applied; later imports do not
+jump back to that selection. Navigating to another function link in the same tab,
+including browser Back/Forward, restores its selection against the current
+recording without reimporting it. Missing or ambiguous matches show a status
+message and remain pending until the original recording is imported.
+Changing the HTTP profile source or Accept setting starts a cancellable import.
+A new remote link takes precedence over a pending import of another recording;
+selection-only changes during import apply when that import finishes.
 Derived profiles must be exported and reopened first. Symbol-remapped copies
 conservatively generate links requiring local reimport.
 
 This partially addresses [#506](https://github.com/jlfwong/speedscope/issues/506).
 Exact call instances, graph view/zoom/time range and profile transformations are
-not restored. Paste a link into a new tab or reload it; same-tab hash changes do
-not trigger another import/restoration.
+not restored. Function links select the matching symbol in Sandwich, rather than
+restoring a specific call occurrence or graph viewport.
 
 ## Upstream review history
 
