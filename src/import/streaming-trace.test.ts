@@ -114,7 +114,7 @@ test('resource limits reject rather than silently truncating or retrying the ful
 
 test('ignored payloads do not consume the retained-event budget', async () => {
   const work = {ph: 'X', ts: 0, dur: 5, name: 'work'}
-  const ignored = {ph: 'i', ts: 1, args: {unused: 'x'.repeat(500)}}
+  const ignored = {ph: 'Z', ts: 1, args: {unused: 'x'.repeat(500)}}
   const text = JSON.stringify([work, ...Array(5000).fill(ignored)])
   const group = await importDurationTraceStream(source(text, 65536), 'trace.json', {
     limits: {maxRetainedBytes: 256},

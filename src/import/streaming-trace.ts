@@ -3,6 +3,7 @@ import {ProfileGroup} from '../lib/profile'
 import {importTraceEvents, TraceEvent} from './trace-event'
 import {StringBackedTextFileContent} from './utils'
 import {sourceFileName} from '../lib/profile-context'
+import {isChromeCPUProfileRecord, isTraceInstant} from './trace-event-instants'
 
 // These are input-complexity limits, not measurements of browser heap usage.
 // Profile construction and rendering still need memory proportional to the trace.
@@ -81,17 +82,14 @@ export async function importDurationTraceStream(
     const event = value as TraceEvent
     // Chrome sampled CPU events and Hermes sample tables need the original
     // detector. This check deliberately includes markers late in the document.
-    if (
-      event.ph !== 'C' &&
-      (event.name === 'CpuProfile' || event.name === 'Profile' || event.name === 'ProfileChunk')
-    )
-      throw new NotDurationTrace()
+    if (isChromeCPUProfileRecord(event)) throw new NotDurationTrace()
     const duration = event.ph === 'B' || event.ph === 'E' || event.ph === 'X'
     const counter = event.ph === 'C'
+    const instant = isTraceInstant(event)
     if ((duration || counter) && !('ts' in event)) throw new NotDurationTrace()
     const metadata =
       event.ph === 'M' && (event.name === 'process_name' || event.name === 'thread_name')
-    if (duration || counter || metadata || count === 1) {
+    if (duration || counter || instant || metadata || count === 1) {
       retainedBytes += offset - eventStart + 1
       if (retainedBytes > limits.maxRetainedBytes)
         throw new TraceImportLimitError('retained event bytes')
@@ -104,6 +102,17 @@ export async function importDurationTraceStream(
         tid: event.tid,
         name: event.name,
         args: event.args,
+        ...(instant
+          ? {
+              cat: event.cat,
+              s: (event as any).s,
+              stack: (event as any).stack,
+              sf: (event as any).sf,
+              id: (event as any).id,
+              id2: (event as any).id2,
+              tts: event.tts,
+            }
+          : {}),
         ...(counter ? {cat: event.cat, id: (event as any).id, id2: (event as any).id2} : {}),
         ...(event.ph === 'X' ? {dur: (event as any).dur, tdur: (event as any).tdur} : {}),
       })

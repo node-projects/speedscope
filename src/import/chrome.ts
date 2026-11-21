@@ -3,6 +3,8 @@ import {getOrInsert, lastOf, sortBy, itForEach} from '../lib/utils'
 import {TimeFormatter} from '../lib/value-formatters'
 import {chromeTreeToNodes, OldCPUProfile} from './v8cpuFormatter'
 import {importTraceCounterTracks} from './trace-event-counters'
+import {attachTraceInstantTracks, isChromeCPUProfileRecord} from './trace-event-instants'
+import {importTraceEvents} from './trace-event'
 
 // See: https://github.com/v8/v8/blob/master/src/inspector/js_protocol.json
 
@@ -53,17 +55,7 @@ export interface CPUProfile {
 export function isChromeTimeline(rawProfile: any): rawProfile is TimelineEvent[] {
   if (!Array.isArray(rawProfile)) return false
   if (rawProfile.length < 1) return false
-  const first = rawProfile[0]
-  if (!('pid' in first && 'tid' in first && 'ph' in first && 'cat' in first)) return false
-  if (
-    !rawProfile.find(
-      e =>
-        e.ph !== 'C' &&
-        (e.name === 'CpuProfile' || e.name === 'Profile' || e.name === 'ProfileChunk'),
-    )
-  )
-    return false
-  return true
+  return rawProfile.some(isChromeCPUProfileRecord)
 }
 
 export function isChromeTimelineObject(
@@ -75,6 +67,11 @@ export function isChromeTimelineObject(
 }
 
 export function importFromChromeTimeline(events: TimelineEvent[], fileName: string): ProfileGroup {
+  if (!events.some(isChromeCPUProfileRecord)) {
+    const group = importTraceEvents(events)
+    group.name = fileName
+    return group
+  }
   // Extract before the existing event sort so equal-timestamp observations
   // preserve their original file order for deterministic last-value wins.
   const counterTracks = importTraceCounterTracks(events, 'chrome-timeline:wall')
@@ -96,7 +93,8 @@ export function importFromChromeTimeline(events: TimelineEvent[], fileName: stri
   sortBy(events, e => e.ts)
 
   for (let event of events) {
-    if (event.ph === 'C') continue
+    if (!isChromeCPUProfileRecord(event) && !(event.ph === 'M' && event.name === 'thread_name'))
+      continue
     if (event.name === 'CpuProfile') {
       const pidTid = `${event.pid}:${event.tid}`
       const id = event.id || pidTid
@@ -200,7 +198,16 @@ export function importFromChromeTimeline(events: TimelineEvent[], fileName: stri
       profiles.push(profile)
     })
 
-    return {name: fileName, indexToView, profiles, ...(counterTracks.length ? {counterTracks} : {})}
+    return attachTraceInstantTracks(
+      {
+        name: fileName,
+        indexToView,
+        profiles,
+        ...(counterTracks.length ? {counterTracks} : {}),
+      },
+      events,
+      'chrome-timeline:wall',
+    )
   } else {
     throw new Error('Could not find CPU profile in Timeline')
   }
