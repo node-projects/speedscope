@@ -347,8 +347,8 @@ export class FlamechartRenderer {
 
       // Render from the cache
       for (let key of keysToRenderCached) {
-        const configSpaceSrcRect = this.configSpaceBoundsForKey(key)
-        this.rowAtlas.renderViaAtlas(key, configToViewport.transformRect(configSpaceSrcRect))
+        const cachedBounds = this.configSpaceBoundsForKey(key)
+        this.rowAtlas.renderViaAtlas(key, configToViewport.transformRect(cachedBounds))
       }
 
       // Render entries that didn't make it into the cache

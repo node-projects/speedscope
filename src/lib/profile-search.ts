@@ -160,6 +160,29 @@ export function searchMatchViewport(
     : viewport
 }
 
+// Explicitly refocus the current match after panning/zooming out. Keep some
+// context around it while honoring the chart's normal precision/zoom limits.
+// Only the viewport changes; frame geometry and measured weights stay intact.
+export function zoomToSearchMatchViewport(
+  flamechart: Flamechart,
+  match: FlamechartSearchMatch,
+  current: Rect,
+): Rect {
+  const bounds = match.configSpaceBounds
+  const width = flamechart.getClampedViewportWidth(bounds.width() * 1.5)
+  return searchMatchViewport(
+    flamechart,
+    {
+      node: match.node,
+      configSpaceBounds: new Rect(
+        bounds.origin.withX(bounds.origin.x + (bounds.width() - width) / 2),
+        bounds.size.withX(width),
+      ),
+    },
+    current,
+  )
+}
+
 interface CachedFlamechartResult {
   matches: {frame: FlamechartFrame; depth: number}[]
   indexForNode: Map<CallTreeNode, number>

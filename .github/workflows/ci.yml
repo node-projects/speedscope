@@ -33,6 +33,8 @@ jobs:
       - run: npm test
       - name: Build standalone package
         run: npm run prepack
+      - name: Build single HTML app
+        run: npm run build:single-file
       - name: Check npm contents and CLI
         run: |
           npm pack --dry-run --ignore-scripts
@@ -40,5 +42,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: standalone-${{ matrix.os }}-node${{ matrix.node }}
-          path: dist/speedscope-*.zip
+          path: |
+            dist/speedscope-*.zip
+            dist/speedscope-standalone.html
           if-no-files-found: error

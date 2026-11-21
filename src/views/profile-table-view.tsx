@@ -440,8 +440,8 @@ export const ProfileTableViewContainer = memo((ownProps: ProfileTableViewContain
   const frameToColorBucket = getFrameToColorBucket(profile)
   const getCSSColorForFrame = createGetCSSColorForFrame({theme, frameToColorBucket})
 
-  const setSelectedFrame = useCallback((selectedFrame: Frame | null) => {
-    profileGroupAtom.setSelectedFrame(selectedFrame)
+  const setSelectedFrame = useCallback((frameToSelect: Frame | null) => {
+    profileGroupAtom.setSelectedFrame(frameToSelect)
   }, [])
   const searchIsActive = useAtom(searchIsActiveAtom)
   const searchQuery = useAtom(searchQueryAtom)

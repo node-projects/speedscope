@@ -41,10 +41,18 @@ interface SearchViewProps {
   resultsLimited?: boolean
   selectNext: () => void
   selectPrev: () => void
+  zoomToMatch?: () => void
 }
 
 export const SearchView = memo(
-  ({numResults, resultIndex, selectNext, selectPrev, resultsLimited = false}: SearchViewProps) => {
+  ({
+    numResults,
+    resultIndex,
+    selectNext,
+    selectPrev,
+    resultsLimited = false,
+    zoomToMatch,
+  }: SearchViewProps) => {
     const theme = useTheme()
     const style = getStyle(theme)
     const searchIsActive = useAtom(searchIsActiveAtom)
@@ -136,7 +144,7 @@ export const SearchView = memo(
     if (!searchIsActive) return null
 
     return (
-      <div className={css(style.searchView)}>
+      <div className={css(style.searchView, zoomToMatch && style.withZoom)}>
         <span className={css(style.icon)}>🔍</span>
         <select
           aria-label="Search match mode"
@@ -151,7 +159,7 @@ export const SearchView = memo(
           <option value={SearchMode.WHOLE_WORD}>Whole word</option>
           <option value={SearchMode.EXACT}>Exact</option>
         </select>
-        <span className={css(style.inputContainer)}>
+        <span className={css(style.inputContainer, zoomToMatch && style.zoomInput)}>
           <input
             maxLength={4096}
             aria-label="Search functions or files"
@@ -185,6 +193,17 @@ export const SearchView = memo(
               ➡️
             </button>
           </Fragment>
+        )}
+        {zoomToMatch && (
+          <button
+            type="button"
+            className={css(style.zoomButton)}
+            disabled={resultIndex == null}
+            title="Center and zoom to the selected search match. Measured frame widths stay unchanged; normal zoom limits apply."
+            onClick={zoomToMatch}
+          >
+            Zoom to match
+          </button>
         )}
         <button
           type="button"
@@ -240,6 +259,27 @@ const getStyle = withTheme(theme =>
       flexShrink: 1,
       flexGrow: 1,
       display: 'flex',
+    },
+    withZoom: {
+      width: 460,
+      height: 'auto',
+      minHeight: Sizes.TOOLBAR_HEIGHT,
+      flexWrap: 'wrap',
+      padding: '2px 0',
+    },
+    zoomInput: {minWidth: 80},
+    zoomButton: {
+      flexShrink: 0,
+      margin: '0 4px',
+      padding: '2px 5px',
+      background: 'none',
+      border: `1px solid ${theme.altFgSecondaryColor}`,
+      borderRadius: 3,
+      color: 'inherit',
+      font: 'inherit',
+      whiteSpace: 'nowrap',
+      cursor: 'pointer',
+      ':disabled': {opacity: 0.5, cursor: 'default'},
     },
     input: {
       minWidth: 0,

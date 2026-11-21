@@ -1,5 +1,69 @@
-import {exactMatchStrings, ProfileSearchResults, SearchMode} from './profile-search'
-import {CallTreeProfileBuilder, Frame, FrameInfo} from './profile'
+import {
+  exactMatchStrings,
+  ProfileSearchResults,
+  SearchMode,
+  searchMatchViewport,
+  zoomToSearchMatchViewport,
+} from './profile-search'
+import {CallTreeProfileBuilder, CallTreeNode, Frame, FrameInfo} from './profile'
+import {Flamechart} from './flamechart'
+import {Rect, Vec2} from './math'
+
+test('explicit match zoom makes a tiny result visible without changing geometry or ordinary navigation', () => {
+  const node = new CallTreeNode({name: 'tiny'} as Frame, null)
+  const flamechart = new Flamechart({
+    getTotalWeight: () => 1_000_000,
+    formatValue: String,
+    getColorBucketForFrame: () => 0,
+    forEachCall: (open, close) => {
+      open(node, 500_000)
+      close(node, 500_000.001)
+    },
+  })
+  const bounds = new Rect(new Vec2(500_000, 0), new Vec2(0.001, 1))
+  const current = new Rect(new Vec2(0, 0), new Vec2(1_000_000, 30))
+  const ordinary = searchMatchViewport(flamechart, {node, configSpaceBounds: bounds}, current)
+  const zoomed = zoomToSearchMatchViewport(flamechart, {node, configSpaceBounds: bounds}, current)
+  expect(zoomed.width()).toBeLessThan(current.width() / 1_000_000)
+  expect(bounds.width() / zoomed.width()).toBeGreaterThan(0.25)
+  expect(zoomed.origin.x).toBeLessThan(bounds.origin.x)
+  expect(zoomed.origin.y).toBe(-1)
+  expect(zoomed.height()).toBe(current.height())
+  expect(bounds.width()).toBe(0.001)
+  expect(flamechart.getLayers()[0][0].start).toBe(500_000)
+  expect(flamechart.getLayers()[0][0].end).toBe(500_000.001)
+  expect(searchMatchViewport(flamechart, {node, configSpaceBounds: bounds}, current)).toEqual(
+    ordinary,
+  )
+})
+
+test('explicit match zoom stays within chart boundaries and honors numerical precision limits', () => {
+  const node = new CallTreeNode({name: 'tiny'} as Frame, null)
+  const flamechart = new Flamechart({
+    getTotalWeight: () => 1_000_000_000_000_000,
+    formatValue: String,
+    getColorBucketForFrame: () => 0,
+    forEachCall: (open, close) => {
+      open(node, 0)
+      close(node, 1)
+    },
+  })
+  const current = new Rect(Vec2.zero, new Vec2(flamechart.getTotalWeight(), 30))
+  for (const start of [0, 500_000_000_000_000, flamechart.getTotalWeight() - 1]) {
+    const bounds = new Rect(new Vec2(start, 0), new Vec2(1, 1))
+    const viewport = zoomToSearchMatchViewport(
+      flamechart,
+      {node, configSpaceBounds: bounds},
+      current,
+    )
+    expect(viewport.width()).toBe(flamechart.getClampedViewportWidth(1.5))
+    expect(viewport.left()).toBeGreaterThanOrEqual(0)
+    expect(viewport.right()).toBeLessThanOrEqual(flamechart.getTotalWeight())
+    expect(viewport.left()).toBeLessThanOrEqual(bounds.left())
+    expect(viewport.right()).toBeGreaterThanOrEqual(bounds.right())
+    expect(Number.isFinite(viewport.origin.x)).toBe(true)
+  }
+})
 
 test('whole-word search finds short symbols without matching surrounding identifiers', () => {
   expect(exactMatchStrings('..', '.', SearchMode.WHOLE_WORD)).toEqual([

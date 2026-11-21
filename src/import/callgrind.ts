@@ -308,8 +308,8 @@ class CallGraph {
 
     const rootNodes = new Set<Frame>(this.frameSet)
 
-    for (let [_, childMap] of this.childrenTotalWeights) {
-      for (let [child, _] of childMap) {
+    for (let [_parent, childMap] of this.childrenTotalWeights) {
+      for (let [child, _weight] of childMap) {
         rootNodes.delete(child)
       }
     }
@@ -547,15 +547,15 @@ class CallgrindParser {
 
       if (nameDefinitionMatch) {
         const id = nameDefinitionMatch[1]
-        const name = nameDefinitionMatch[2]
+        const definedName = nameDefinitionMatch[2]
         if (id in saved) {
           throw new Error(
-            `Redefinition of name with id: ${id}. Original value was "${saved[id]}". Tried to redefine as "${name}" on line ${this.lineNum}.`,
+            `Redefinition of name with id: ${id}. Original value was "${saved[id]}". Tried to redefine as "${definedName}" on line ${this.lineNum}.`,
           )
         }
 
-        saved[id] = name
-        return name
+        saved[id] = definedName
+        return definedName
       }
     }
 

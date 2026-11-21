@@ -783,12 +783,12 @@ function paternMatchObjectiveC(
         // See: https://github.com/apple/swift-corelibs-foundation/blob/76995e8d3d8c10f3f3ec344dace43426ab941d0e/Foundation/NSObjCRuntime.swift#L19
         // const type = String.fromCharCode(value['NS.type'])
 
-        let array: any[] = []
+        let decodedArray: any[] = []
         for (let i = 0; i < count; i++) {
           const element = value['$' + i]
-          array.push(element)
+          decodedArray.push(element)
         }
-        return array
+        return decodedArray
       }
 
       case 'NSDictionary':

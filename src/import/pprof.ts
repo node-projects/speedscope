@@ -102,9 +102,9 @@ export function importAsPprofProfile(rawProfile: ArrayBuffer): Profile | null {
 
     if (lastLine.functionId) {
       let funcFrame = frameInfoByFunctionID.get(i32(lastLine.functionId))
-      const line = lastLine.line instanceof Long ? lastLine.line.toNumber() : lastLine.line
-      if (line && line > 0 && funcFrame != null) {
-        funcFrame.line = line
+      const sourceLine = lastLine.line instanceof Long ? lastLine.line.toNumber() : lastLine.line
+      if (sourceLine && sourceLine > 0 && funcFrame != null) {
+        funcFrame.line = sourceLine
       }
       return funcFrame || null
     } else {

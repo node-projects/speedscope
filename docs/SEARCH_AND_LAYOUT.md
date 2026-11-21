@@ -234,7 +234,19 @@ errors. A PLC streaming smoke retained four profiles, 17,510 frames and
 2.4 seconds in that Node run. These UI changes add no per-frame context index or
 profile copy. Source-name metadata is one bounded string per group.
 
-## Share a selected function
+## Refocus a search match
+
+Graph search offers **Zoom to match** once a retained result is selected. After
+zooming or panning away, use it to center that same match with a little context.
+The action changes only the viewport: measured widths and profile weights stay
+intact. Ordinary next/previous navigation is unchanged, and the existing 10,000
+result cap and numerical zoom limits still apply. Very small matches may reach
+those precision limits. Sandwich's table search does not add this graph action.
+
+This partially addresses [#548](https://github.com/jlfwong/speedscope/issues/548);
+artificially inflating tiles in an overview remains separate work.
+
+## Share function links
 
 Select a function in Time Order, Left Heavy or Sandwich, then choose **Profile
 actions → Link to selected function…**. Review and copy the generated URL in the

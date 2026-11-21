@@ -15,14 +15,16 @@ function arrayBuffer(bytes: Uint8Array): ArrayBuffer {
 const text = '[{"name":"work","ph":"B","ts":1}]'
 
 test('line iterables preserve empty/CRLF/Unicode lines across byte boundaries and can be reused', async () => {
-  for (const text of ['', '\n', '\n\n', 'a\r\nb\n', 'α😀\n日本語\nlong line']) {
+  for (const sampleText of ['', '\n', '\n\n', 'a\r\nb\n', 'α😀\n日本語\nlong line']) {
     for (const size of [1, 2, 3, 7]) {
       await withMockedFileChunkSizeForTests(size, () => {
-        const content = new BufferBackedTextFileContent(arrayBuffer(new TextEncoder().encode(text)))
-        for (const source of [content, new StringBackedTextFileContent(text)]) {
+        const content = new BufferBackedTextFileContent(
+          arrayBuffer(new TextEncoder().encode(sampleText)),
+        )
+        for (const source of [content, new StringBackedTextFileContent(sampleText)]) {
           const lines = source.splitLines()
-          expect([...lines]).toEqual(text.split('\n'))
-          expect([...lines]).toEqual(text.split('\n'))
+          expect([...lines]).toEqual(sampleText.split('\n'))
+          expect([...lines]).toEqual(sampleText.split('\n'))
         }
       })
     }
@@ -142,8 +144,10 @@ test('retains byte-array parsing when text exceeds the string limit', async () =
 
 test('removes a V8 version warning before partial arrays in both parser paths', async () => {
   await withMockedFileChunkSizeForTests(2, () => {
-    const text = ' \nTesting v8 version different from logging version\n[1,2,'
-    const content = new BufferBackedTextFileContent(arrayBuffer(new TextEncoder().encode(text)))
+    const warningText = ' \nTesting v8 version different from logging version\n[1,2,'
+    const content = new BufferBackedTextFileContent(
+      arrayBuffer(new TextEncoder().encode(warningText)),
+    )
     expect(content.parseAsJSON()).toEqual([1, 2])
     const join = jest.spyOn(Array.prototype, 'join')
     join.mockImplementationOnce(() => {

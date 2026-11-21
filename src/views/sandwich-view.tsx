@@ -181,34 +181,34 @@ export const SandwichViewContainer = memo((ownProps: SandwichViewContainerProps)
   const selectedFrame = callerCallee ? callerCallee.selectedFrame : null
 
   const rowList: Frame[] = useMemo(() => {
-    const rowList: Frame[] = []
+    const sortedRows: Frame[] = []
 
     profile.forEachFrame(frame => {
       if (profileSearchResults && !profileSearchResults.hasMatchForFrame(frame)) {
         return
       }
-      rowList.push(frame)
+      sortedRows.push(frame)
     })
 
     switch (tableSortMethod.field) {
       case SortField.SYMBOL_NAME: {
-        sortBy(rowList, f => f.name.toLowerCase())
+        sortBy(sortedRows, f => f.name.toLowerCase())
         break
       }
       case SortField.SELF: {
-        sortBy(rowList, f => f.getSelfWeight())
+        sortBy(sortedRows, f => f.getSelfWeight())
         break
       }
       case SortField.TOTAL: {
-        sortBy(rowList, f => f.getTotalWeight())
+        sortBy(sortedRows, f => f.getTotalWeight())
         break
       }
     }
     if (tableSortMethod.direction === SortDirection.DESCENDING) {
-      rowList.reverse()
+      sortedRows.reverse()
     }
 
-    return rowList
+    return sortedRows
   }, [profile, profileSearchResults, tableSortMethod])
 
   const getIndexForFrame: (frame: Frame) => number | null = useMemo(() => {

@@ -23,7 +23,7 @@ test('V8 JS source coordinates preserve Windows paths, URLs, spaces and Unicode 
   const found: any[] = []
   profile.forEachFrame(frame => found.push([frame.file, frame.line, frame.col, frame.name]))
   for (const [name, file, line, col] of sources) {
-    const frame = found.find(frame => frame[0] === file)
+    const frame = found.find(candidate => candidate[0] === file)
     expect(frame.slice(0, 3)).toEqual([file, line, col])
     if (name) expect(frame[3]).toBe(name)
     else expect(frame[3]).toContain('(anonymous')
