@@ -13,6 +13,70 @@ import {profileGroupAtom, viewModeAtom} from '../app-state'
 import * as fileFormat from '../lib/file-format'
 import {ViewMode} from '../lib/view-mode'
 import {MultiTrackView} from './multi-track-view'
+import {CounterTrack} from '../lib/counter-track'
+import {ProfileGroupAtom} from '../app-state/profile-group'
+
+function counter(): CounterTrack {
+  return {
+    id: 'heap',
+    name: 'Heap',
+    clock: 'wall',
+    timeUnit: 'microseconds',
+    start: 100,
+    valueUnit: 'bytes',
+    times: new Float64Array([0, 1]),
+    values: new Float64Array([20, 40]),
+  }
+}
+
+test('counter-only captures load into Tracks without fabricated profiles and remain exportable', async () => {
+  const counters = [counter()]
+  const group = {name: 'Counters only', indexToView: 0, profiles: [], counterTracks: counters}
+  const setViewMode = jest.fn(),
+    setProfileGroup = jest.fn(),
+    alert = jest.spyOn(window, 'alert')
+  alert.mockImplementation(() => {})
+  const app = new Application({
+    hashParams: {},
+    setProfileGroup,
+    setViewMode,
+    setError: jest.fn(),
+    setLoading: jest.fn(),
+    viewMode: ViewMode.CHRONO_FLAME_CHART,
+  } as any)
+  app.forceUpdate = jest.fn()
+  const save = jest.spyOn(fileFormat, 'saveToFile')
+  save.mockResolvedValue(undefined)
+  try {
+    await (app as any).loadProfile(async () => group)
+    expect(alert).not.toHaveBeenCalled()
+    expect(setProfileGroup).toHaveBeenCalledWith(group)
+    expect(setViewMode).toHaveBeenLastCalledWith(ViewMode.MULTI_TRACK)
+    const state = new ProfileGroupAtom(null, 'counter-only-test')
+    state.setProfileGroup(group)
+    expect(state.get()!.counterTracks).toBe(counters)
+    state.setProfileIndexToView(10)
+    expect(state.get()!.indexToView).toBe(0)
+    ;(app as any).props = {
+      ...app.props,
+      activeProfileState: null,
+      profileGroup: state.get(),
+      viewMode: ViewMode.SANDWICH_VIEW,
+    }
+    const rendered = app.renderContent() as any
+    expect(rendered.type).toBe(MultiTrackView)
+    expect(rendered.props.profiles).toEqual([])
+    expect(rendered.props.counterTracks).toBe(counters)
+    await app.onWindowKeyPress({key: '1'} as KeyboardEvent)
+    expect(setViewMode).toHaveBeenLastCalledWith(ViewMode.MULTI_TRACK)
+    await (app as any).saveFile()
+    expect(save.mock.calls[0][0].counterTracks).toBe(counters)
+    expect(save.mock.calls[0][0].profiles).toEqual([])
+  } finally {
+    save.mockRestore()
+    alert.mockRestore()
+  }
+})
 
 test('function links restore the destination profile after loading and do not reapply to later imports', async () => {
   const builder = new StackListProfileBuilder()

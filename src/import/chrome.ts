@@ -2,6 +2,7 @@ import {Profile, FrameInfo, CallTreeProfileBuilder, ProfileGroup} from '../lib/p
 import {getOrInsert, lastOf, sortBy, itForEach} from '../lib/utils'
 import {TimeFormatter} from '../lib/value-formatters'
 import {chromeTreeToNodes, OldCPUProfile} from './v8cpuFormatter'
+import {importTraceCounterTracks} from './trace-event-counters'
 
 // See: https://github.com/v8/v8/blob/master/src/inspector/js_protocol.json
 
@@ -56,7 +57,9 @@ export function isChromeTimeline(rawProfile: any): rawProfile is TimelineEvent[]
   if (!('pid' in first && 'tid' in first && 'ph' in first && 'cat' in first)) return false
   if (
     !rawProfile.find(
-      e => e.name === 'CpuProfile' || e.name === 'Profile' || e.name === 'ProfileChunk',
+      e =>
+        e.ph !== 'C' &&
+        (e.name === 'CpuProfile' || e.name === 'Profile' || e.name === 'ProfileChunk'),
     )
   )
     return false
@@ -72,6 +75,9 @@ export function isChromeTimelineObject(
 }
 
 export function importFromChromeTimeline(events: TimelineEvent[], fileName: string): ProfileGroup {
+  // Extract before the existing event sort so equal-timestamp observations
+  // preserve their original file order for deterministic last-value wins.
+  const counterTracks = importTraceCounterTracks(events, 'chrome-timeline:wall')
   // It seems like sometimes Chrome timeline files contain multiple CpuProfiles?
   // For now, choose the first one in the list.
 
@@ -90,6 +96,7 @@ export function importFromChromeTimeline(events: TimelineEvent[], fileName: stri
   sortBy(events, e => e.ts)
 
   for (let event of events) {
+    if (event.ph === 'C') continue
     if (event.name === 'CpuProfile') {
       const pidTid = `${event.pid}:${event.tid}`
       const id = event.id || pidTid
@@ -193,7 +200,7 @@ export function importFromChromeTimeline(events: TimelineEvent[], fileName: stri
       profiles.push(profile)
     })
 
-    return {name: fileName, indexToView, profiles}
+    return {name: fileName, indexToView, profiles, ...(counterTracks.length ? {counterTracks} : {})}
   } else {
     throw new Error('Could not find CPU profile in Timeline')
   }

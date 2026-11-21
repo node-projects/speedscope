@@ -81,13 +81,17 @@ export async function importDurationTraceStream(
     const event = value as TraceEvent
     // Chrome sampled CPU events and Hermes sample tables need the original
     // detector. This check deliberately includes markers late in the document.
-    if (event.name === 'CpuProfile' || event.name === 'Profile' || event.name === 'ProfileChunk')
+    if (
+      event.ph !== 'C' &&
+      (event.name === 'CpuProfile' || event.name === 'Profile' || event.name === 'ProfileChunk')
+    )
       throw new NotDurationTrace()
     const duration = event.ph === 'B' || event.ph === 'E' || event.ph === 'X'
-    if (duration && !('ts' in event)) throw new NotDurationTrace()
+    const counter = event.ph === 'C'
+    if ((duration || counter) && !('ts' in event)) throw new NotDurationTrace()
     const metadata =
       event.ph === 'M' && (event.name === 'process_name' || event.name === 'thread_name')
-    if (duration || metadata || count === 1) {
+    if (duration || counter || metadata || count === 1) {
       retainedBytes += offset - eventStart + 1
       if (retainedBytes > limits.maxRetainedBytes)
         throw new TraceImportLimitError('retained event bytes')
@@ -100,6 +104,7 @@ export async function importDurationTraceStream(
         tid: event.tid,
         name: event.name,
         args: event.args,
+        ...(counter ? {cat: event.cat, id: (event as any).id, id2: (event as any).id2} : {}),
         ...(event.ph === 'X' ? {dur: (event as any).dur, tdur: (event as any).tdur} : {}),
       })
     }

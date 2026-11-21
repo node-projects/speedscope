@@ -70,6 +70,9 @@ function HelpDialog(props: {onClose(): void}) {
               <strong>Tracks:</strong> align chronological threads sharing an explicit clock. Pan
               and zoom all rows together, or move the time marker to correlate activity. Open a
               profile for deeper stacks. Profiles without a shared origin are excluded with reasons.
+              Numeric counter rows use their own value axis and unit; Show counters jumps to them.
+              Counter-only recordings open here. Dense rows show an envelope of observed minima and
+              maxima so brief spikes remain visible.
             </li>
           </ul>
           <p>

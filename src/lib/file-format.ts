@@ -10,6 +10,7 @@ import {
 import {TimeFormatter, ByteFormatter, RawValueFormatter} from './value-formatters'
 import {FileFormat} from './file-format-spec'
 import {ExportOptions, exportProfileGroupToBlob} from './profile-export'
+import {exportCounterTracks, importCounterTracks} from './counter-track'
 
 export function exportProfileGroup(profileGroup: ProfileGroup): FileFormat.File {
   const frames: FileFormat.Frame[] = []
@@ -39,6 +40,9 @@ export function exportProfileGroup(profileGroup: ProfileGroup): FileFormat.File 
     $schema: 'https://www.speedscope.app/file-format-schema.json',
     shared: {frames},
     profiles: [],
+    ...(profileGroup.counterTracks
+      ? {counterTracks: exportCounterTracks(profileGroup.counterTracks)}
+      : {}),
   }
 
   for (let profile of profileGroup.profiles) {
@@ -178,9 +182,12 @@ export function importSpeedscopeProfiles(serialized: FileFormat.File): ProfileGr
     }
   }
   return {
-    name: serialized.name || serialized.profiles[0].name || 'profile',
+    name: serialized.name || serialized.profiles[0]?.name || 'profile',
     indexToView: serialized.activeProfileIndex || 0,
     profiles: serialized.profiles.map(p => importSpeedscopeProfile(p, serialized.shared.frames)),
+    ...(serialized.counterTracks === undefined
+      ? {}
+      : {counterTracks: importCounterTracks(serialized.counterTracks)}),
   }
 }
 

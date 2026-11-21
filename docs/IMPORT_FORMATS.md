@@ -88,6 +88,36 @@ to inspect net changes; see [signed pprof semantics and limits](PPROF_IMPORT.md)
 This does not add arbitrary-precision weights, a metric chooser or full inline
 chains. See the [pprof schema used by the importer](../src/import/profile.proto).
 
+## Numeric counter charts
+
+Trace Event `C` observations and native `counterTracks` display as independent
+numeric rows in Tracks, including counter-only recordings. Time clocks/units and
+value units are separate. No byte units, missing-key zeroes or stack durations
+are inferred. Signed gauges, native/worker/export preservation and bounded
+min/max overview behavior are documented in [COUNTERS.md](COUNTERS.md).
+
+## Generic gzip/zlib decompression
+
+Generic compressed inputs have a **512 MiB expanded-byte cap**, shared by
+concatenated members. Both native gzip and incremental fallback gzip/zlib
+decoders enforce the budget while consuming bounded compressed/output chunks.
+Output is copied into owned 16 KiB slabs so tiny members cannot retain many
+large hidden codec buffers. Cancellation and limit failures propagate; a limit
+failure never retries through an unlimited decoder or becomes raw-data success.
+
+This remains an in-memory fallback: compressed input, expanded slabs and the
+final contiguous decoded buffer can overlap. Final assembly can temporarily
+need roughly **twice the expanded bytes**, plus codec state, the compressed
+input, JSON/parser objects and output profiles. Raw uncompressed input is not
+capped by this decompression guard. Parsed models and snapshots still scale
+with the capture. This is neither a total-heap limit nor out-of-core import.
+
+Supported streaming duration/text codecs retain their own separate byte and
+complexity budgets; this generic cap does not replace or lower those limits.
+Format-specific bounds, such as native cProfile and Java ZIP, also remain.
+Corrupt/unsupported compression can return to historical raw format detection,
+but cancellation and expansion-limit errors cannot be bypassed that way.
+
 ## Background import for large recordings
 
 ### Streaming perf and folded stacks

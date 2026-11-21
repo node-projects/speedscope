@@ -325,7 +325,7 @@ export class Application extends StatelessComponent<ApplicationProps> {
       if (profileGroup == null) {
         alert('Unrecognized format! See documentation about supported formats.')
         return
-      } else if (!profileGroup.profiles.length) {
+      } else if (!profileGroup.profiles.length && !profileGroup.counterTracks?.length) {
         alert("Successfully imported profile, but it's empty!")
         return
       }
@@ -338,6 +338,8 @@ export class Application extends StatelessComponent<ApplicationProps> {
       document.title = profileWindowTitle(profileGroup, this.currentHashParams.title)
       if (this.currentHashParams.viewMode !== undefined)
         this.props.setViewMode(this.currentHashParams.viewMode)
+      if (!profileGroup.profiles.length && profileGroup.counterTracks?.length)
+        this.props.setViewMode(ViewMode.MULTI_TRACK)
       const selected = profileGroup.profiles[profileGroup.indexToView]
       if (
         selected &&
@@ -439,6 +441,9 @@ export class Application extends StatelessComponent<ApplicationProps> {
           return {
             name: this.props.profileGroup.name || 'profile',
             sourceName: this.props.profileGroup.sourceName,
+            ...(this.props.profileGroup.counterTracks === undefined
+              ? {}
+              : {counterTracks: this.props.profileGroup.counterTracks}),
             indexToView: this.props.profileGroup.indexToView,
             profiles: this.props.profileGroup.profiles.map(profileState => {
               // We do a shallow clone here to invalidate certain caches keyed
@@ -515,6 +520,12 @@ export class Application extends StatelessComponent<ApplicationProps> {
       )
     )
       return
+    if (
+      !this.props.activeProfileState &&
+      this.props.profileGroup?.counterTracks?.length &&
+      /^[1-4]$/.test(ev.key)
+    )
+      return
     if (ev.key === '1') {
       this.props.setViewMode(
         this.props.activeProfileState?.profile.isChronological() === false
@@ -548,11 +559,12 @@ export class Application extends StatelessComponent<ApplicationProps> {
   private saveFile = async () => {
     if (this.props.loading || this.exportController) return
     if (this.props.profileGroup) {
-      const {name, indexToView, profiles} = this.props.profileGroup
+      const {name, indexToView, profiles, counterTracks} = this.props.profileGroup
       const profileGroup: ProfileGroup = {
         name,
         indexToView,
         profiles: profiles.map(p => p.profile),
+        ...(counterTracks === undefined ? {} : {counterTracks}),
       }
       const controller = new AbortController()
       this.exportController = controller
@@ -809,7 +821,13 @@ export class Application extends StatelessComponent<ApplicationProps> {
   renderContent() {
     const {activeProfileState, error, loading, glCanvas} = this.props
     const viewMode = this.effectiveViewMode()
-    if (viewMode !== ViewMode.MULTI_TRACK || loading || error || !activeProfileState)
+    const counterTracks = this.props.profileGroup?.counterTracks
+    if (
+      viewMode !== ViewMode.MULTI_TRACK ||
+      loading ||
+      error ||
+      (!activeProfileState && !counterTracks?.length)
+    )
       this.trackProfiles = []
 
     if (error) {
@@ -838,6 +856,13 @@ export class Application extends StatelessComponent<ApplicationProps> {
             {progress.profilesCompleted}/{progress.profileCount} profiles ·{' '}
             {progress.framesWritten.toLocaleString()}/{progress.frameCount.toLocaleString()} source
             frames
+            {progress.counterCount !== undefined && (
+              <span>
+                {' '}
+                · {(progress.counterSamplesWritten || 0).toLocaleString()} counter samples ·{' '}
+                {progress.counterCount} counter series
+              </span>
+            )}
           </p>
           <progress
             aria-label="Profiles exported"
@@ -854,11 +879,12 @@ export class Application extends StatelessComponent<ApplicationProps> {
     if (activeProfileState && viewMode === ViewMode.CALL_TREE) {
       return <CallTreeView profile={activeProfileState.profile} />
     }
-    if (activeProfileState && viewMode === ViewMode.MULTI_TRACK) {
+    if ((activeProfileState || counterTracks?.length) && viewMode === ViewMode.MULTI_TRACK) {
       return (
         <MultiTrackView
           profiles={this.getTrackProfiles()}
-          selectedProfileIndex={activeProfileState.index}
+          counterTracks={counterTracks}
+          selectedProfileIndex={activeProfileState?.index ?? 0}
           onSelectProfile={this.openTrackProfile}
         />
       )
@@ -884,6 +910,8 @@ export class Application extends StatelessComponent<ApplicationProps> {
   }
 
   private effectiveViewMode() {
+    if (!this.props.activeProfileState && this.props.profileGroup?.counterTracks?.length)
+      return ViewMode.MULTI_TRACK
     return this.props.viewMode === ViewMode.CHRONO_FLAME_CHART &&
       this.props.activeProfileState?.profile.isChronological() === false
       ? ViewMode.LEFT_HEAVY_FLAME_GRAPH

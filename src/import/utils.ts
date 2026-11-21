@@ -1,5 +1,5 @@
-import * as pako from 'pako'
 import {JSON_parse} from 'uint8array-json-parser'
+import {decompressProfileInput, DecompressionOptions} from './bounded-decompression'
 
 export interface ProfileDataSource {
   name(): Promise<string>
@@ -299,34 +299,18 @@ export class TextProfileDataSource implements ProfileDataSource {
 }
 
 export class MaybeCompressedDataReader implements ProfileDataSource {
-  private uncompressedData: Promise<ArrayBuffer>
+  private uncompressedData: Promise<ArrayBuffer> | undefined
+  private maybeCompressedDataPromise: Promise<ArrayBuffer> | null
 
   constructor(
     private namePromise: Promise<string>,
     maybeCompressedDataPromise: Promise<ArrayBuffer>,
+    private options: DecompressionOptions = {},
   ) {
-    this.uncompressedData = maybeCompressedDataPromise.then(async (fileData: ArrayBuffer) => {
-      const bytes = new Uint8Array(fileData)
-      if (
-        bytes[0] === 0x1f &&
-        bytes[1] === 0x8b &&
-        typeof DecompressionStream !== 'undefined' &&
-        typeof Response !== 'undefined'
-      ) {
-        try {
-          const stream = new Response(fileData).body!.pipeThrough(new DecompressionStream('gzip'))
-          return await new Response(stream).arrayBuffer()
-        } catch (e) {
-          // Retain the existing inflater for browsers without working native gzip support.
-        }
-      }
-      try {
-        const result = pako.inflate(bytes).buffer as ArrayBuffer
-        return result
-      } catch (e) {
-        return fileData
-      }
-    })
+    // Observe early FileReader failures even if an import is cancelled before
+    // requesting its body. Decompression itself starts lazily and is cached.
+    this.maybeCompressedDataPromise = maybeCompressedDataPromise
+    void maybeCompressedDataPromise.catch(() => {})
   }
 
   async name(): Promise<string> {
@@ -334,7 +318,13 @@ export class MaybeCompressedDataReader implements ProfileDataSource {
   }
 
   async readAsArrayBuffer(): Promise<ArrayBuffer> {
-    return await this.uncompressedData
+    if (this.options.signal?.aborted) throw new DOMException('Import cancelled', 'AbortError')
+    if (!this.uncompressedData) {
+      const input = this.maybeCompressedDataPromise!
+      this.maybeCompressedDataPromise = null
+      this.uncompressedData = input.then(data => decompressProfileInput(data, this.options))
+    }
+    return this.uncompressedData
   }
 
   async readAsText(): Promise<TextFileContent> {
@@ -342,23 +332,53 @@ export class MaybeCompressedDataReader implements ProfileDataSource {
     return new BufferBackedTextFileContent(buffer)
   }
 
-  static fromFile(file: File): MaybeCompressedDataReader {
+  static fromFile(file: File, options: DecompressionOptions = {}): MaybeCompressedDataReader {
     const maybeCompressedDataPromise: Promise<ArrayBuffer> = new Promise((resolve, reject) => {
       const reader = new FileReader()
-      reader.addEventListener('loadend', () => {
+      const cancel = () => reader.abort()
+      const cleanup = () => {
+        options.signal?.removeEventListener('abort', cancel)
+        reader.removeEventListener('loadend', loadend)
+      }
+      const loadend = () => {
+        cleanup()
+        if (options.signal?.aborted) {
+          reject(new DOMException('Import cancelled', 'AbortError'))
+          return
+        }
         if (!(reader.result instanceof ArrayBuffer)) {
           reject(reader.error || new Error('Could not read profile file'))
           return
         }
         resolve(reader.result)
-      })
-      reader.readAsArrayBuffer(file)
+      }
+      reader.addEventListener('loadend', loadend)
+      if (options.signal?.aborted) {
+        cleanup()
+        reject(new DOMException('Import cancelled', 'AbortError'))
+        return
+      }
+      options.signal?.addEventListener('abort', cancel, {once: true})
+      try {
+        reader.readAsArrayBuffer(file)
+      } catch (error) {
+        cleanup()
+        reject(error)
+      }
     })
 
-    return new MaybeCompressedDataReader(Promise.resolve(file.name), maybeCompressedDataPromise)
+    return new MaybeCompressedDataReader(
+      Promise.resolve(file.name),
+      maybeCompressedDataPromise,
+      options,
+    )
   }
 
-  static fromArrayBuffer(name: string, buffer: ArrayBuffer): MaybeCompressedDataReader {
-    return new MaybeCompressedDataReader(Promise.resolve(name), Promise.resolve(buffer))
+  static fromArrayBuffer(
+    name: string,
+    buffer: ArrayBuffer,
+    options: DecompressionOptions = {},
+  ): MaybeCompressedDataReader {
+    return new MaybeCompressedDataReader(Promise.resolve(name), Promise.resolve(buffer), options)
   }
 }

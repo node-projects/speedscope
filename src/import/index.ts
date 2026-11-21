@@ -80,7 +80,7 @@ export async function importProfilesFromFile(
   checkImportAbort(options)
   await checkJavaThreadDumpZipFileSize(file, options.signal)
   await checkPythonCProfileFileSize(file, options.signal)
-  return importProfileGroup(MaybeCompressedDataReader.fromFile(file), options)
+  return importProfileGroup(MaybeCompressedDataReader.fromFile(file, options), options)
 }
 
 export async function importProfilesFromArrayBuffer(
@@ -89,7 +89,10 @@ export async function importProfilesFromArrayBuffer(
   options: ImportReadOptions = {},
 ): Promise<ProfileGroup | null> {
   checkImportAbort(options)
-  return importProfileGroup(MaybeCompressedDataReader.fromArrayBuffer(fileName, buffer), options)
+  return importProfileGroup(
+    MaybeCompressedDataReader.fromArrayBuffer(fileName, buffer, options),
+    options,
+  )
 }
 
 async function importProfileGroup(

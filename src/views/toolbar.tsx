@@ -49,7 +49,7 @@ function ToolbarLeftContent(props: ToolbarProps) {
   const setCallTree = useSetViewMode(viewModeAtom.set, ViewMode.CALL_TREE)
   const setTracks = useSetViewMode(viewModeAtom.set, ViewMode.MULTI_TRACK)
 
-  if (!props.activeProfileState) return null
+  if (!props.activeProfileState && !props.profileGroup?.counterTracks?.length) return null
 
   return (
     <div className={css(style.toolbarLeft)}>
@@ -60,11 +60,13 @@ function ToolbarLeftContent(props: ToolbarProps) {
           props.viewMode === ViewMode.CHRONO_FLAME_CHART && style.toolbarTabActive,
         )}
         onClick={setChronoFlameChart}
-        disabled={!props.activeProfileState.profile.isChronological()}
+        disabled={!props.activeProfileState?.profile.isChronological()}
         title={
-          !props.activeProfileState.profile.isChronological()
-            ? 'This profile contains aggregate weights without chronological order'
-            : undefined
+          !props.activeProfileState
+            ? 'No stack profile is selected'
+            : !props.activeProfileState.profile.isChronological()
+              ? 'This profile contains aggregate weights without chronological order'
+              : undefined
         }
       >
         <span className={css(style.emoji)}>🕰</span>Time Order
@@ -76,6 +78,7 @@ function ToolbarLeftContent(props: ToolbarProps) {
           props.viewMode === ViewMode.LEFT_HEAVY_FLAME_GRAPH && style.toolbarTabActive,
         )}
         onClick={setLeftHeavyFlameGraph}
+        disabled={!props.activeProfileState}
       >
         <span className={css(style.emoji)}>⬅️</span>Left Heavy
       </button>
@@ -86,6 +89,7 @@ function ToolbarLeftContent(props: ToolbarProps) {
           props.viewMode === ViewMode.SANDWICH_VIEW && style.toolbarTabActive,
         )}
         onClick={setSandwichView}
+        disabled={!props.activeProfileState}
       >
         <span className={css(style.emoji)}>🥪</span>Sandwich
       </button>
@@ -96,6 +100,7 @@ function ToolbarLeftContent(props: ToolbarProps) {
           props.viewMode === ViewMode.CALL_TREE && style.toolbarTabActive,
         )}
         onClick={setCallTree}
+        disabled={!props.activeProfileState}
       >
         Call Tree
       </button>
@@ -208,7 +213,9 @@ function ToolbarCenterContent(props: ToolbarProps): JSX.Element {
       )
     }
   }
-  return <Fragment>{'🔬speedscope'}</Fragment>
+  return (
+    <Fragment>{profileGroup?.counterTracks?.length ? profileGroup.name : '🔬speedscope'}</Fragment>
+  )
 }
 
 function ToolbarRightContent(props: ToolbarProps) {
@@ -361,6 +368,9 @@ function ToolbarRightContent(props: ToolbarProps) {
       props.setProfileGroup({
         name: profileGroup.name,
         sourceName: profileGroup.sourceName,
+        ...(profileGroup.counterTracks === undefined
+          ? {}
+          : {counterTracks: profileGroup.counterTracks}),
         indexToView: profileGroup.profiles.length,
         profiles: [...profileGroup.profiles.map(p => p.profile), derived],
       })
@@ -437,7 +447,7 @@ function ToolbarRightContent(props: ToolbarProps) {
           </option>
         </select>
       )}
-      {props.activeProfileState && exportFile}
+      {(props.activeProfileState || props.profileGroup?.counterTracks?.length) && exportFile}
       {importFile}
       {colorSchemeToggle}
       {help}
@@ -489,6 +499,7 @@ function ToolbarRightContent(props: ToolbarProps) {
             current.setProfileGroup({
               name: group.name,
               sourceName: group.sourceName,
+              ...(group.counterTracks === undefined ? {} : {counterTracks: group.counterTracks}),
               indexToView: group.indexToView,
               profiles,
             })
@@ -523,6 +534,7 @@ function ToolbarRightContent(props: ToolbarProps) {
             current.setProfileGroup({
               name: group.name,
               sourceName: group.sourceName,
+              ...(group.counterTracks === undefined ? {} : {counterTracks: group.counterTracks}),
               indexToView: group.profiles.length,
               profiles: [...group.profiles.map(p => p.profile), derived],
             })
