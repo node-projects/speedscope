@@ -3,6 +3,22 @@
 The [README](../README.md#supported-file-formats) lists supported sources.
 This guide describes additional fork-specific behavior and its limits.
 
+## Trace Event matching diagnostics
+
+Duration-event imports emit at most two console examples for each of four
+categories across the entire recording: an end on an empty stack, a mismatched
+end name, mismatched end arguments and a frame still open at EOF. Completed
+duration normalization prints one summary with all category counts and the
+number of suppressed examples. Clean imports are silent. Frame-key snippets are limited to 512
+characters with control characters escaped; each example is at most 2,048
+characters. Suppressed examples do not format a message or retain raw events.
+
+These diagnostics describe the existing matching behavior, including ignored
+end events and automatic frame closure. Begin/end arguments can differ, so the
+counts do not establish that a recording is invalid. This logging limit does
+not change event ordering, exported profiles or handling of crossing intervals.
+It also does not bound the frame-key serialization, event queues or final model.
+
 ## Instant events
 
 Trace Event phases `i`, historical `I` and `R` import as scoped points on
