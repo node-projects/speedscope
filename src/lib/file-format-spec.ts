@@ -53,6 +53,11 @@ export namespace FileFormat {
   }
 
   export interface IProfile {
+    // Explicit fork metadata. start is the shared-clock timestamp corresponding
+    // to this profile's startValue, in the profile's own time unit. Clock names
+    // are comparable only within this file/group; they are not global IDs.
+    // Explicit source-time origin. startValue alone never implies alignment.
+    timeline?: TimelineOrigin
     // Optional fork metadata. Aggregate-only profiles have no time-order axis.
     // Omitted values preserve compatibility with existing speedscope files.
     isChronological?: boolean
@@ -62,6 +67,20 @@ export namespace FileFormat {
     // different kinds of profiles to be contained and each type to be part of
     // a discriminated union.
     type: ProfileType
+  }
+
+  export interface TimelineOrigin {
+    // Clock identity is scoped to the containing file/group, not a global
+    // promise that independently imported recordings share synchronized clocks.
+    /** Shared clock name within one source profile group.
+     * @minLength 1
+     * @maxLength 128
+     */
+    clock: string
+    // Finite source timestamp of local coordinate zero, in this profile's unit.
+    // For native input this is already the origin AFTER startValue is rebased;
+    // importers must not add or subtract serialized startValue a second time.
+    start: number
   }
 
   export interface EventedProfile extends IProfile {

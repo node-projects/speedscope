@@ -149,22 +149,56 @@ class GroupedCallTreeIndex {
   }
 }
 
+export type TimelineOrigin = Readonly<FileFormat.TimelineOrigin>
+
 export class Profile {
   protected name: string = ''
   private chronological = true
   private derived = false
+  private timelineOrigin: TimelineOrigin | undefined
+
+  getTimelineOrigin(): TimelineOrigin | undefined {
+    return this.timelineOrigin
+  }
+  setTimelineOrigin(origin: TimelineOrigin | undefined) {
+    if (origin === undefined) {
+      this.timelineOrigin = undefined
+      return
+    }
+    if (
+      !origin ||
+      typeof origin !== 'object' ||
+      typeof origin.clock !== 'string' ||
+      !origin.clock.length ||
+      origin.clock.length > 128 ||
+      origin.clock.trim() !== origin.clock ||
+      /[\u0000-\u001f\u007f]/.test(origin.clock) ||
+      typeof origin.start !== 'number' ||
+      !Number.isFinite(origin.start)
+    )
+      throw new Error('Invalid timeline origin: use a bounded clock name and finite timestamp')
+    if (
+      !this.chronological ||
+      this.derived ||
+      !['nanoseconds', 'microseconds', 'milliseconds', 'seconds'].includes(this.getWeightUnit())
+    )
+      throw new Error('Timeline origin requires an original chronological profile with time units')
+    this.timelineOrigin = Object.freeze({clock: origin.clock, start: origin.start})
+  }
 
   isChronological() {
     return this.chronological
   }
   setChronological(value: boolean) {
     this.chronological = value
+    if (!value) this.timelineOrigin = undefined
   }
   isDerived() {
     return this.derived
   }
   setDerived(value: boolean) {
     this.derived = value
+    if (value) this.timelineOrigin = undefined
   }
 
   protected totalWeight: number
@@ -235,6 +269,7 @@ export class Profile {
       totalWeight: this.totalWeight,
       chronological: this.chronological,
       derived: this.derived,
+      ...(this.timelineOrigin ? {timeline: this.timelineOrigin} : {}),
       frames: frames.map(({key, name, file, line, col, color}) => ({
         key,
         name,
@@ -277,6 +312,7 @@ export class Profile {
     if (data.unit === 'bytes') profile.setValueFormatter(new ByteFormatter())
     else if (data.unit === 'none') profile.setValueFormatter(new RawValueFormatter())
     else profile.setValueFormatter(new TimeFormatter(data.unit))
+    if (data.timeline !== undefined) profile.setTimelineOrigin(data.timeline)
     const setWeights = (target: HasWeights, total: number, self: number) => {
       if (!Number.isFinite(total) || !Number.isFinite(self) || total < 0 || self < 0)
         throw new Error('Invalid profile snapshot weights')
@@ -346,6 +382,7 @@ export class Profile {
     return this.valueFormatter.format(v, step)
   }
   setValueFormatter(f: ValueFormatter) {
+    if (f.unit !== this.valueFormatter.unit) this.timelineOrigin = undefined
     this.valueFormatter = f
   }
   getWeightUnit(): FileFormat.ValueUnit {
