@@ -4,7 +4,7 @@ import '../../assets/source-code-pro.css'
 import {h} from 'preact'
 import {StyleSheet, css} from 'aphrodite'
 
-import {ProfileGroup, SymbolRemapper} from '../lib/profile'
+import {Profile, ProfileGroup, SymbolRemapper} from '../lib/profile'
 import {profileWindowTitle} from '../lib/profile-context'
 import {FontFamily, FontSize, Duration} from './style'
 import {importEmscriptenSymbolMap as importEmscriptenSymbolRemapper} from '../lib/emscripten'
@@ -29,6 +29,7 @@ import {StatelessComponent} from '../lib/preact-helpers'
 import {HelpButton} from './help'
 import {SandwichViewContainer} from './sandwich-view'
 import {CallTreeView} from './call-tree-view'
+import {MultiTrackView} from './multi-track-view'
 import {
   importProfileFile,
   importProfileBuffer,
@@ -197,6 +198,28 @@ export type ApplicationProps = {
 }
 
 export class Application extends StatelessComponent<ApplicationProps> {
+  private trackProfiles: Profile[] = []
+  private getTrackProfiles() {
+    const profiles = this.props.profileGroup?.profiles || []
+    if (
+      profiles.length !== this.trackProfiles.length ||
+      profiles.some((entry, index) => entry.profile !== this.trackProfiles[index])
+    )
+      this.trackProfiles = profiles.map(entry => entry.profile)
+    return this.trackProfiles
+  }
+  private openTrackProfile = (index: number) => {
+    const profile = this.props.profileGroup?.profiles[index]?.profile
+    if (!profile) return
+    this.props.setProfileIndexToView(index)
+    this.props.setViewMode(
+      !this.props.canvasContext
+        ? ViewMode.CALL_TREE
+        : profile.isChronological()
+          ? ViewMode.CHRONO_FLAME_CHART
+          : ViewMode.LEFT_HEAVY_FLAME_GRAPH,
+    )
+  }
   private loadError = ''
   private exportController: AbortController | null = null
   private exportProgress: ExportProgress | null = null
@@ -484,6 +507,14 @@ export class Application extends StatelessComponent<ApplicationProps> {
   }
 
   onWindowKeyPress = async (ev: KeyboardEvent) => {
+    if (ev.defaultPrevented || ev.ctrlKey || ev.metaKey || ev.altKey || ev.isComposing) return
+    if (
+      ev.target instanceof Element &&
+      ev.target.closest(
+        'input, textarea, select, [contenteditable], [role="textbox"], [role="combobox"]',
+      )
+    )
+      return
     if (ev.key === '1') {
       this.props.setViewMode(
         this.props.activeProfileState?.profile.isChronological() === false
@@ -496,6 +527,8 @@ export class Application extends StatelessComponent<ApplicationProps> {
       this.props.setViewMode(ViewMode.SANDWICH_VIEW)
     } else if (ev.key === '4') {
       this.props.setViewMode(ViewMode.CALL_TREE)
+    } else if (ev.key === '5') {
+      this.props.setViewMode(ViewMode.MULTI_TRACK)
     } else if (ev.key === 'r') {
       const {flattenRecursion} = this.props
       this.props.setFlattenRecursion(!flattenRecursion)
@@ -776,6 +809,8 @@ export class Application extends StatelessComponent<ApplicationProps> {
   renderContent() {
     const {activeProfileState, error, loading, glCanvas} = this.props
     const viewMode = this.effectiveViewMode()
+    if (viewMode !== ViewMode.MULTI_TRACK || loading || error || !activeProfileState)
+      this.trackProfiles = []
 
     if (error) {
       return this.renderError()
@@ -818,6 +853,15 @@ export class Application extends StatelessComponent<ApplicationProps> {
 
     if (activeProfileState && viewMode === ViewMode.CALL_TREE) {
       return <CallTreeView profile={activeProfileState.profile} />
+    }
+    if (activeProfileState && viewMode === ViewMode.MULTI_TRACK) {
+      return (
+        <MultiTrackView
+          profiles={this.getTrackProfiles()}
+          selectedProfileIndex={activeProfileState.index}
+          onSelectProfile={this.openTrackProfile}
+        />
+      )
     }
 
     if (!activeProfileState || !glCanvas) {

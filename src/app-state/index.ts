@@ -82,6 +82,9 @@ export const tableSortMethodAtom = new Atom<SortMethod>(
 let synchronizingSelection = false
 function synchronizeSelection() {
   if (synchronizingSelection) return
+  // Tracks uses original chronological profiles and owns no individual-stack
+  // selection. Avoid constructing a flattened profile just to enter this view.
+  if (viewModeAtom.get() === ViewMode.MULTI_TRACK) return
   const active = profileGroupAtom.getActiveProfile()
   if (!active) return
   synchronizingSelection = true
