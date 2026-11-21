@@ -71,6 +71,7 @@ speedscope is designed to ingest profiles from a variety of different profilers 
 - [Importing from custom sources](https://github.com/jlfwong/speedscope/wiki/Importing-from-custom-sources)
   - [Differential folded files](docs/PROFILE_COMPARISON.md#differential-folded-files), using explicit import to preserve ordinary numeric symbol names.
   - [Producer frame colors](docs/SOURCE_AND_LABELS.md), with theme contrast adaptation and exact RGB export.
+  - [Numeric counter charts](docs/COUNTERS.md), including Trace Event `C` input and independent native time/value axes.
 
 Contributions to add support for additional formats are welcome! Open an issue in
 [this fork](https://github.com/node-projects/speedscope/issues). Upstream importer
@@ -90,9 +91,10 @@ including perf, folded stacks, pprof, JFR, Android traces and renamed captures.
 Recognized gzip perf/folded/text files prefer a worker even when compressed
 below 1 MiB.
 Progress and **Cancel import** keep the app responsive. Supported perf/folded text
-and duration traces stream plain/gzip input; generic fallback formats still
-materialize their input. Final profile models remain proportional to recording
-size. Very large captures can
+and duration traces stream plain/gzip input. Generic gzip/zlib fallback expansion
+is capped at 512 MiB but still materializes decoded input and JSON; final buffer
+assembly can temporarily need roughly twice the expanded bytes. Final profile
+models remain proportional to recording size. Very large captures can
 still exceed browser memory limits. Search offers Contains, Whole word and Exact
 matching for function names and source paths. **Regex (RE2)** supports bounded,
 linear-time regular-expression matching; unsupported syntax shows an error.
@@ -120,6 +122,11 @@ native recordings can declare them explicitly. Unanchored or aggregate profiles
 are excluded with reasons. The view extracts bounded visible geometry rather
 than retaining another full flamechart per thread. See [clock semantics and
 track controls](docs/MULTI_TRACK.md).
+Numeric counter rows share that clock while retaining independent value axes and
+units. Trace Event counters keep unspecified units as `unknown`; explicit native
+metadata can declare bytes or other gauges. Markers use original observations,
+and dense ranges show bounded min/max envelopes. Counter-only captures and export
+are supported. See [counter semantics and limits](docs/COUNTERS.md).
 Use **Profile actions → Link to selected function…** to share a function selection.
 For local recordings, the recipient opens the link and imports the same file.
 Same-tab links and browser Back/Forward update the function selection without

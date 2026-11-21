@@ -33,8 +33,11 @@ rounding or dropping negative values. This is not arbitrary-precision int64
 support. Existing pprof limitations remain: only the selected metric is imported,
 only the outermost inline location frame is retained, labels and mapping/address
 metadata are not fully represented, and parsed input plus output trees scale
-with capture size. Generic gzip decompression is not bounded by the text-stream
-limits. This change does not make pprof streaming or out of core.
+with capture size. Generic gzip/zlib expansion has a separate 512 MiB cap;
+it still materializes decoded input, and final assembly can temporarily need
+roughly twice the expanded bytes, in addition to compressed input and models.
+The supported text-stream readers keep their own limits. This does not make
+pprof streaming or out of core. See [generic decompression](IMPORT_FORMATS.md#generic-gzipzlib-decompression).
 
 A local Go 1.24.1 `net/http/pprof` heap-delta check allocated then released 16 MiB
 between collections. It imported 16,777,600 negative and 78,112 positive bytes,

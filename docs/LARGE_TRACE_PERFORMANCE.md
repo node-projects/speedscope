@@ -1,5 +1,62 @@
 # Large trace performance follow-up
 
+## Counter charts and bounded generic decompression (2026-11-21)
+
+[Counter tracks](COUNTERS.md) preserve independent numeric observations instead
+of creating stack frames or measured durations. Counter-only groups, native
+roundtrips, worker transfer/hydration and chunked export are supported. Internal
+counter data is capped at 256 series, two million observations and 32,000,000
+unique numeric backing bytes. Hidden oversized backing buffers are rejected;
+shared buffers count once. Tracks retains at most 16,384 visible counter points
+across virtual rows and uses explicit min/max envelopes for dense ranges.
+Markers still read original observations. These bounds do not bound the input
+JSON, other stack models or the exported artifact.
+
+Generic gzip/zlib decoding now caps cumulative expansion at **512 MiB**, using
+bounded input/output chunks in native and fallback codecs. Owned 16 KiB slabs
+avoid retaining large codec buffers behind tiny output views. Concatenated
+members share one budget; cancellation/limit failures cannot retry through an
+unlimited path. Supported streaming duration/text paths retain their own guards.
+
+Generic fallback still materializes the expanded output and often parses a full
+JSON document. Slabs and final contiguous output can coexist during assembly,
+temporarily requiring roughly twice the expanded bytes, plus compressed input,
+codec state, parsed objects and final models. Uncompressed raw input is not
+covered by the decompression cap. This remains bounded decompression rather
+than an out-of-core viewer or total-process memory guarantee; see
+[the generic policy](IMPORT_FORMATS.md#generic-gzipzlib-decompression).
+
+Established focused checks cover native counter-only object/chunked roundtrips,
+zero-copy worker hydration, transfer-list deduplication, malformed observations,
+sample/label/backing-byte caps and export cancellation/progress. Generic codec
+regressions cover native/fallback gzip/zlib byte parity, concatenated-member
+budgets and cancellation without turning a limit error into raw-data success.
+The authored counter fixture and separately checked public #235 capture are
+documented in [counter provenance](../sample/profiles/trace-event/COUNTERS.md).
+The private PLC browser check loaded four stack profiles and four counter series
+(two COM-load and two cycle-time series) on the same `trace-event:wall`
+microsecond clock; Show counters exposed those rows. An authored counter-only
+native recording with byte and signed-count series opened directly in Tracks
+with stack tabs disabled, read original values at the marker, and exported zero
+profiles/two counters with values and units intact. These are browser smoke
+checks, not a claim that every large counter recording fits in memory.
+Earlier exact export-hash comparisons below predate the new explicit clock and
+counter fields; current full native exports preserve that additional data.
+
+A single local before/after reproduction with 10,000 one-byte gzip members
+(about 210 KB compressed input and 10 KB expanded output) measured peak
+`ArrayBuffers` at **161.80 MiB → 15.57 MiB** after owned-slab retention replaced
+codec-view retention. This peak includes transient allocations and garbage
+collection timing; it is not retained-memory accounting or a process-wide bound.
+
+A final local Node 22 run passed 105 suites, 716 tests and 310 snapshots.
+Type checking, schema checks, five Node tests, prepack/Pages/single-file builds
+and npm dry-pack checks also passed; the package includes the counter guide.
+Regressions include empty-member cancellation, FileReader cleanup and
+fractional shared-timestamp boundaries.
+Counter steps use the primary foreground with a 1.5-pixel stroke for legibility;
+their observed values and step durations are unchanged.
+
 ## Long-timeline GPU precision (2026-11-21)
 
 The renderer previously uploaded absolute time coordinates as float32. Near
@@ -216,7 +273,7 @@ its whole contents; transferred ArrayBuffers are consumed in 64 KiB slices.
 Native `DecompressionStream` inflates gzip incrementally. The streaming parser
 ([@streamparser/json](https://github.com/juanjoDiaz/streamparser-json), pinned at
 0.0.26) releases completed event objects from its parent array. We retain the
-duration events, naming metadata and first event needed by the existing Hermes
+duration/counter events, naming metadata and first event needed by the existing Hermes
 discriminator, dropping unused event fields and ignored events. Event arguments
 remain intact because they participate in frame identities.
 

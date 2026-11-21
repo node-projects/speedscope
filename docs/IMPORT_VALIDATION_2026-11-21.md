@@ -258,3 +258,29 @@ Those limits, broader format clock coverage, mixed-unit conversion and nested
 process grouping remain explicit. Issues #556/#473/#117 are therefore recorded
 as partial rather than claiming universal multitrack support. Private PLC data
 and ignored before/after diagnostic bundles remain excluded from Git.
+
+## Counter charts and generic expansion limits
+
+The final Node 22 local suite passed 716 tests across 105 suites with 310 snapshots.
+Five Node tests, typecheck, lint, schema generation, all 134 backlog classifications,
+standalone/Pages/single-file builds and npm dry-pack checks passed. Focused tests
+cover counter-only import/export, worker ownership and unique backing-byte limits,
+raw-observation limits, last duplicate values, dense extrema, fractional marker
+boundaries, cancellation, native/fallback codecs and FileReader cleanup.
+
+Browser checks loaded the private PLC as four profiles and four counters, and the
+public issue #235 capture as 113 profiles and twelve counters with bounded dense
+min/max envelopes. Native counter-only byte/signed-count series opened in Tracks
+and exported zero profiles/two counters with the same observations and units.
+The existing click-open thread selector was rechecked on deployed Pages: selecting
+Worker succeeded and restored focus to the trigger. Its fix is already in f630315.
+
+The forced generic PLC path retained 17,510 frames and 1,039,656 call events;
+the shared-frame/profile payload SHA-256 remained
+`53b28f954a000a144a4b88d6806a8e20a79ee58b3ef748067d132232977bd75b`.
+This hash excludes group-level counters and does not imply identical whole exports.
+A 10,000 one-byte gzip-member diagnostic measured about 160 MiB versus 16 MiB
+peak ArrayBuffer growth after coalescing output into owned slabs; transient codec
+allocation and GC remain part of that observation. Generic decode/JSON still
+materializes input, and the 512 MiB expansion limit is not a process-memory cap.
+Private traces, diagnostic bundles and screenshots remain ignored.

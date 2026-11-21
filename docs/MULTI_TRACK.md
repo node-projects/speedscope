@@ -13,6 +13,14 @@ was idle. Tracks uses Canvas 2D independently of WebGL; if WebGL is unavailable,
 **Open profile** uses the Call Tree. Canvas allocation failures are reported
 without hiding the row's profile navigation.
 
+Numeric counter rows share a compatible clock while retaining independent value
+axes and units. **Show counters** and **Show profiles** navigate between the row
+types. Counter-only captures open directly in Tracks, with export available and
+stack tabs disabled. Markers read original observations; dense ranges use
+bounded min/max envelopes rather than reconstructed values or longer spikes.
+See [counter charts and native metadata](COUNTERS.md) for the exact model and
+separate point/storage budgets.
+
 ## Explicit origin metadata
 
 Trace Event B/E/X duration imports retain the earliest importable wall-clock

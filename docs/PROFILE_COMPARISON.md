@@ -105,7 +105,10 @@ It rejects malformed noncomment lines, negative/nonfinite weights, overflowing
 totals and mixed one/two-column files. Decimal/scientific notation is accepted;
 all-zero rows have no measured width. UTF-8 plain/native-gzip inputs stream with
 the existing text byte, line, sample and depth guards. Output models still scale
-with both sides; generic fallback decoding can materialize expanded input.
+with both sides; generic gzip/zlib fallback has a separate 512 MiB expansion cap
+but materializes decoded input and JSON. Final byte-buffer assembly can
+temporarily need roughly twice the expanded bytes, in addition to both models.
+See [generic decompression limits](IMPORT_FORMATS.md#generic-gzipzlib-decompression).
 
 The format follows the [producer's column definition](https://github.com/brendangregg/FlameGraph/blob/master/difffolded.pl).
 Our graph uses the documented union envelope and total-delta colors. It does not
