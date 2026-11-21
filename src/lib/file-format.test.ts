@@ -1,4 +1,44 @@
 import {checkProfileSnapshot, expectImportFailure} from './test-utils'
+import {exportProfileGroup, importSpeedscopeProfiles} from './file-format'
+import {FileFormat} from './file-format-spec'
+
+function coloredProfile(color: unknown): FileFormat.File {
+  return {
+    $schema: 'https://www.speedscope.app/file-format-schema.json',
+    shared: {
+      frames: [
+        {name: 'same function', color},
+        {name: 'same function', color: '#00FF00'},
+      ],
+    },
+    profiles: [
+      {
+        type: 'sampled',
+        name: 'colors',
+        unit: 'none',
+        startValue: 0,
+        endValue: 2,
+        samples: [[0], [1]],
+        weights: [1, 1],
+      },
+    ],
+  } as unknown as FileFormat.File
+}
+
+test('native producer colors preserve exact RGB spelling and distinct frame identities', () => {
+  const output = exportProfileGroup(importSpeedscopeProfiles(coloredProfile('#8a2BE2')))
+  expect(output.shared.frames).toEqual([
+    {name: 'same function', color: '#8a2BE2'},
+    {name: 'same function', color: '#00FF00'},
+  ])
+})
+
+test('native producer colors reject CSS expressions, alpha, short hex and nonstrings', () => {
+  for (const color of ['red', '#fff', '#12345678', 'url(test)', '', '#12345G', null, 123]) {
+    expect(() => importSpeedscopeProfiles(coloredProfile(color))).toThrow('RGB hex')
+  }
+  expect(() => importSpeedscopeProfiles(coloredProfile(undefined))).not.toThrow()
+})
 
 describe('importSpeedscopeProfiles', () => {
   test('0.0.1 evented profile', async () => {

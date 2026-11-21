@@ -50,6 +50,28 @@ test('inversion reverses complete stacks without losing self time (#497)', () =>
   expect(inner.getTotalWeight()).toBe(4)
 })
 
+test('combining preserves producer color identities, merging only equivalent RGB spelling', () => {
+  const profiles = ['#FF0000', '#00ff00', '#00FF00'].map(color => {
+    const builder = new StackListProfileBuilder()
+    builder.appendSampleWithWeight([{key: 0, name: 'same function', color}], 1)
+    return builder.build()
+  })
+  const combined = combineProfiles(profiles)
+  expect(
+    combined
+      .getGroupedCalltreeRoot()
+      .children.map(node => [node.frame.color, node.getTotalWeight()]),
+  ).toEqual(
+    expect.arrayContaining([
+      ['#FF0000', 1],
+      ['#00ff00', 2],
+    ]),
+  )
+  expect(combined.getGroupedCalltreeRoot().children).toHaveLength(2)
+  const exported = exportProfileGroup({name: 'colors', indexToView: 0, profiles: [combined]})
+  expect(exported.shared.frames.map(frame => frame.color).sort()).toEqual(['#00ff00', '#FF0000'])
+})
+
 test('aggregate and derived metadata survive cloning and export without double counting', () => {
   const originals = [profile('one'), profile('two')]
   const combined = combineProfiles(originals)

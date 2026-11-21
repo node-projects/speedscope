@@ -4,6 +4,7 @@ import {RowAtlas} from '../gl/row-atlas'
 import {CanvasContext} from '../gl/canvas-context'
 import {FlamechartRowAtlasKey} from '../gl/flamechart-renderer'
 import {Theme} from '../views/themes/theme'
+import {frameColorForTheme} from '../lib/frame-color'
 
 export const createGetColorBucketForFrame = memoizeByReference(
   (frameToColorBucket: Map<number | string, number>) => {
@@ -22,7 +23,17 @@ export const createGetCSSColorForFrame = memoizeByShallowEquality(
     frameToColorBucket: Map<number | string, number>
   }) => {
     const getColorBucketForFrame = createGetColorBucketForFrame(frameToColorBucket)
+    const colors = new Map<string, string>()
     return (frame: Frame): string => {
+      if (frame.color) {
+        let color = colors.get(frame.color)
+        if (color === undefined) {
+          color = frameColorForTheme(frame.color, theme).toCSS()
+          // Bound retained presentation data even for adversarial producers.
+          if (colors.size < 65025) colors.set(frame.color, color)
+        }
+        return color
+      }
       const t = getColorBucketForFrame(frame) / 255
       return theme.colorForBucket(t).toCSS()
     }

@@ -125,6 +125,43 @@ search and exports. Function signatures containing path-like punctuation are
 preserved. Search still matches the full name: a match entirely inside a hidden
 prefix can highlight a frame without underlining text in its displayed suffix.
 
+## Producer-selected frame colors
+
+Native `.speedscope.json` producers can set an optional `color` on each shared
+frame. Use exactly six RGB hex digits, such as `"color": "#8A2BE2"`. Short hex,
+alpha channels, named colors and CSS expressions are rejected. Frames without
+this field keep the normal generated theme colors.
+
+```json
+{"name": "compiled method", "file": "example.rb", "line": 12, "color": "#8A2BE2"}
+```
+
+The main flamechart, minimap and function color indicators honor the supplied
+color in both themes. If a color would hide the normal frame label, its displayed
+RGB is mixed toward the active theme background until the label has at least
+4.5:1 contrast. Unmatched search labels retain the existing dimmed style, and
+search highlights and selection outlines remain visible above the frame color.
+Comparison flamegraphs continue to use their signed-difference colors.
+
+The original RGB spelling survives imports, worker transport and both export
+paths unchanged; theme adjustments affect presentation only. Producers can use
+separate shared-frame entries for the same function when it needs different
+colors. Combining profiles preserves different RGB identities while treating
+upper- and lowercase spellings of the same RGB as equivalent.
+
+Each graph renderer retains at most 65,025 distinct custom colors in one fixed
+256 KiB palette, allocated only when a custom color occurs. Additional colors
+fall back to generated colors in that graph, with one console warning. Their raw
+RGB values still survive export, and table indicators can still display them.
+Vertex buffers retain their existing stride, and cached and direct graph draws
+use the same palette. This does not impose a bound on the recording itself.
+
+This implements the producer-color request in upstream
+[#351](https://github.com/jlfwong/speedscope/issues/351). It does not add an editor
+for assigning colors to frames in an already loaded recording. See
+[`custom-colors.speedscope.json`](../sample/profiles/speedscope/custom-colors.speedscope.json)
+for a complete example.
+
 ## Large traces
 
 Neither setting reimports or transforms a recording. Labels are shortened only

@@ -6,7 +6,14 @@ import {CallTreeProfileBuilder, ProfileGroup, StackListProfileBuilder} from './p
 
 function group(): ProfileGroup {
   const builder = new CallTreeProfileBuilder(12)
-  const frame = {key: 'quoted', name: 'a"\\\n😀', file: 'src/文件.ts', line: 3, col: 2}
+  const frame = {
+    key: 'quoted',
+    name: 'a"\\\n😀',
+    file: 'src/文件.ts',
+    line: 3,
+    col: 2,
+    color: '#8a2BE2',
+  }
   builder.enterFrame(frame, 2)
   builder.enterFrame(frame, 4)
   builder.leaveFrame(frame, 5)

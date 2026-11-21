@@ -24,6 +24,7 @@ export function exportProfileGroup(profileGroup: ProfileGroup): FileFormat.File 
       if (frame.file != null) serializedFrame.file = frame.file
       if (frame.line != null) serializedFrame.line = frame.line
       if (frame.col != null) serializedFrame.col = frame.col
+      if (frame.color != null) serializedFrame.color = frame.color
       index = frames.length
       indexForFrame.set(frame, index)
       frames.push(serializedFrame)
@@ -166,6 +167,14 @@ function importSpeedscopeProfile(
 }
 
 export function importSpeedscopeProfiles(serialized: FileFormat.File): ProfileGroup {
+  for (const frame of serialized.shared.frames) {
+    if (
+      frame.color !== undefined &&
+      (typeof frame.color !== 'string' || !/^#[0-9a-fA-F]{6}$/.test(frame.color))
+    ) {
+      throw new Error('Frame color must be an RGB hex string such as #8A2BE2')
+    }
+  }
   return {
     name: serialized.name || serialized.profiles[0].name || 'profile',
     indexToView: serialized.activeProfileIndex || 0,

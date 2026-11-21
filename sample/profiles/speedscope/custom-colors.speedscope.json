@@ -1,0 +1,20 @@
+{
+  "$schema": "https://www.speedscope.app/file-format-schema.json",
+  "name": "Producer-selected colors",
+  "shared": {
+    "frames": [
+      {"name": "application", "color": "#8A2BE2"},
+      {"name": "same function: interpreted", "color": "#FF0000"},
+      {"name": "same function: compiled", "color": "#00FF00"},
+      {"name": "black producer color", "color": "#000000"},
+      {"name": "white producer color", "color": "#FFFFFF"},
+      {"name": "generated color"}
+    ]
+  },
+  "profiles": [{
+    "type": "sampled", "name": "Producer colors", "unit": "none",
+    "startValue": 0, "endValue": 10,
+    "samples": [[0,1], [0,2], [0,3], [0,4], [0,5]],
+    "weights": [2,2,2,2,2]
+  }]
+}

@@ -19,10 +19,17 @@ const vert = `
 
   attribute vec2 unitSpacePos;
   attribute vec3 color;
-  varying vec3 vColor;
+  varying vec4 vColor;
 
   void main() {
-    vColor = color;
+    vColor = vec4(color, 1);
+    // Negative blue packs a custom palette index in one existing float. Split
+    // it in the high-precision vertex shader; fragment mediump need only bytes.
+    if (color.b < 0.0) {
+      float index = -color.b - 1.0;
+      vColor = vec4(color.rg, (mod(index, 255.0) + 1.0) / 255.0,
+                    floor(index / 255.0) / 255.0);
+    }
     vec2 position = (unitSpaceToNDC * vec3(unitSpacePos, 1)).xy;
     gl_Position = vec4(position, 1, 1);
   }
@@ -30,10 +37,10 @@ const vert = `
 
 const frag = `
   precision mediump float;
-  varying vec3 vColor;
+  varying vec4 vColor;
 
   void main() {
-    gl_FragColor = vec4(vColor.rgb, 1);
+    gl_FragColor = vColor;
   }
 `
 
@@ -162,7 +169,8 @@ export class RectangleBatchRenderer {
       })(),
     )
 
-    this.gl.setUnpremultipliedBlendState()
+    // RGBA carries metadata, including palette row in alpha, not opacity.
+    this.gl.setCopyBlendState()
     this.gl.draw(
       Graphics.Primitive.TRIANGLES,
       this.material,

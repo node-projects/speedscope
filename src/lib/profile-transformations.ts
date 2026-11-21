@@ -82,7 +82,13 @@ export function combineProfiles(profiles: Profile[]): Profile {
       builder.appendSampleWithWeight(
         stack.map(frame => ({
           ...frame,
-          key: JSON.stringify([frame.name, frame.file, frame.line, frame.col]),
+          key: JSON.stringify([
+            frame.name,
+            frame.file,
+            frame.line,
+            frame.col,
+            ...(frame.color ? [frame.color.toLowerCase()] : []),
+          ]),
         })),
         weight,
       ),

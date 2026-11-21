@@ -30,6 +30,7 @@ function context() {
     }),
     createMaterial: jest.fn((_format: unknown, _vertex: string, _fragment: string) => material),
     setUnpremultipliedBlendState: jest.fn(),
+    setCopyBlendState: jest.fn(),
     draw: jest.fn(),
   }
   return {gl: gl as unknown as Graphics.Context, raw: gl, buffers, uniforms}
