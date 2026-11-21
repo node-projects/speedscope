@@ -12,11 +12,19 @@ Module['wasm_demangle'] = function(mangled) {
      * instead of using `cwrap` because we need to `free` the pointer
      * returned by `_demangle`.
      */
-    const param_ptr = stringToUTF8OnStack(mangled);
-    const result_ptr = _demangle(param_ptr);
-    const result = UTF8ToString(result_ptr);
-    if (result_ptr !== null && result_ptr !== undefined) {
-        _free(result_ptr);
+    const saved_stack = stackSave();
+    let result_ptr = 0;
+    try {
+        const param_ptr = stringToUTF8OnStack(mangled);
+        result_ptr = _demangle(param_ptr);
+        return UTF8ToString(result_ptr);
+    } finally {
+        try {
+            if (result_ptr) {
+                _free(result_ptr);
+            }
+        } finally {
+            stackRestore(saved_stack);
+        }
     }
-    return result;
 }
